@@ -133,7 +133,7 @@ raw_key! {
 /// # Example
 ///
 /// ```
-/// use aranya_crypto_core::raw_key;
+/// use spideroak_crypto::raw_key;
 ///
 /// raw_key! {
 ///     /// Some documentation.

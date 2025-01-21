@@ -8,15 +8,15 @@ use crate::{csprng::Csprng, keys::SecretKey, mac::Mac};
 /// # Example
 ///
 /// ```
-/// use aranya_crypto_core::{default::Rng, rust::HmacSha256};
+/// use spideroak_crypto::{default::Rng, rust::HmacSha256};
 ///
-/// # aranya_crypto_core::__doctest_os_hardware_rand!();
+/// # spideroak_crypto::__doctest_os_hardware_rand!();
 /// macro_rules! run_test {
 ///     ($test:ident) => {
-///         aranya_crypto_core::test_util::mac::$test::<HmacSha256, _>(&mut Rng);
+///         spideroak_crypto::test_util::mac::$test::<HmacSha256, _>(&mut Rng);
 ///     }
 /// }
-/// aranya_crypto_core::for_each_mac_test!(run_test);
+/// spideroak_crypto::for_each_mac_test!(run_test);
 /// ```
 #[macro_export]
 macro_rules! for_each_mac_test {
@@ -40,7 +40,7 @@ macro_rules! for_each_mac_test {
 /// # Example
 ///
 /// ```
-/// use aranya_crypto_core::{test_mac, rust::HmacSha256};
+/// use spideroak_crypto::{test_mac, rust::HmacSha256};
 ///
 /// // Without test vectors.
 /// test_mac!(hmac_sha256, HmacSha256);

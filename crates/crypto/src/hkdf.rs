@@ -137,7 +137,7 @@ impl<H: Hash> Hkdf<H> {
 /// # Example
 ///
 /// ```rust
-/// use aranya_crypto_core::{
+/// use spideroak_crypto::{
 ///     hash::{Block, Digest, Hash, HashId},
 ///     hkdf_impl,
 ///     typenum::U32,

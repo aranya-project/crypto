@@ -21,7 +21,7 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// use aranya_crypto_core::{
+/// use spideroak_crypto::{
 ///     default::Rng,
 ///     rust::{
 ///         Aes256Gcm,
@@ -31,10 +31,10 @@ use crate::{
 ///     test_hpke,
 /// };
 ///
-/// # aranya_crypto_core::__doctest_os_hardware_rand!();
+/// # spideroak_crypto::__doctest_os_hardware_rand!();
 /// macro_rules! run_test {
 ///     ($test:ident) => {
-///         aranya_crypto_core::test_util::hpke::$test::<
+///         spideroak_crypto::test_util::hpke::$test::<
 ///             DhKemP256HkdfSha256,
 ///             HkdfSha256,
 ///             Aes256Gcm,
@@ -42,7 +42,7 @@ use crate::{
 ///         >(&mut Rng);
 ///     };
 /// }
-/// aranya_crypto_core::for_each_hpke_test!(run_test);
+/// spideroak_crypto::for_each_hpke_test!(run_test);
 /// ```
 #[macro_export]
 macro_rules! for_each_hpke_test {
@@ -64,7 +64,7 @@ pub use for_each_hpke_test;
 /// # Example
 ///
 /// ```
-/// use aranya_crypto_core::{
+/// use spideroak_crypto::{
 ///     rust::{
 ///         Aes256Gcm,
 ///         DhKemP256HkdfSha256,

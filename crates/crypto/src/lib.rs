@@ -13,7 +13,7 @@
 #![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
 #![warn(missing_docs)]
 
-pub(crate) use aranya_crypto_derive::AlgId;
+pub(crate) use spideroak_crypto_derive::AlgId;
 pub mod aead;
 pub mod asn1;
 pub mod bearssl;

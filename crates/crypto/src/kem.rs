@@ -541,7 +541,7 @@ type PubKeyData<T> = <<T as Ecdh>::PublicKey as PublicKey>::Data;
 /// # Example
 ///
 /// ```rust,ignore
-/// use aranya_crypto_core::dhkem_impl;
+/// use spideroak_crypto::dhkem_impl;
 /// dhkem_impl! {
 ///     DhKemP256HkdfSha256,
 ///     "DHKEM(P256, HKDF-SHA256)",
