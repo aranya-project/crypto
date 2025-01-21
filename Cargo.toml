@@ -1,0 +1,88 @@
+[workspace]
+resolver = "2"
+
+members = [
+	"canaries/*",
+	"crates/*",
+]
+
+default-members = [
+	"crates/*",
+]
+
+[workspace.package]
+authors = ["SpiderOak, Inc."]
+edition = "2021"
+license = "AGPL-3.0-only"
+repository = "https://github.com/aranya-project/crypto"
+rust-version = "1.81.0"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unsafe_op_in_unsafe_fn = "warn"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+arithmetic_side_effects = "warn"
+cast_lossless = "warn"
+cast_possible_wrap = "warn"
+cast_precision_loss = "warn"
+cast_sign_loss = "warn"
+panic = "warn"
+unwrap_used = "warn"
+wildcard_imports = "warn"
+
+[workspace.dependencies]
+anyhow = { version = "1.0" }
+byteorder = { version = "1", default-features = false }
+cfg-if = { version = "1", default-features = false }
+const_format = { version = "0.2", default-features = false }
+heapless = { version = "0.8", default-features = false }
+libc = { version = "0.2", default-features = false }
+log = { version = "0.4", default-features = false }
+postcard = { version = "1", default-features = false }
+proptest = { version = "1.6", default-features = false, features = ["no_std", "alloc"] }
+proptest-derive = { version = "0.5" }
+rand = { version = "0.8", default-features = false }
+rand_core = { version = "0.6", default-features = false }
+rustix = { version = "0.38", default-features = false }
+rustls = { version = "0.21.0", default-features = false }
+serde = { version = "1.0.210", default-features = false }
+spin = { version = "0.9.8", default-features = false }
+test-log = { version = "0.2", default-features = false, features = ["trace"] }
+thiserror = { version = "2", default-features = false }
+tokio = { version = "1.41.1", default-features = false, features = ["macros"] }
+tokio-util = { version = "0.7.8", default-features = false }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+tracing-subscriber = { version = "0.3.18", default-features = false }
+
+prettyplease = "0.2"
+proc-macro2 = "1.0.80"
+syn = "2.0.59"
+quote = "1.0"
+
+[profile.dev]
+panic = "abort"
+opt-level = 1
+
+[profile.dev-std]
+inherits = "dev"
+panic = "unwind"
+
+[profile.release]
+lto = "thin"
+panic = "abort"
+
+[profile.release-small]
+inherits = "release"
+opt-level = "s"
+strip = "debuginfo"
+
+[profile.release-std]
+inherits = "release"
+panic = "unwind"
+
+[profile.bench]
+inherits = "release"
