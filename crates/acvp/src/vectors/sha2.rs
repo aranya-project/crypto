@@ -180,10 +180,7 @@ pub enum ExpansionTechnique {
 
 /// Tests `H` against the SHA-2 test vectors.
 pub fn test<H: Hash>(vectors: TestVectors) -> anyhow::Result<()> {
-    use crate::{
-        testing::sha2::{LargeDataTest, MctIter},
-        vectors::sha2::{Aft, Ldt, Mct, Tests},
-    };
+    use crate::testing::sha2::{LargeDataTest, MctIter};
 
     let mut ldt = LargeDataTest::new();
 

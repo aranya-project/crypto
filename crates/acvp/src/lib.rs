@@ -9,3 +9,5 @@ pub mod testing;
 pub mod traits;
 mod util;
 pub mod vectors;
+
+pub use anyhow;

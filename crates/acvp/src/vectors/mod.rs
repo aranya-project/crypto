@@ -31,6 +31,7 @@ use alloc::{string::String, vec::Vec};
 pub use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+pub mod hmac;
 pub mod sha2;
 pub mod sha3;
 

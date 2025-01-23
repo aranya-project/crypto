@@ -16,6 +16,7 @@ pub mod kdf;
 pub mod mac;
 pub mod signer;
 pub mod vectors;
+pub mod wycheproof;
 
 use core::{
     fmt::{self, Debug},

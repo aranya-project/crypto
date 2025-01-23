@@ -63,7 +63,7 @@ pub use for_each_aead_test;
 /// ```
 #[macro_export]
 macro_rules! test_aead {
-    ($name:ident, $aead:ty $(, AeadTest::$vectors:ident)?) => {
+    ($name:ident, $aead:ty $(, $vectors:literal)?) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
@@ -71,7 +71,7 @@ macro_rules! test_aead {
             $crate::test_aead!($aead $(, AeadTest::$vectors)?);
         }
     };
-    ($aead:ty $(, AeadTest::$vectors:ident)?) => {
+    ($aead:ty $(, $vectors:literal)?) => {
         macro_rules! __aead_test {
             ($test:ident) => {
                 #[test]
@@ -88,9 +88,7 @@ macro_rules! test_aead {
         $(
             #[test]
             fn vectors() {
-                $crate::test_util::vectors::test_aead::<$aead>(
-                    $crate::test_util::vectors::AeadTest::$vectors,
-                );
+                $crate::test_util::vectors::test_aead::<$aead>($vectors);
             }
         )?
     };
