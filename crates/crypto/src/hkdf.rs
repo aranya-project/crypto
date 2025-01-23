@@ -11,6 +11,7 @@ use generic_array::GenericArray;
 use typenum::{Prod, U255};
 
 use crate::{
+    block::BlockSize,
     hash::Hash,
     hmac::{Hmac, Tag},
     kdf::{KdfError, Prk},
@@ -23,7 +24,7 @@ pub type MaxOutput<D> = Prod<U255, D>;
 /// HKDF for some hash `H`.
 pub struct Hkdf<H>(PhantomData<H>);
 
-impl<H: Hash> Hkdf<H> {
+impl<H: Hash + BlockSize> Hkdf<H> {
     /// The maximum nuumber of bytes that can be expanded by
     /// [`Self::expand`] and [`Self::expand_multi`].
     pub const MAX_OUTPUT: usize = 255 * H::DIGEST_SIZE;
@@ -149,8 +150,6 @@ impl<H: Hash> Hkdf<H> {
 /// impl Hash for Sha256 {
 ///     const ID: HashId = HashId::Sha256;
 ///     type DigestSize = U32;
-///     type Block = Block<64>;
-///     const BLOCK_SIZE: usize = 64;
 ///     fn new() -> Self {
 ///         Self
 ///     }

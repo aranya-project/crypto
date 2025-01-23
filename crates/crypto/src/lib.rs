@@ -13,10 +13,14 @@
 #![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
 #![warn(missing_docs)]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 pub(crate) use spideroak_crypto_derive::AlgId;
 pub mod aead;
 pub mod asn1;
 pub mod bearssl;
+pub mod block;
 pub mod csprng;
 pub mod default;
 pub mod ec;
@@ -32,6 +36,7 @@ pub mod kem;
 pub mod keys;
 pub mod mac;
 pub mod rust;
+pub(crate) mod sha3;
 pub mod signer;
 pub mod test_util;
 mod util;
@@ -39,5 +44,6 @@ pub mod zeroize;
 
 pub use aranya_buggy;
 pub use generic_array;
+pub use hybrid_array;
 pub use subtle;
 pub use typenum;

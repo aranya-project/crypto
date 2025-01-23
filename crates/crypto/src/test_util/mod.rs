@@ -7,8 +7,8 @@
 #![allow(clippy::panic)]
 #![cfg(any(test, feature = "test_util"))]
 #![cfg_attr(docsrs, doc(cfg(feature = "test_util")))]
-#![forbid(unsafe_code)]
 
+pub mod acvp;
 pub mod aead;
 pub mod hash;
 pub mod hpke;
@@ -34,6 +34,7 @@ use zeroize::ZeroizeOnDrop;
 use crate::{
     aead::{Aead, AeadId, Lifetime, OpenError, SealError},
     csprng::Csprng,
+    hash::{Digest, Hash, HashId},
     import::{ExportError, Import, ImportError},
     kdf::{Kdf, KdfError, KdfId, Prk},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
@@ -152,6 +153,29 @@ impl<T: Aead> Aead for AeadWithDefaults<T> {
         additional_data: &[u8],
     ) -> Result<(), OpenError> {
         self.0.open_in_place(nonce, data, tag, additional_data)
+    }
+}
+
+/// A [`Hash`] that that uses the default trait methods.
+#[derive(Clone)]
+pub struct HashWithDefaults<T>(T);
+
+impl<T: Hash> Hash for HashWithDefaults<T> {
+    const ID: HashId = <T as Hash>::ID;
+
+    type DigestSize = <T as Hash>::DigestSize;
+    const DIGEST_SIZE: usize = <T as Hash>::DIGEST_SIZE;
+
+    fn new() -> Self {
+        Self(T::new())
+    }
+
+    fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+
+    fn digest(self) -> Digest<Self::DigestSize> {
+        self.0.digest()
     }
 }
 

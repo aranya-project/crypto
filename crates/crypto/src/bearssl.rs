@@ -30,9 +30,10 @@ use crate::{
         Lifetime, OpenError, SealError,
     },
     asn1::{max_sig_len, raw_sig_len, RawSig, Sig},
+    block::BlockSize,
     csprng::Csprng,
     ec::{Curve, Curve25519, Scalar, Secp256r1, Secp384r1, Secp521r1, Uncompressed},
-    hash::{Block, Digest, Hash, HashId},
+    hash::{Digest, Hash, HashId},
     hex::ToHex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
@@ -973,9 +974,6 @@ macro_rules! hash_impl {
             type DigestSize = U<{ $digest_size as usize }>;
             const DIGEST_SIZE: usize = $digest_size as usize;
 
-            const BLOCK_SIZE: usize = $block_size;
-            type Block = Block<{ Self::BLOCK_SIZE }>;
-
             #[inline]
             fn new() -> Self {
                 let mut ctx = $ctx::default();
@@ -1003,6 +1001,10 @@ macro_rules! hash_impl {
                 unsafe { $digest(ptr::addr_of_mut!(self.0), out.as_mut_ptr() as *mut c_void) }
                 out
             }
+        }
+
+        impl BlockSize for $name {
+            type BlockSize = U<{ $block_size }>;
         }
     };
 }

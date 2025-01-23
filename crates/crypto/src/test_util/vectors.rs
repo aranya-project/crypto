@@ -1,7 +1,5 @@
 //! Test specific algorithms using test vectors.
 
-extern crate alloc;
-
 use alloc::{string::ToString, vec};
 use core::borrow::Borrow;
 
@@ -13,9 +11,12 @@ pub use wycheproof::{
 };
 use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac};
 
-use super::{AeadWithDefaults, KdfWithDefaults, MacWithDefaults, SignerWithDefaults};
+use super::{
+    AeadWithDefaults, HashWithDefaults, KdfWithDefaults, MacWithDefaults, SignerWithDefaults,
+};
 use crate::{
     aead::{Aead, IndCca2, Nonce},
+    hash::Hash,
     hpke::{Hpke, SealCtx},
     import::Import,
     kdf::Kdf,
@@ -33,11 +34,22 @@ macro_rules! msg {
     };
 }
 
+/// Supported hash algorithms.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum HashTest {
+    /// SHA2-256.
+    Sha2_256,
+    /// SHA2-512.
+    Sha2_512,
+    /// SHA2-512/256.
+    Sha2_512_256,
+    /// SHA3-256.
+    Sha3_256,
+}
+
 /// HPKE tests.
 #[allow(missing_docs)]
 pub mod hpke {
-    extern crate alloc;
-
     use alloc::{boxed::Box, vec::Vec};
     use core::{result::Result, str::FromStr};
 
@@ -426,6 +438,27 @@ fn test_eddsa_inner<T: Signer>(name: EddsaTest) {
                 }
             };
         }
+    }
+}
+
+/// Tests a [`Hash`] against ACVP test vectors.
+pub fn test_hash<H: Hash>(name: HashTest) {
+    test_hash_inner::<H>(name);
+    test_hash_inner::<HashWithDefaults<H>>(name);
+}
+
+fn test_hash_inner<H: Hash>(name: HashTest) {
+    use acvp::vectors::{sha2, sha3};
+
+    use super::acvp::{test_sha2, test_sha3};
+
+    match name {
+        HashTest::Sha2_256 => test_sha2::<H>(sha2::load(sha2::Algorithm::Sha2_256).unwrap()),
+        HashTest::Sha2_512 => test_sha2::<H>(sha2::load(sha2::Algorithm::Sha2_512).unwrap()),
+        HashTest::Sha2_512_256 => {
+            test_sha2::<H>(sha2::load(sha2::Algorithm::Sha2_512_256).unwrap())
+        }
+        HashTest::Sha3_256 => test_sha3::<H>(sha3::load(sha3::Algorithm::Sha3_256).unwrap()),
     }
 }
 

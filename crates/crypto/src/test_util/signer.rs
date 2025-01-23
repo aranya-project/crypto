@@ -1,7 +1,5 @@
 //! [`Signer`] tests.
 
-extern crate alloc;
-
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 

@@ -1,7 +1,5 @@
 //! [`Hpke`] tests.
 
-extern crate alloc;
-
 use alloc::vec;
 
 use generic_array::GenericArray;

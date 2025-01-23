@@ -37,19 +37,23 @@ pub use for_each_hash_test;
 /// ```
 /// use spideroak_crypto::{test_hash, rust::Sha256};
 ///
+/// // Without test vectors.
 /// test_hash!(sha256, Sha256);
+///
+/// // With test vectors.
+/// test_hash!(sha256, Sha256, HashTest::Sha2_256);
 /// ```
 #[macro_export]
 macro_rules! test_hash {
-    ($name:ident, $hash:ty) => {
+    ($name:ident, $hash:ty $(, HashTest::$vectors:ident)?) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_hash!($hash);
+            $crate::test_hash!($hash $(, HashTest::$vectors)?);
         }
     };
-    ($hash:ty) => {
+    ($hash:ty $(, HashTest::$vectors:ident)?) => {
         macro_rules! __hash_test {
             ($test:ident) => {
                 #[test]
@@ -59,6 +63,15 @@ macro_rules! test_hash {
             };
         }
         $crate::for_each_hash_test!(__hash_test);
+
+        $(
+            #[test]
+            fn vectors() {
+                $crate::test_util::vectors::test_hash::<$hash>(
+                    $crate::test_util::vectors::HashTest::$vectors,
+                );
+            }
+        )?
     };
 }
 pub use test_hash;

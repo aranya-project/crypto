@@ -1,7 +1,5 @@
 //! [`Kdf`] tests.
 
-extern crate alloc;
-
 use alloc::vec;
 
 use more_asserts::assert_ge;

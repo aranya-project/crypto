@@ -1,15 +1,13 @@
 //! Cryptographic hash functions.
 
-#![forbid(unsafe_code)]
-
 use core::{
-    borrow::{Borrow, BorrowMut},
     fmt::{self, Debug},
     num::NonZeroU16,
     ops::{Deref, DerefMut},
+    ptr,
 };
 
-use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
+use generic_array::{ArrayLength, GenericArray, IntoArrayLength, LengthError};
 use sha3_utils::{encode_string, right_encode_bytes};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
@@ -24,17 +22,26 @@ use crate::AlgId;
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
 pub enum HashId {
     /// SHA-256.
-    #[alg_id(0x0001)]
+    #[alg_id(1)]
     Sha256,
     /// SHA-384.
-    #[alg_id(0x0002)]
+    #[alg_id(2)]
     Sha384,
     /// SHA-512/256.
-    #[alg_id(0x0003)]
+    #[alg_id(3)]
     Sha512_256,
     /// SHA-512.
-    #[alg_id(0x0004)]
+    #[alg_id(4)]
     Sha512,
+    /// SHA3-256.
+    #[alg_id(5)]
+    Sha3_256,
+    /// SHA3-384.
+    #[alg_id(6)]
+    Sha3_384,
+    /// SHA3-512.
+    #[alg_id(7)]
+    Sha3_512,
     /// Some other hash function.
     #[alg_id(Other)]
     Other(NonZeroU16),
@@ -65,12 +72,6 @@ pub trait Hash: Clone {
     type DigestSize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
     /// Shorthand for [`DigestSize`][Self::DigestSize].
     const DIGEST_SIZE: usize = Self::DigestSize::USIZE;
-
-    /// The size in bytes of a [`Self::Block`].
-    const BLOCK_SIZE: usize;
-
-    /// An individual block.
-    type Block: Borrow<[u8]> + BorrowMut<[u8]> + Default + Clone;
 
     /// Creates a new [`Hash`].
     fn new() -> Self;
@@ -117,6 +118,21 @@ impl<N: ArrayLength> Digest<N> {
         Self::new(GenericArray::from_array(digest))
     }
 
+    /// Creates a hash digest from a slice.
+    #[inline]
+    pub const fn try_from_slice(digest: &[u8]) -> Result<&Self, LengthError> {
+        match GenericArray::<u8, N>::try_from_slice(digest) {
+            Ok(array) => {
+                // SAFETY: `Self` is a `#[repr(transparent)]` wrapper
+                // around `GenericArray<u8, N>`, so they both have the
+                // same layout in memory.
+                let digest = unsafe { &*(ptr::from_ref(array).cast::<Self>()) };
+                Ok(digest)
+            }
+            Err(err) => Err(err),
+        }
+    }
+
     /// Returns the length of the hash digest.
     #[inline]
     #[allow(clippy::len_without_is_empty)]
@@ -144,6 +160,16 @@ impl<N: ArrayLength> Digest<N> {
 }
 
 impl<N: ArrayLength> Copy for Digest<N> where N::ArrayType<u8>: Copy {}
+
+impl<N: ArrayLength, T> AsRef<T> for Digest<N>
+where
+    T: ?Sized,
+    <Digest<N> as Deref>::Target: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
 
 impl<N: ArrayLength> Deref for Digest<N> {
     type Target = [u8];
@@ -199,28 +225,12 @@ impl<N: ArrayLength> ConstantTimeEq for Digest<N> {
     }
 }
 
-/// An hash function block.
-#[derive(Clone)]
-pub struct Block<const N: usize>([u8; N]);
+impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for &'a Digest<N> {
+    type Error = LengthError;
 
-impl<const N: usize> Default for Block<N> {
     #[inline]
-    fn default() -> Self {
-        Self([0u8; N])
-    }
-}
-
-impl<const N: usize> Borrow<[u8]> for Block<N> {
-    #[inline]
-    fn borrow(&self) -> &[u8] {
-        self.0.borrow()
-    }
-}
-
-impl<const N: usize> BorrowMut<[u8]> for Block<N> {
-    #[inline]
-    fn borrow_mut(&mut self) -> &mut [u8] {
-        self.0.borrow_mut()
+    fn try_from(digest: &'a [u8]) -> Result<Self, Self::Error> {
+        Digest::try_from_slice(digest)
     }
 }
 

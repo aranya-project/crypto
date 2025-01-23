@@ -29,9 +29,10 @@ use crate::{
         check_open_in_place_params, check_seal_in_place_params, Aead, AeadId, AeadKey, IndCca2,
         Lifetime, OpenError, SealError,
     },
+    block::BlockSize,
     csprng::Csprng,
     ec::{Curve, Secp256r1, Secp384r1},
-    hash::{Block, Digest, Hash, HashId},
+    hash::{Digest, Hash, HashId},
     hex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
@@ -504,9 +505,6 @@ macro_rules! hash_impl {
             const DIGEST_SIZE: usize =
                 <<sha2::$name as OutputSizeUser>::OutputSize as Unsigned>::USIZE;
 
-            const BLOCK_SIZE: usize = <sha2::$name as BlockSizeUser>::BlockSize::USIZE;
-            type Block = Block<{ Self::BLOCK_SIZE }>;
-
             #[inline]
             fn new() -> Self {
                 Self(<sha2::$name as sha2::Digest>::new())
@@ -527,11 +525,15 @@ macro_rules! hash_impl {
                 Digest::from_array(<sha2::$name as sha2::Digest>::digest(data).into())
             }
         }
+
+        impl BlockSize for $name {
+            type BlockSize = <sha2::$name as BlockSizeUser>::BlockSize;
+        }
     };
 }
-hash_impl!(Sha256, "SHA-256");
-hash_impl!(Sha384, "SHA-384");
-hash_impl!(Sha512, "SHA-512");
+hash_impl!(Sha256, "SHA2-256");
+hash_impl!(Sha384, "SHA2-384");
+hash_impl!(Sha512, "SHA2-512");
 
 hkdf_impl!(HkdfSha256, "HKDF-SHA256", Sha256);
 hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384);
@@ -643,5 +645,14 @@ mod tests {
             Aes256Gcm,
             HpkeTest::HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm,
         );
+    }
+
+    mod hash_tests {
+        use super::*;
+        use crate::test_util::test_hash;
+
+        test_hash!(sha2_256, Sha256, HashTest::Sha2_256);
+        test_hash!(sha2_384, Sha384);
+        test_hash!(sha2_512, Sha512, HashTest::Sha2_512);
     }
 }

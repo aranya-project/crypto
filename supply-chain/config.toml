@@ -32,6 +32,10 @@ url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/
 [imports.zcash.criteria-map]
 crypto-safe = "crypto-safe"
 
+[policy.acvp]
+audit-as-crates-io = false
+notes = "SpiderOak crate"
+
 [policy.spideroak-crypto]
 audit-as-crates-io = false
 notes = "SpiderOak crate"
@@ -54,6 +58,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.aho-corasick]]
 version = "1.1.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.anyhow]]
+version = "1.0.95"
 criteria = "safe-to-deploy"
 
 [[exemptions.atomic-polyfill]]
@@ -188,6 +196,10 @@ criteria = "safe-to-deploy"
 version = "0.12.4"
 criteria = "safe-to-deploy"
 
+[[exemptions.hybrid-array]]
+version = "0.2.3"
+criteria = "safe-to-deploy"
+
 [[exemptions.itertools]]
 version = "0.13.0"
 criteria = "safe-to-deploy"
@@ -289,7 +301,7 @@ version = "0.4.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rustix]]
-version = "0.38.34"
+version = "0.38.44"
 criteria = "safe-to-run"
 
 [[exemptions.ryu]]
@@ -314,6 +326,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.serde_repr]]
 version = "0.1.19"
+criteria = "safe-to-deploy"
+
+[[exemptions.sha2-asm]]
+version = "0.6.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
@@ -342,6 +358,10 @@ criteria = "safe-to-run"
 
 [[exemptions.typenum]]
 version = "1.15.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.unicode-ident]]
+version = "1.0.15"
 criteria = "safe-to-deploy"
 
 [[exemptions.version_check]]

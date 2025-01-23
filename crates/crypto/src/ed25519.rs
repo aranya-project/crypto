@@ -21,7 +21,7 @@ use crate::{
     import::{try_import, ExportError, Import, ImportError},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     signer::{self, PkError, Signer, SignerError, SignerId},
-    zeroize::{ZeroizeOnDrop, Zeroizing},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// EdDSA using Ed25519.
@@ -84,9 +84,7 @@ impl SecretKey for SigningKey {
 
 impl ConstantTimeEq for SigningKey {
     fn ct_eq(&self, other: &Self) -> Choice {
-        let lhs = Zeroizing::new(self.0.to_bytes());
-        let rhs = Zeroizing::new(other.0.to_bytes());
-        ConstantTimeEq::ct_eq(lhs.as_ref(), rhs.as_ref())
+        self.0.as_bytes().ct_eq(other.0.as_bytes())
     }
 }
 
