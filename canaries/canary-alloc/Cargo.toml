@@ -3,7 +3,7 @@ name = "canary-alloc"
 publish = false
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
+license = "BSD-3-Clause"
 rust-version.workspace = true
 
 [dependencies]
