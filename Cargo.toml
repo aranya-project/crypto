@@ -13,7 +13,7 @@ default-members = [
 [workspace.package]
 authors = ["SpiderOak, Inc."]
 edition = "2021"
-license = "AGPL-3.0-only"
+license = "BSD-3-Clause"
 repository = "https://github.com/aranya-project/crypto"
 rust-version = "1.81.0"
 
