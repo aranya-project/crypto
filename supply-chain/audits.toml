@@ -1,0 +1,33 @@
+
+# cargo-vet audits file
+
+[criteria.crypto-safe]
+description = """
+The cryptographic code in this crate has been reviewed for correctness by a
+member of a designated set of cryptography experts within the project.
+"""
+
+[criteria.does-not-implement-crypto]
+description = """
+Does not implement cryptography.
+"""
+
+[audits]
+
+[[trusted.aranya-bearssl-sys]]
+criteria = ["safe-to-deploy", "crypto-safe"]
+user-id = 293722 # aranya-project-bot
+start = "2024-10-15"
+end = "2026-01-23"
+
+[[trusted.aranya-buggy]]
+criteria = ["safe-to-deploy", "does-not-implement-crypto"]
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.sha3-utils]]
+criteria = ["safe-to-deploy", "crypto-safe"]
+user-id = 3479 # Eric Lagergren (ericlagergren)
+start = "2024-12-18"
+end = "2026-01-23"
