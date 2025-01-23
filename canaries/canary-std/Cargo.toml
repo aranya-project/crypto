@@ -1,0 +1,16 @@
+[package]
+name = "canary-std"
+publish = false
+authors.workspace = true
+edition.workspace = true
+license = "BSD-3-Clause"
+rust-version.workspace = true
+
+[dependencies]
+# `spideroak-crypto` enables `getrandom` by default.
+spideroak-crypto = { path = "../../crates/crypto", default-features = false, features = [
+	"alloc",
+	"committing-aead",
+	"clone-aead",
+	"rand_compat",
+] }

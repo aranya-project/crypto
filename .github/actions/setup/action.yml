@@ -1,0 +1,30 @@
+name: "Setup build tools"
+description: "Action for setting up build tools"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Version info
+      shell: bash
+      run: |
+        cargo --version --verbose
+        ldd --version
+        clang --version
+        gcc --version
+        cmake --version
+
+    - name: Install sccache
+      uses: aranya-project/sccache-action@main
+      with:
+        version: "v0.8.2"
+
+    - name: Configure sccache
+      shell: bash
+      run: |
+        echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+        echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV
+
+    - name: Install cargo-make
+      shell: bash
+      run: cargo install --version '0.37.23' --locked cargo-make
