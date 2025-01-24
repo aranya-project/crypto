@@ -20,7 +20,7 @@ user-id = 293722 # aranya-project-bot
 start = "2024-10-15"
 end = "2026-01-23"
 
-[[trusted.aranya-buggy]]
+[[trusted.buggy]]
 criteria = ["safe-to-deploy", "does-not-implement-crypto"]
 user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
