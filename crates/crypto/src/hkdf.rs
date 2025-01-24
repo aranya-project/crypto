@@ -140,7 +140,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
 /// ```rust
 /// use spideroak_crypto::{
 ///     block::BlockSize,
-///     hash::{Block, Digest, Hash, HashId},
+///     hash::{Digest, Hash, HashId},
 ///     hkdf_impl,
 ///     typenum::U32,
 /// };

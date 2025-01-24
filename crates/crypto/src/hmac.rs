@@ -167,7 +167,8 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
 ///
 /// ```rust
 /// use spideroak_crypto::{
-///     hash::{Block, Digest, Hash, HashId},
+///     block::BlockSize,
+///     hash::{Digest, Hash, HashId},
 ///     hmac_impl,
 ///     typenum::U32,
 /// };
