@@ -27,7 +27,7 @@ macro_rules! for_each_hash_test {
 }
 pub use for_each_hash_test;
 
-/// Performs all of the tests in this module.
+/// Performs cryptographic hash tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -37,15 +37,11 @@ pub use for_each_hash_test;
 /// ```
 /// use spideroak_crypto::{test_hash, rust::Sha256};
 ///
-/// // Without test vectors.
-/// test_hash!(sha256, Sha256);
-///
-/// // With test vectors.
-/// test_hash!(sha256, Sha256, SHA2_256);
+/// test_hash!(mod sha256, Sha256, SHA2_256);
 /// ```
 #[macro_export]
 macro_rules! test_hash {
-    ($name:ident, $hash:ty, $alg:ident) => {
+    (mod $name:ident, $hash:ty, $alg:ident) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;

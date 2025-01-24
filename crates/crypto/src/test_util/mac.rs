@@ -32,7 +32,7 @@ macro_rules! for_each_mac_test {
     };
 }
 
-/// Performs all of the tests in this module.
+/// Performs MAC tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -42,23 +42,19 @@ macro_rules! for_each_mac_test {
 /// ```
 /// use spideroak_crypto::{test_mac, rust::HmacSha256};
 ///
-/// // Without test vectors.
-/// test_mac!(hmac_sha256, HmacSha256);
-///
-/// // With test vectors.
-/// test_mac!(hmac_sha256_with_vecs, HmacSha256, MacTest::HmacSha256);
+/// test_mac!(mod hmac_sha256, HmacSha256, HMAC_SHA_256);
 /// ```
 #[macro_export]
 macro_rules! test_mac {
-    ($name:ident, $mac:ty $(, MacTest::$vectors:ident)?) => {
+    (mod $name:ident, $mac:ty, $alg:ident) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_mac!($mac $(, MacTest::$vectors)?);
+            $crate::test_mac!($mac, $alg);
         }
     };
-    ($mac:ty $(, MacTest::$vectors:ident)?) => {
+    ($mac:ty, $alg:ident) => {
         macro_rules! __mac_test {
             ($test:ident) => {
                 #[test]
@@ -69,14 +65,8 @@ macro_rules! test_mac {
         }
         $crate::for_each_mac_test!(__mac_test);
 
-        // $(
-        //     #[test]
-        //     fn vectors() {
-        //         $crate::test_util::vectors::test_mac::<$mac>(
-        //             $crate::test_util::vectors::MacTest::$vectors,
-        //         );
-        //     }
-        // )?
+        $crate::test_acvp!($mac, $alg);
+        $crate::test_wycheproof!($mac, $alg);
     };
 }
 pub use test_mac;

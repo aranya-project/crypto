@@ -48,7 +48,7 @@ macro_rules! for_each_aead_test {
 }
 pub use for_each_aead_test;
 
-/// Performs all of the tests in this module.
+/// Performs AEAD tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -58,7 +58,7 @@ pub use for_each_aead_test;
 /// ```
 /// use spideroak_crypto::{test_aead, rust::Aes256Gcm};
 ///
-/// test_aead!(aes256gcm, Aes256Gcm, AES-256-GCM);
+/// test_aead!(mod aes256gcm, Aes256Gcm, AES_256_GCM);
 /// ```
 #[macro_export]
 macro_rules! test_aead {

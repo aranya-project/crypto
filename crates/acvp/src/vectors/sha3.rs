@@ -10,11 +10,11 @@
 use alloc::{format, vec::Vec};
 use core::fmt;
 
-use anyhow::{ensure, Context};
+use anyhow::Context;
 use either::Either;
 use serde::{Deserialize, Serialize};
 
-use crate::traits::Hash;
+use crate::{traits::Hash, util::ensure_eq};
 
 super::define_tests! {
     Sha3_256 => "sha3_256",
@@ -189,12 +189,13 @@ pub fn test<H: Hash>(vectors: &TestVectors) -> anyhow::Result<()> {
                     len,
                 } in tests.iter()
                 {
-                    ensure!(
-                        len % 8 == 0,
+                    ensure_eq!(
+                        len % 8,
+                        0,
                         "`len` must be padded to full bytes, got `{len}`"
                     );
                     let got = <H>::hash(msg);
-                    ensure!(got.as_ref() == md, "#{tc_id}");
+                    ensure_eq!(got.as_ref(), md, "#{tc_id}");
                 }
             }
             Tests::Mct(tests) => {
@@ -210,8 +211,9 @@ pub fn test<H: Hash>(vectors: &TestVectors) -> anyhow::Result<()> {
                         MctVersion::Alternate => Either::Right(AltMctIter::<H>::new(msg)),
                     };
                     for (j, (got, want)) in mct.zip(results_array).enumerate() {
-                        ensure!(
-                            got.as_ref() == want.md,
+                        ensure_eq!(
+                            got.as_ref(),
+                            want.md,
                             "#{tc_id}: j={j} vers={}",
                             group.mct_version
                         );
@@ -230,7 +232,7 @@ pub fn test<H: Hash>(vectors: &TestVectors) -> anyhow::Result<()> {
                     let got = ldt
                         .run::<H>(&large_msg.content, total_bytes)
                         .with_context(|| format!("{tc_id}"))?;
-                    ensure!(got.as_ref() == md, "#{tc_id}");
+                    ensure_eq!(got.as_ref(), md, "#{tc_id}");
                 }
             }
         }

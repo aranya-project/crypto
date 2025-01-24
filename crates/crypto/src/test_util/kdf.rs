@@ -32,7 +32,7 @@ macro_rules! for_each_kdf_test {
     };
 }
 
-/// Performs all of the tests in this module.
+/// Performs KDF tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -42,23 +42,19 @@ macro_rules! for_each_kdf_test {
 /// ```
 /// use spideroak_crypto::{test_kdf, rust::HkdfSha256};
 ///
-/// // Without test vectors.
-/// test_kdf!(hkdf_sha256, HkdfSha256);
-///
-/// // With test vectors.
-/// test_kdf!(hkdf_sha256_with_vecs, HkdfSha256, HkdfTest::HkdfSha256);
+/// test_kdf!(mod hkdf_sha256, HkdfSha256, HKDF_SHA_256);
 /// ```
 #[macro_export]
 macro_rules! test_kdf {
-    ($name:ident, $kdf:ty $(, HkdfTest::$vectors:ident)?) => {
+    (mod $name:ident, $kdf:ty, $alg:ident) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_kdf!($kdf $(, HkdfTest::$vectors)?);
+            $crate::test_kdf!($kdf, $alg);
         }
     };
-    ($kdf:ty $(, HkdfTest::$vectors:ident)?) => {
+    ($kdf:ty, $alg:ident) => {
         macro_rules! __kdf_test {
             ($test:ident) => {
                 #[test]
@@ -69,14 +65,8 @@ macro_rules! test_kdf {
         }
         $crate::for_each_kdf_test!(__kdf_test);
 
-        // $(
-        //     #[test]
-        //     fn vectors() {
-        //         $crate::test_util::vectors::test_hkdf::<$kdf>(
-        //             $crate::test_util::vectors::HkdfTest::$vectors,
-        //         );
-        //     }
-        // )?
+        $crate::test_acvp!($kdf, $alg);
+        $crate::test_wycheproof!($kdf, $alg);
     };
 }
 pub use test_kdf;

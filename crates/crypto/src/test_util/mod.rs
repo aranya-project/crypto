@@ -10,12 +10,12 @@
 
 pub mod acvp;
 pub mod aead;
+pub mod ecdh;
 pub mod hash;
 pub mod hpke;
 pub mod kdf;
 pub mod mac;
 pub mod signer;
-pub mod vectors;
 pub mod wycheproof;
 
 use core::{
@@ -23,13 +23,16 @@ use core::{
     marker::PhantomData,
 };
 
+pub use acvp::test_acvp;
 pub use aead::test_aead;
+pub use ecdh::test_ecdh;
 pub use hash::test_hash;
 pub use hpke::test_hpke;
 pub use kdf::test_kdf;
 pub use mac::test_mac;
 pub use signer::test_signer;
 use subtle::{Choice, ConstantTimeEq};
+pub use wycheproof::test_wycheproof;
 use zeroize::ZeroizeOnDrop;
 
 use crate::{

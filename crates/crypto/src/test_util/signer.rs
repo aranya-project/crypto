@@ -41,7 +41,7 @@ macro_rules! for_each_signer_test {
 }
 pub use for_each_signer_test;
 
-/// Performs all of the tests in this module.
+/// Performs signer (digital signature) tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -51,15 +51,19 @@ pub use for_each_signer_test;
 /// ```
 /// use spideroak_crypto::{test_signer, rust::P256};
 ///
-/// // Without test vectors.
-/// test_signer!(p256, P256);
-///
-/// // With test vectors.
-/// test_signer!(p256_with_vecs, P256, EcdsaTest::Secp256r1Sha256);
+/// test_signer!(mod p256, P256, ECDSA_secp256r1);
 /// ```
 #[macro_export]
 macro_rules! test_signer {
-    (@test $signer:ty $(, $f:ident, $which:ident, $vectors:ident)? $(,)?) => {
+    (mod $name:ident, $signer:ty, $alg:ident) => {
+        mod $name {
+            #[allow(unused_imports)]
+            use super::*;
+
+            $crate::test_signer!($signer, $alg);
+        }
+    };
+    ($signer:ty, $alg:ident) => {
         macro_rules! __signer_test {
             ($test:ident) => {
                 #[test]
@@ -70,47 +74,8 @@ macro_rules! test_signer {
         }
         $crate::for_each_signer_test!(__signer_test);
 
-        // $(
-        //     #[test]
-        //     fn vectors() {
-        //         $crate::test_util::vectors::$f::<$signer>(
-        //             $crate::test_util::vectors::$which::$vectors,
-        //         );
-        //     }
-        // )?
-    };
-    ($name:ident, $signer:ty) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            $crate::test_signer!($signer);
-        }
-    };
-    ($signer:ty) => {
-        $crate::test_signer!(@test $signer);
-    };
-    ($name:ident, $signer:ty, EcdsaTest::$vectors:ident $(,)?) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            $crate::test_signer!($signer, EcdsaTest::$vectors);
-        }
-    };
-    ($signer:ty, EcdsaTest::$vectors:ident $(,)?) => {
-        $crate::test_signer!(@test $signer, test_ecdsa, EcdsaTest, $vectors);
-    };
-    ($name:ident, $signer:ty, EddsaTest::$vectors:ident $(,)?) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            $crate::test_signer!($signer, EddsaTest::$vectors);
-        }
-    };
-    ($signer:ty, EddsaTest::$vectors:ident $(,)?) => {
-        $crate::test_signer!(@test $signer, test_eddsa, EddsaTest, $vectors);
+        $crate::test_acvp!($signer, $alg);
+        $crate::test_wycheproof!($signer, $alg);
     };
 }
 pub use test_signer;

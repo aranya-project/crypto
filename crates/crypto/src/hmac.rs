@@ -189,6 +189,10 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
 ///     }
 /// }
 ///
+/// impl BlockSize for Sha256 {
+///     type BlockSize = U32;
+/// }
+///
 /// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256);
 /// ```
 #[macro_export]
@@ -235,9 +239,9 @@ mod tests {
             hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384);
             hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512);
 
-            test_mac!(hmac_sha256, HmacSha256, MacTest::HmacSha256);
-            test_mac!(hmac_sha384, HmacSha384, MacTest::HmacSha384);
-            test_mac!(hmac_sha512, HmacSha512, MacTest::HmacSha512);
+            test_mac!(mod hmac_sha256, HmacSha256, HMAC_SHA_256);
+            test_mac!(mod hmac_sha384, HmacSha384, HMAC_SHA_384);
+            test_mac!(mod hmac_sha512, HmacSha512, HMAC_SHA_512);
         };
     }
 

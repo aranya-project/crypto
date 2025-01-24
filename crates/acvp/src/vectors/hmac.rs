@@ -9,8 +9,10 @@
 
 use alloc::{format, string::String, vec::Vec};
 
-use anyhow::{ensure, Context};
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
+
+use crate::util::ensure_eq;
 
 super::define_tests! {
     Sha2_256 => "sha2_256",
@@ -91,7 +93,7 @@ where
                 } in &tests
                 {
                     let got = f(key, msg).with_context(|| format!("#{tc_id}: `F` failed"))?;
-                    ensure!(got.as_ref() == md, "#{tc_id}");
+                    ensure_eq!(got.as_ref(), md, "#{tc_id}");
                 }
             }
         }
