@@ -179,20 +179,20 @@ pub enum ExpansionTechnique {
 }
 
 /// Tests `H` against the SHA-2 test vectors.
-pub fn test<H: Hash>(vectors: TestVectors) -> anyhow::Result<()> {
+pub fn test<H: Hash>(vectors: &TestVectors) -> anyhow::Result<()> {
     use crate::testing::sha2::{LargeDataTest, MctIter};
 
     let mut ldt = LargeDataTest::new();
 
-    for group in vectors.test_groups {
-        match group.tests {
+    for group in &vectors.test_groups {
+        match &group.tests {
             Tests::Aft(tests) => {
                 for Aft {
                     tc_id,
                     msg,
                     md,
                     len,
-                } in &tests
+                } in tests.iter()
                 {
                     ensure!(
                         len % 8 == 0,
@@ -208,7 +208,7 @@ pub fn test<H: Hash>(vectors: TestVectors) -> anyhow::Result<()> {
                     msg,
                     results_array,
                     ..
-                } in &tests
+                } in tests.iter()
                 {
                     let mct = MctIter::<H>::new(msg, group.mct_version.is_alt());
                     for (j, (got, want)) in mct.zip(results_array).enumerate() {
@@ -226,7 +226,7 @@ pub fn test<H: Hash>(vectors: TestVectors) -> anyhow::Result<()> {
                     md,
                     large_msg,
                     ..
-                } in &tests
+                } in tests.iter()
                 {
                     let total_bytes = large_msg.full_length / 8;
                     let got = ldt

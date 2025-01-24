@@ -1,5 +1,8 @@
 //! [`Aead`] tests.
 
+// TODO(eric): add tests for boundaries. E.g., nonce is too long,
+// tag is too short, etc.
+
 use alloc::vec;
 
 use more_asserts::assert_ge;
@@ -55,42 +58,31 @@ pub use for_each_aead_test;
 /// ```
 /// use spideroak_crypto::{test_aead, rust::Aes256Gcm};
 ///
-/// // Without test vectors.
-/// test_aead!(aes256gcm, Aes256Gcm);
-///
-/// // With test vectors.
-/// test_aead!(aes256gcm_with_vecs, Aes256Gcm, AeadTest::AesGcm);
+/// test_aead!(aes256gcm, Aes256Gcm, AES-256-GCM);
 /// ```
 #[macro_export]
 macro_rules! test_aead {
-    ($name:ident, $aead:ty $(, $vectors:literal)?) => {
+    (mod $name:ident, $aead:ty, $alg:ident) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_aead!($aead $(, AeadTest::$vectors)?);
+            $crate::test_aead!($aead, $alg);
         }
     };
-    ($aead:ty $(, $vectors:literal)?) => {
+    ($aead:ty, $alg:ident) => {
         macro_rules! __aead_test {
             ($test:ident) => {
                 #[test]
                 fn $test() {
                     $crate::test_util::aead::$test::<$aead, _>(&mut $crate::default::Rng)
                 }
-            }
+            };
         }
         $crate::for_each_aead_test!(__aead_test);
 
-        // TODO(eric): add tests for boundaries. E.g., nonce is
-        // too long, tag is too short, etc.
-
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::test_aead::<$aead>($vectors);
-            }
-        )?
+        $crate::test_acvp!($aead, $alg);
+        $crate::test_wycheproof!($aead, $alg);
     };
 }
 pub use test_aead;

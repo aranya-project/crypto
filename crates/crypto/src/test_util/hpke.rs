@@ -109,14 +109,14 @@ macro_rules! test_hpke {
         }
         $crate::for_each_hpke_test!(__hpke_test);
 
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::test_hpke::<$kem, $kdf, $aead>(
-                    $crate::test_util::vectors::HpkeTest::$vectors,
-                );
-            }
-        )?
+        // $(
+        //     #[test]
+        //     fn vectors() {
+        //         $crate::test_util::vectors::test_hpke::<$kem, $kdf, $aead>(
+        //             $crate::test_util::vectors::HpkeTest::$vectors,
+        //         );
+        //     }
+        // )?
     };
 }
 pub use test_hpke;

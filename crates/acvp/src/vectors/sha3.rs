@@ -174,20 +174,20 @@ pub enum ExpansionTechnique {
 }
 
 /// Tests `H` against the SHA-3 test vectors.
-pub fn test<H: Hash>(vectors: TestVectors) -> anyhow::Result<()> {
+pub fn test<H: Hash>(vectors: &TestVectors) -> anyhow::Result<()> {
     use crate::testing::sha3::{AltMctIter, LargeDataTest, StdMctIter};
 
     let mut ldt = LargeDataTest::new();
 
-    for group in vectors.test_groups {
-        match group.tests {
+    for group in &vectors.test_groups {
+        match &group.tests {
             Tests::Aft(tests) => {
                 for Aft {
                     tc_id,
                     msg,
                     md,
                     len,
-                } in &tests
+                } in tests.iter()
                 {
                     ensure!(
                         len % 8 == 0,
@@ -203,7 +203,7 @@ pub fn test<H: Hash>(vectors: TestVectors) -> anyhow::Result<()> {
                     msg,
                     results_array,
                     ..
-                } in &tests
+                } in tests.iter()
                 {
                     let mct = match group.mct_version {
                         MctVersion::Standard => Either::Left(StdMctIter::<H>::new(msg)),
@@ -224,7 +224,7 @@ pub fn test<H: Hash>(vectors: TestVectors) -> anyhow::Result<()> {
                     md,
                     large_msg,
                     ..
-                } in &tests
+                } in tests.iter()
                 {
                     let total_bytes = large_msg.full_length / 8;
                     let got = ldt

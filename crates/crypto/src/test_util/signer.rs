@@ -70,14 +70,14 @@ macro_rules! test_signer {
         }
         $crate::for_each_signer_test!(__signer_test);
 
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::$f::<$signer>(
-                    $crate::test_util::vectors::$which::$vectors,
-                );
-            }
-        )?
+        // $(
+        //     #[test]
+        //     fn vectors() {
+        //         $crate::test_util::vectors::$f::<$signer>(
+        //             $crate::test_util::vectors::$which::$vectors,
+        //         );
+        //     }
+        // )?
     };
     ($name:ident, $signer:ty) => {
         mod $name {

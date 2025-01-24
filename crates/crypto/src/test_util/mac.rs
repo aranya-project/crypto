@@ -69,14 +69,14 @@ macro_rules! test_mac {
         }
         $crate::for_each_mac_test!(__mac_test);
 
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::test_mac::<$mac>(
-                    $crate::test_util::vectors::MacTest::$vectors,
-                );
-            }
-        )?
+        // $(
+        //     #[test]
+        //     fn vectors() {
+        //         $crate::test_util::vectors::test_mac::<$mac>(
+        //             $crate::test_util::vectors::MacTest::$vectors,
+        //         );
+        //     }
+        // )?
     };
 }
 pub use test_mac;

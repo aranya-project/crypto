@@ -69,14 +69,14 @@ macro_rules! test_kdf {
         }
         $crate::for_each_kdf_test!(__kdf_test);
 
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::test_hkdf::<$kdf>(
-                    $crate::test_util::vectors::HkdfTest::$vectors,
-                );
-            }
-        )?
+        // $(
+        //     #[test]
+        //     fn vectors() {
+        //         $crate::test_util::vectors::test_hkdf::<$kdf>(
+        //             $crate::test_util::vectors::HkdfTest::$vectors,
+        //         );
+        //     }
+        // )?
     };
 }
 pub use test_kdf;

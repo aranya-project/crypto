@@ -30,18 +30,43 @@ macro_rules! msg {
     };
 }
 
+/// Tests a particular algorithm against the Project Wycheproof
+/// test vectors.
+#[macro_export]
+macro_rules! test_wycheproof {
+    (@aead $name:ident, $aead:ty, $test:ident) => {
+        #[test]
+        fn $name() {
+            use $crate::test_util::wycheproof::{test_aead, AeadTest};
+            use $crate::test_util::AeadWithDefaults;
+            test_aead::<$aead>(AeadTest::$test);
+            test_aead::<AeadWithDefaults<$aead>>(AeadTest::$test);
+        }
+    };
+    ($aead:ty, AES_128_GCM) => {
+        $crate::test_wycheproof!(@aead test_aes_128_gcm_wycheproof, $aead, AesGcm);
+    };
+    ($aead:ty, AES_256_GCM) => {
+        $crate::test_wycheproof!(@aead test_aes_256_gcm_wycheproof, $aead, AesGcm);
+    };
+    ($aead:ty, CMT1_AES_256_GCM) => {};
+    ($aead:ty, CMT4_AES_256_GCM) => {};
+
+    ($ty:ty, $alg:expr) => {
+        // Unsupported
+    }
+}
+
 /// Tests an [`Aead`] against Project Wycheproof test vectors.
-///
-/// It tests both `A` and [`AeadWithDefaults<T>`].
 pub fn test_aead<A: Aead>(name: AeadTest) {
     let set = aead::TestSet::load(name).expect("should be able to load tests");
-    for g in &set.test_groups {
-        if g.nonce_size / 8 != A::NONCE_SIZE
-            || g.key_size / 8 != A::KEY_SIZE
-            || g.tag_size / 8 != A::OVERHEAD
-        {
-            continue;
-        }
+    let groups = set.test_groups.iter().filter(|g| {
+        g.nonce_size / 8 == A::NONCE_SIZE
+            && g.key_size / 8 == A::KEY_SIZE
+            && g.tag_size / 8 == A::OVERHEAD
+    });
+    // TODO(eric): check that we have at least one test.
+    for g in groups {
         for tc in &g.tests {
             let id = tc.tc_id;
 
