@@ -14,13 +14,14 @@ pub use wycheproof::{
 use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac};
 
 use crate::{
-    aead::{Aead, IndCca2, Nonce},
+    aead::{Aead, AeadId, IndCca2, Nonce},
     hpke::{Hpke, SealCtx},
     import::Import,
     kdf::Kdf,
     kem::{Ecdh, Kem},
     mac::Mac,
     signer::{Signer, VerifyingKey},
+    test_util::UnknownAlgId,
 };
 
 macro_rules! msg {
@@ -30,6 +31,17 @@ macro_rules! msg {
     ($($arg:tt)*) => {
         &format!($($arg)*)
     };
+}
+
+impl TryFrom<AeadId> for AeadTest {
+    type Error = UnknownAlgId;
+
+    fn try_from(id: AeadId) -> Result<Self, Self::Error> {
+        match id {
+            AeadId::Aes128Gcm | AeadId::Aes256Gcm => Ok(AeadTest::AesGcm),
+            _ => Err(UnknownAlgId(id.to_u16())),
+        }
+    }
 }
 
 /// Tests a particular algorithm against the Project Wycheproof

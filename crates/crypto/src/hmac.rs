@@ -92,6 +92,9 @@ impl<H: Hash + BlockSize> Hmac<H> {
 /// An [`Hmac`] key.
 pub type HmacKey<N> = MacKey<N>;
 
+// /// An [`Hmac`] key.
+// pub struct HmacKey<'a>(&'a [u8]);
+
 /// An [`Hmac`] authentication code.
 #[derive(Clone, Debug)]
 #[repr(transparent)]
@@ -141,6 +144,18 @@ cfg_if::cfg_if! {
                 self.0.as_bytes()
             }
         }
+    }
+}
+
+// NB: this is hidden because the only safe way to use a MAC is
+// to compare it for equality using `ConstantTimeEq`. It's needed
+// by the `test_util` module, however.
+#[doc(hidden)]
+#[cfg(feature = "test_util")]
+impl<N: ArrayLength> AsRef<[u8]> for Tag<N> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 

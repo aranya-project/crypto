@@ -42,16 +42,28 @@ impl core::error::Error for MacError {}
 /// MAC algorithm identifiers.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
 pub enum MacId {
-    /// HMAC-SHA256.
-    #[alg_id(0x0001)]
+    /// HMAC-SHA2-256.
+    #[alg_id(1)]
     HmacSha256,
-    /// HMAC-SHA384.
-    #[alg_id(0x0002)]
+    /// HMAC-SHA2-384.
+    #[alg_id(2)]
     HmacSha384,
-    /// HMAC-SHA512.
-    #[alg_id(0x0003)]
+    /// HMAC-SHA2-512.
+    #[alg_id(3)]
     HmacSha512,
-    /// Some other digital signature algorithm.
+    /// HMAC-SHA2-512/256.
+    #[alg_id(4)]
+    HmacSha512_256,
+    /// HMAC-SHA3-256.
+    #[alg_id(5)]
+    HmacSha3_256,
+    /// HMAC-SHA3-384.
+    #[alg_id(6)]
+    HmacSha3_384,
+    /// HMAC-SHA3-512.
+    #[alg_id(7)]
+    HmacSha3_512,
+    /// Some other message authentication code algorithm.
     #[alg_id(Other)]
     Other(NonZeroU16),
 }
@@ -69,8 +81,8 @@ pub enum MacId {
 /// * Be a PRF
 ///
 /// Examples of keyed MAC algorithms that fulfill these
-/// requirements include HMAC-SHA-512 (for |K| in [L, B]) and
-/// KMAC256 (for |K| >= 256).
+/// requirements include HMAC-SHA-512 and KMAC256 (for |K| >=
+/// 256).
 pub trait Mac: Clone + Sized {
     /// Uniquely identifies the MAC algorithm.
     const ID: MacId;

@@ -9,10 +9,56 @@ pub use acvp;
 use acvp::vectors::{hmac, sha2, sha3};
 
 use crate::{
-    hash::{Digest, Hash},
+    hash::{Digest, Hash, HashId},
     import::Import,
-    mac::Mac,
+    mac::{Mac, MacId},
+    test_util::UnknownAlgId,
 };
+
+macro_rules! map_ids {
+    (
+        $from:ty => $to:ty;
+        $($id:ident => $alg:ident),+ $(,)?
+    ) => {
+        impl TryFrom<$from> for $to {
+            type Error = UnknownAlgId;
+
+            fn try_from(id: $from) -> Result<Self, Self::Error> {
+                match id {
+                    $(
+                        <$from>::$id => Ok(<$to>::$alg),
+                    )+
+                    id => Err(UnknownAlgId(id.to_u16())),
+                }
+            }
+        }
+    };
+}
+map_ids! {
+    MacId => hmac::Algorithm;
+    HmacSha256 => HmacSha2_256,
+    HmacSha384 => HmacSha2_384,
+    HmacSha512 => HmacSha2_512,
+    HmacSha512 => HmacSha2_512_256,
+    HmacSha3_256 => HmacSha3_256,
+    HmacSha3_384 => HmacSha3_384,
+    HmacSha3_512 => HmacSha3_512,
+}
+map_ids! {
+    HashId => sha2::Algorithm;
+    Sha256 => Sha2_256,
+    // `acvp` currently doesn't support SHA-384.
+    // Sha384 => Sha2_384,
+    Sha512 => Sha2_512,
+    Sha512_256 => Sha2_512_256,
+}
+map_ids! {
+    HashId => sha3::Algorithm;
+    Sha3_256 => Sha3_256,
+    // `acvp` currently doesn't support SHA3-384 or SHA3-512.
+    // Sha3_384 => Sha3_256,
+    // Sha3_512 => Sha3_512,
+}
 
 /// Tests a particular algorithm against the ACVP test vectors.
 ///
@@ -92,7 +138,7 @@ pub use test_acvp;
 
 /// Tests `M` against HMAC test vectors.
 #[track_caller]
-pub fn test_hmac<M>(vectors: hmac::TestVectors)
+pub fn test_hmac<M>(vectors: &hmac::TestVectors)
 where
     M: Mac,
     M::Tag: AsRef<[u8]>,

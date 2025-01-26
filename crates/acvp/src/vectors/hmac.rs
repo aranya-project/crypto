@@ -7,7 +7,7 @@
 #![cfg(feature = "sha2")]
 #![cfg_attr(docsrs, doc(cfg(feature = "sha2")))]
 
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, vec::Vec};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -15,9 +15,14 @@ use serde::{Deserialize, Serialize};
 use crate::util::ensure_eq;
 
 super::define_tests! {
-    Sha2_256 => "sha2_256",
-    Sha2_512 => "sha2_512",
-    Sha2_512_256 => "sha2_512_256",
+    HmacSha2_256 => "hmac_sha2_256",
+    HmacSha2_384 => "hmac_sha2_384",
+    HmacSha2_512 => "hmac_sha2_512",
+    HmacSha2_512_256 => "hmac_sha2_512_256",
+
+    HmacSha3_256 => "hmac_sha3_256",
+    HmacSha3_384 => "hmac_sha3_384",
+    HmacSha3_512 => "hmac_sha3_512",
 }
 
 /// A group of test vectors.
@@ -26,10 +31,6 @@ super::define_tests! {
 pub struct TestGroup {
     /// Identifies the group.
     pub tg_id: usize,
-    /// The HMAC function name.
-    pub function: String,
-    /// The size in bits of the digest.
-    pub digest_size: String,
     /// The length in bits of the key.
     pub key_len: usize,
     /// The length in bits of the message.
@@ -68,32 +69,34 @@ pub struct Aft {
     pub msg: Vec<u8>,
     /// The expected digest.
     #[serde(with = "hex::serde")]
-    pub md: Vec<u8>,
+    pub mac: Vec<u8>,
 }
 
 /// Tests `F` against the HMAC test vectors.
 ///
 /// The first argument to `F` is the key, the second is the
 /// message.
-pub fn test<F, T>(vectors: TestVectors, f: F) -> anyhow::Result<()>
+pub fn test<F, T>(vectors: &TestVectors, f: F) -> anyhow::Result<()>
 where
     F: Fn(&[u8], &[u8]) -> anyhow::Result<T>,
     T: AsRef<[u8]>,
 {
     use crate::vectors::hmac::{Aft, Tests};
 
-    for group in vectors.test_groups {
-        match group.tests {
+    for group in &vectors.test_groups {
+        match &group.tests {
             Tests::Aft(tests) => {
                 for Aft {
                     tc_id,
                     key,
                     msg,
-                    md,
-                } in &tests
+                    mac,
+                } in tests.iter()
                 {
                     let got = f(key, msg).with_context(|| format!("#{tc_id}: `F` failed"))?;
-                    ensure_eq!(got.as_ref(), md, "#{tc_id}");
+                    ensure_eq!(got.as_ref(), mac, "#{tc_id}");
+
+                    // TODO(eric): test using `ConstantTimeEq`.
                 }
             }
         }

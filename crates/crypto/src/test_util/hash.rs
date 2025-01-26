@@ -21,6 +21,7 @@ macro_rules! for_each_hash_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
             test_basic,
         }
     };
@@ -54,17 +55,34 @@ macro_rules! test_hash {
             ($test:ident) => {
                 #[test]
                 fn $test() {
-                    $crate::test_util::hash::$test::<$hash>()
+                    use $crate::test_util::{hash::$test, HashWithDefaults};
+
+                    $test::<$hash>();
+                    $test::<HashWithDefaults<$hash>>();
                 }
             };
         }
         $crate::for_each_hash_test!(__hash_test);
-
-        $crate::test_acvp!($hash, $alg);
-        $crate::test_wycheproof!($hash, $alg);
     };
 }
 pub use test_hash;
+
+/// Tests against hash-specific vectors.
+///
+/// Unknown hash algorithms are ignored.
+pub fn test_vectors<T: Hash>() {
+    use acvp::vectors::{sha2, sha3};
+
+    use crate::test_util::acvp::{test_sha2, test_sha3};
+
+    if let Ok(alg) = T::ID.try_into() {
+        let vectors = sha2::load(alg).expect("should be able to load SHA-2 test vectors");
+        test_sha2::<T>(&vectors);
+    } else if let Ok(alg) = T::ID.try_into() {
+        let vectors = sha3::load(alg).expect("should be able to load SHA-3 test vectors");
+        test_sha3::<T>(&vectors);
+    }
+}
 
 /// A basic test for a `Hash`.
 pub fn test_basic<T: Hash>() {

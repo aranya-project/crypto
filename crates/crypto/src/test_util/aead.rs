@@ -7,11 +7,11 @@ use alloc::vec;
 
 use more_asserts::assert_ge;
 
-use super::{assert_all_zero, assert_ct_ne};
 use crate::{
     aead::{Aead, Nonce, OpenError},
     csprng::Csprng,
     keys::SecretKey,
+    test_util::{assert_all_zero, assert_ct_ne, wycheproof},
 };
 
 /// Invokes `callback` for each AEAD test.
@@ -34,6 +34,7 @@ macro_rules! for_each_aead_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
             test_basic,
             test_new_key,
             test_round_trip,
@@ -80,15 +81,19 @@ macro_rules! test_aead {
             };
         }
         $crate::for_each_aead_test!(__aead_test);
-
-        $crate::test_acvp!($aead, $alg);
-        $crate::test_wycheproof!($aead, $alg);
     };
 }
 pub use test_aead;
 
 const GOLDEN: &[u8] = b"hello, world!";
 const AD: &[u8] = b"some additional data";
+
+/// Tests against AEAD-specific vectors.
+pub fn test_vectors<A: Aead, R: Csprng>(_rng: &mut R) {
+    if let Ok(name) = wycheproof::AeadTest::try_from(A::ID) {
+        wycheproof::test_aead::<A>(name);
+    }
+}
 
 /// A basic positive test.
 pub fn test_basic<A: Aead, R: Csprng>(_rng: &mut R) {

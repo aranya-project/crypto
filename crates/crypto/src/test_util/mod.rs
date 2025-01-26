@@ -19,6 +19,7 @@ pub mod signer;
 pub mod wycheproof;
 
 use core::{
+    error,
     fmt::{self, Debug},
     marker::PhantomData,
 };
@@ -110,6 +111,18 @@ macro_rules! __doctest_os_hardware_rand {
             rand::rngs::OsRng.next_u32()
         }
     };
+}
+
+/// The algorithm ID is unknown.
+#[derive(Debug)]
+pub struct UnknownAlgId(u16);
+
+impl error::Error for UnknownAlgId {}
+
+impl fmt::Display for UnknownAlgId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown algorithm ID: {}", self.0)
+    }
 }
 
 /// An [`Aead`] that that uses the default trait methods.
