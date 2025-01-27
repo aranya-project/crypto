@@ -646,7 +646,10 @@ pub struct SendCtx<K: Kem, F: Kdf, A: Aead + IndCca2> {
     export: ExportCtx<K, F, A>,
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> SendCtx<K, F, A> {
+impl<K: Kem, F: Kdf, A: Aead + IndCca2> SendCtx<K, F, A>
+where
+    A::Key: for<'a> Import<&'a [u8]>,
+{
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = SealCtx::<A>::OVERHEAD;
 
@@ -689,7 +692,9 @@ impl<K: Kem, F: Kdf, A: Aead + IndCca2> SendCtx<K, F, A> {
     ) -> Result<Seq, HpkeError> {
         self.seal_ctx()?.seal_in_place(data, tag, additional_data)
     }
+}
 
+impl<K: Kem, F: Kdf, A: Aead + IndCca2> SendCtx<K, F, A> {
     /// Exports a secret from the encryption context.
     pub fn export<T>(&self, context: &[u8]) -> Result<T, KdfError>
     where
@@ -726,7 +731,10 @@ impl<A: Aead + IndCca2> SealCtx<A> {
         key: &KeyData<A>,
         base_nonce: &Nonce<A::NonceSize>,
         seq: Seq,
-    ) -> Result<Self, ImportError> {
+    ) -> Result<Self, ImportError>
+    where
+        A::Key: for<'a> Import<&'a [u8]>,
+    {
         let key = A::Key::import(key.as_bytes())?;
         Ok(Self {
             aead: A::new(&key),
@@ -789,7 +797,10 @@ pub struct RecvCtx<K: Kem, F: Kdf, A: Aead + IndCca2> {
     export: ExportCtx<K, F, A>,
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> RecvCtx<K, F, A> {
+impl<K: Kem, F: Kdf, A: Aead + IndCca2> RecvCtx<K, F, A>
+where
+    A::Key: for<'a> Import<&'a [u8]>,
+{
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = OpenCtx::<A>::OVERHEAD;
 
@@ -861,7 +872,9 @@ impl<K: Kem, F: Kdf, A: Aead + IndCca2> RecvCtx<K, F, A> {
         self.open_ctx()?
             .open_in_place_at(data, tag, additional_data, seq)
     }
+}
 
+impl<K: Kem, F: Kdf, A: Aead + IndCca2> RecvCtx<K, F, A> {
     /// Exports a secret from the encryption context.
     pub fn export<T>(&self, context: &[u8]) -> Result<T, KdfError>
     where
@@ -898,7 +911,10 @@ impl<A: Aead + IndCca2> OpenCtx<A> {
         key: &KeyData<A>,
         base_nonce: &Nonce<A::NonceSize>,
         seq: Seq,
-    ) -> Result<Self, ImportError> {
+    ) -> Result<Self, ImportError>
+    where
+        A::Key: for<'a> Import<&'a [u8]>,
+    {
         let key = A::Key::import(key.as_bytes())?;
         Ok(Self {
             aead: A::new(&key),

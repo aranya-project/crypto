@@ -1,7 +1,12 @@
 //! [`Mac`] tests.
 
+use subtle::ConstantTimeEq;
+
 use super::{assert_ct_eq, assert_ct_ne};
-use crate::{csprng::Csprng, keys::SecretKey, mac::Mac};
+use crate::{
+    csprng::{Csprng, Random},
+    mac::Mac,
+};
 
 /// Invokes `callback` for each MAC test.
 ///
@@ -84,16 +89,26 @@ pub use test_mac;
 const DATA: &[u8] = b"hello, world!";
 
 /// Basic positive test.
-pub fn test_default<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = T::Key::new(rng);
+pub fn test_default<T, R>(rng: &mut R)
+where
+    T: Mac,
+    T::Key: Random,
+    R: Csprng,
+{
+    let key = Random::random(rng);
     let tag1 = T::mac(&key, DATA);
     let tag2 = T::mac(&key, DATA);
     assert_ct_eq!(tag1, tag2, "tags should be the same");
 }
 
 /// Tests that [`Mac::update`] is the same as [`Mac::mac`].
-pub fn test_update<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = T::Key::new(rng);
+pub fn test_update<T, R>(rng: &mut R)
+where
+    T: Mac,
+    T::Key: Random,
+    R: Csprng,
+{
+    let key = Random::random(rng);
     let tag1 = T::mac(&key, DATA);
     let tag2 = {
         let mut h = T::new(&key);
@@ -106,8 +121,13 @@ pub fn test_update<T: Mac, R: Csprng>(rng: &mut R) {
 }
 
 /// Test [`Mac::verify`].
-pub fn test_verify<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = T::Key::new(rng);
+pub fn test_verify<T, R>(rng: &mut R)
+where
+    T: Mac,
+    T::Key: Random,
+    R: Csprng,
+{
+    let key = Random::random(rng);
     let tag1 = T::mac(&key, DATA);
 
     let mut h = T::new(&key);
@@ -118,9 +138,14 @@ pub fn test_verify<T: Mac, R: Csprng>(rng: &mut R) {
 }
 
 /// Negative tests for different keys.
-pub fn test_different_keys<T: Mac, R: Csprng>(rng: &mut R) {
-    let key1 = T::Key::new(rng);
-    let key2 = T::Key::new(rng);
+pub fn test_different_keys<T, R>(rng: &mut R)
+where
+    T: Mac,
+    T::Key: ConstantTimeEq + Random,
+    R: Csprng,
+{
+    let key1 = Random::random(rng);
+    let key2 = Random::random(rng);
     assert_ct_ne!(key1, key2, "keys should differ");
 
     let tag1 = T::mac(&key1, DATA);
@@ -129,8 +154,13 @@ pub fn test_different_keys<T: Mac, R: Csprng>(rng: &mut R) {
 }
 
 /// Negative test for MACs of different data.
-pub fn test_different_data<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = T::Key::new(rng);
+pub fn test_different_data<T, R>(rng: &mut R)
+where
+    T: Mac,
+    T::Key: Random,
+    R: Csprng,
+{
+    let key = Random::random(rng);
     let tag1 = T::mac(&key, b"hello");
     let tag2 = T::mac(&key, b"world");
     assert_ct_ne!(tag1, tag2, "tags should differ");

@@ -27,7 +27,7 @@ pub use crate::hpke::AeadId;
 use crate::{
     csprng::{Csprng, Random},
     kdf::{Expand, Kdf, KdfError, Prk},
-    keys::{raw_key, SecretKey, SecretKeyBytes},
+    keys::{raw_key, FixedLength, SecretKey, SecretKeyBytes},
     util::const_assert,
     zeroize::Zeroize,
 };
@@ -410,7 +410,7 @@ pub trait Aead {
         };
 
     /// The key used by the [`Aead`].
-    type Key: SecretKey<Size = Self::KeySize>;
+    type Key: SecretKey + FixedLength<Size = Self::KeySize>;
 
     /// Creates a new [`Aead`].
     fn new(key: &Self::Key) -> Self;
@@ -539,7 +539,7 @@ pub trait Aead {
 
 /// Shorthand which the compiler does not understand without
 /// a good amount of hand holding.
-pub type KeyData<A> = SecretKeyBytes<<<A as Aead>::Key as SecretKey>::Size>;
+pub type KeyData<A> = SecretKeyBytes<<<A as Aead>::Key as FixedLength>::Size>;
 
 /// An authentication tag.
 pub type Tag<A> = GenericArray<u8, <A as Aead>::Overhead>;
@@ -1347,15 +1347,18 @@ mod committing {
                     // The nonce length is fixed, so use
                     // HMAC(K || N || A)[1 : k] per Theorem 3.2.
                     let tag = {
-                        let key = $crate::keys::SecretKey::try_export_secret(&self.key)?;
-                        let mut hmac = $crate::hmac::Hmac::<$hash>::new(key.as_bytes());
+                        let bytes = $crate::keys::SecretKey::try_export_secret(&self.key)?;
+                        let key = $crate::hmac::HmacKey::<$hash>::new(
+                            $crate::keys::RawSecretBytes::raw_secret_bytes(&bytes),
+                        );
+                        let mut hmac = $crate::hmac::Hmac::<$hash>::new(&key);
                         hmac.update(nonce);
                         hmac.update(ad);
                         hmac.tag()
                     };
                     let mut key_bytes = $crate::generic_array::GenericArray::<
                         u8,
-                        <<$inner as $crate::aead::Aead>::Key as $crate::keys::SecretKey>::Size,
+                        <<$inner as $crate::aead::Aead>::Key as $crate::keys::FixedLength>::Size,
                     >::default();
                     let k = ::core::cmp::min(tag.len(), key_bytes.as_slice().len());
                     key_bytes

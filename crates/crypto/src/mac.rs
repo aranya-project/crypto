@@ -11,11 +11,11 @@ use generic_array::{ArrayLength, GenericArray};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
-    U16, U32, U48, U64, U65536,
+    U32, U48, U64, U65536,
 };
 
 use crate::{
-    keys::{raw_key, SecretKey},
+    keys::{raw_key, InvalidKey, SecretKey},
     AlgId,
 };
 
@@ -79,18 +79,22 @@ pub trait Mac: Clone + Sized {
     type Tag: ConstantTimeEq;
     /// The size in octets of a tag used by this [`Mac`].
     ///
-    /// Must be at least 32 octets and less than 2³² octets.
+    /// Must be at least 32 octets and less than 2¹⁶ octets.
     type TagSize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
 
     /// The key used by the [`Mac`].
-    type Key: SecretKey<Size = Self::KeySize>;
-    /// The size in octets of a key used by this [`Mac`].
+    type Key: SecretKey;
+    /// The minimum allowed size in octets of a key used by this
+    /// [`Mac`].
     ///
-    /// Must be at least 16 octets and less than 2¹⁶ octets.
-    type KeySize: ArrayLength + IsGreaterOrEqual<U16> + IsLess<U65536> + 'static;
+    /// Must be at least 32 octets and less than 2¹⁶ octets.
+    type MinKeySize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
 
     /// Creates a new [`Mac`].
     fn new(key: &Self::Key) -> Self;
+
+    /// Attempts to create a new [`Mac`].
+    fn try_new(key: &[u8]) -> Result<Self, InvalidKey>;
 
     /// Adds `data` to the running tag.
     fn update(&mut self, data: &[u8]);

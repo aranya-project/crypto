@@ -165,6 +165,14 @@ pub trait Import<T>: Sized {
     fn import(data: T) -> Result<Self, ImportError>;
 }
 
+/// TODO
+pub trait Export {
+    /// TODO
+    type Secret;
+    /// TODO
+    fn try_export_secret(&self) -> Result<Self::Secret, ExportError>;
+}
+
 /// An error that occurs while exporting secret key material.
 #[derive(Debug, Eq, PartialEq)]
 pub enum ExportError {

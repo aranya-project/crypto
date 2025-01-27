@@ -3,7 +3,6 @@
 #![forbid(unsafe_code)]
 
 use core::{
-    borrow::{Borrow, BorrowMut},
     fmt::{self, Debug},
     num::NonZeroU16,
     ops::{Deref, DerefMut},
@@ -65,12 +64,6 @@ pub trait Hash: Clone {
     type DigestSize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
     /// Shorthand for [`DigestSize`][Self::DigestSize].
     const DIGEST_SIZE: usize = Self::DigestSize::USIZE;
-
-    /// The size in bytes of a [`Self::Block`].
-    const BLOCK_SIZE: usize;
-
-    /// An individual block.
-    type Block: Borrow<[u8]> + BorrowMut<[u8]> + Default + Clone;
 
     /// Creates a new [`Hash`].
     fn new() -> Self;
@@ -196,31 +189,6 @@ impl<N: ArrayLength> ConstantTimeEq for Digest<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.as_bytes().ct_eq(other.as_bytes())
-    }
-}
-
-/// An hash function block.
-#[derive(Clone)]
-pub struct Block<const N: usize>([u8; N]);
-
-impl<const N: usize> Default for Block<N> {
-    #[inline]
-    fn default() -> Self {
-        Self([0u8; N])
-    }
-}
-
-impl<const N: usize> Borrow<[u8]> for Block<N> {
-    #[inline]
-    fn borrow(&self) -> &[u8] {
-        self.0.borrow()
-    }
-}
-
-impl<const N: usize> BorrowMut<[u8]> for Block<N> {
-    #[inline]
-    fn borrow_mut(&mut self) -> &mut [u8] {
-        self.0.borrow_mut()
     }
 }
 

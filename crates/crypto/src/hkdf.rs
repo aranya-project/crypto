@@ -11,8 +11,9 @@ use generic_array::GenericArray;
 use typenum::{Prod, U255};
 
 use crate::{
+    block::BlockSize,
     hash::Hash,
-    hmac::{Hmac, Tag},
+    hmac::{Hmac, HmacKey, Tag},
     kdf::{KdfError, Prk},
     keys::SecretKeyBytes,
 };
@@ -23,7 +24,7 @@ pub type MaxOutput<D> = Prod<U255, D>;
 /// HKDF for some hash `H`.
 pub struct Hkdf<H>(PhantomData<H>);
 
-impl<H: Hash> Hkdf<H> {
+impl<H: Hash + BlockSize> Hkdf<H> {
     /// The maximum nuumber of bytes that can be expanded by
     /// [`Self::expand`] and [`Self::expand_multi`].
     pub const MAX_OUTPUT: usize = 255 * H::DIGEST_SIZE;
@@ -55,11 +56,15 @@ impl<H: Hash> Hkdf<H> {
         // salt: optional salt value (a non-secret random value);
         // if not provided, it is set to a string of HashLen
         // zeros.
-        let zero = GenericArray::<u8, H::DigestSize>::default();
-        let salt = if salt.is_empty() { &zero } else { salt };
+        let salt = if salt.is_empty() {
+            let zero = GenericArray::<u8, H::DigestSize>::default();
+            HmacKey::new(zero.as_slice())
+        } else {
+            HmacKey::new(salt)
+        };
 
         // PRK = HMAC-Hash(salt, IKM)
-        let prk = Hmac::<H>::mac_multi(salt, ikm).into_array();
+        let prk = Hmac::<H>::mac_multi(&salt, ikm).into_array();
         Prk::new(SecretKeyBytes::new(prk))
     }
 
@@ -110,7 +115,8 @@ impl<H: Hash> Hkdf<H> {
             return Err(KdfError::OutputTooLong);
         }
 
-        let expander = Hmac::<H>::new(prk.as_bytes());
+        let key = HmacKey::<H>::new(prk.as_bytes());
+        let expander = Hmac::<H>::new(&key);
         let info = info.into_iter();
 
         let mut prev: Option<Tag<H::DigestSize>> = None;
@@ -138,9 +144,10 @@ impl<H: Hash> Hkdf<H> {
 ///
 /// ```rust
 /// use spideroak_crypto::{
-///     hash::{Block, Digest, Hash, HashId},
+///     block::BlockSize,
+///     hash::{Digest, Hash, HashId},
 ///     hkdf_impl,
-///     typenum::U32,
+///     typenum::{U32, U64},
 /// };
 ///
 /// #[derive(Clone)]
@@ -149,8 +156,6 @@ impl<H: Hash> Hkdf<H> {
 /// impl Hash for Sha256 {
 ///     const ID: HashId = HashId::Sha256;
 ///     type DigestSize = U32;
-///     type Block = Block<64>;
-///     const BLOCK_SIZE: usize = 64;
 ///     fn new() -> Self {
 ///         Self
 ///     }
@@ -160,6 +165,10 @@ impl<H: Hash> Hkdf<H> {
 ///     fn digest(self) -> Digest<Self::DigestSize> {
 ///         todo!()
 ///     }
+/// }
+///
+/// impl BlockSize for Sha256 {
+///     type BlockSize = U64;
 /// }
 ///
 /// hkdf_impl!(HkdfSha256, "HMAC-SHA-256", Sha256);

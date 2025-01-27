@@ -2,23 +2,20 @@
 //!
 //! [FIPS PUB 198-1]: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.198-1.pdf
 
-use core::{
-    borrow::{Borrow, BorrowMut},
-    cmp,
-    marker::PhantomData,
-    mem,
-};
+#![forbid(unsafe_code)]
+
+use core::cmp;
 
 use generic_array::{ArrayLength, GenericArray, LengthError};
 use subtle::{Choice, ConstantTimeEq};
-use typenum::Unsigned;
 
 use crate::{
-    csprng::Csprng,
+    block::{Block, BlockSize},
+    csprng::{Csprng, Random},
     hash::{Digest, Hash},
-    import::{ExportError, Import, ImportError, InvalidSizeError},
-    keys::{RawSecretBytes, SecretKey, SecretKeyBytes},
-    zeroize::ZeroizeOnDrop,
+    import::{ExportError, Import, ImportError},
+    keys::{FixedLength, SecretKey, SecretKeyBytes},
+    zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
 /// HMAC per [FIPS PUB 198-1] for some hash `H`.
@@ -32,37 +29,24 @@ pub struct Hmac<H> {
     opad: H,
 }
 
-impl<H: Hash> Hmac<H> {
+impl<H: Hash + BlockSize> Hmac<H> {
     /// Creates an HMAC using the provided `key`.
-    pub fn new(key: &[u8]) -> Self {
-        let mut key = {
-            let mut tmp = H::Block::default();
-            let tmp_len = tmp.borrow().len();
-            if key.len() <= tmp_len {
-                // Steps 1 and 3
-                tmp.borrow_mut()[..key.len()].copy_from_slice(key);
-            } else {
-                // Step 2
-                let d = H::hash(key);
-                let n = cmp::min(d.len(), tmp_len);
-                tmp.borrow_mut()[..n].copy_from_slice(&d[..n]);
-            };
-            tmp
-        };
+    pub fn new(key: &HmacKey<H>) -> Self {
+        let mut key = Zeroizing::new(key.0.clone());
 
         // Step 4: K_0 ^ ipad (0x36)
-        for v in key.borrow_mut() {
+        for v in key.iter_mut() {
             *v ^= 0x36;
         }
         let mut ipad = H::new();
-        ipad.update(key.borrow());
+        ipad.update(key.as_slice());
 
         // Step 7: K_0 ^ opad (0x5c)
-        for v in key.borrow_mut() {
+        for v in key.iter_mut() {
             *v ^= 0x36 ^ 0x5c;
         }
         let mut opad = H::new();
-        opad.update(key.borrow());
+        opad.update(key.as_slice());
 
         Self { ipad, opad }
     }
@@ -83,7 +67,7 @@ impl<H: Hash> Hmac<H> {
     }
 
     /// Computes the single-shot tag from `data` using `key`.
-    pub fn mac_multi<I>(key: &[u8], data: I) -> Tag<H::DigestSize>
+    pub fn mac_multi<I>(key: &HmacKey<H>, data: I) -> Tag<H::DigestSize>
     where
         I: IntoIterator,
         I::Item: AsRef<[u8]>,
@@ -167,52 +151,74 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
 
 /// An [`Hmac`] key.
 #[repr(transparent)]
-pub struct HmacKey<L> {
-    _l: PhantomData<L>,
-    key: [u8],
-}
+pub struct HmacKey<H: Hash + BlockSize>(Block<H>);
 
-impl<'a, L: ArrayLength> SecretKey for HmacKey<L> {
-    type Size = L;
-    fn new<R: Csprng>(_rng: &mut R) -> Self {
-        todo!()
-    }
-
-    type Secret = &'a [u8];
-    fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
-        Ok(&self.key)
-    }
-}
-
-impl<L: ArrayLength> Import<&[u8]> for &HmacKey<L> {
-    fn import(data: &[u8]) -> Result<Self, ImportError> {
-        if data.len() < L::USIZE {
-            Err(ImportError::InvalidSize(InvalidSizeError {
-                got: data.len(),
-                // TODO(eric): `usize::MAX` is not the correct
-                // upper bound here.
-                want: L::USIZE..usize::MAX,
-            }))
+impl<H: Hash + BlockSize> HmacKey<H> {
+    /// Creates an `HmacKey`.
+    pub fn new(key: &[u8]) -> Self {
+        let mut out = Block::<H>::default();
+        if key.len() <= out.len() {
+            // Steps 1 and 3
+            out[..key.len()].copy_from_slice(key);
         } else {
-            // SAFETY: `&[u8]` and `Self` have the same layout in
-            // memory.
-            let key = unsafe { mem::transmute::<&[u8], Self>(data) };
-            Ok(key)
-        }
+            // Step 2
+            let d = H::hash(key);
+            let n = cmp::min(d.len(), out.len());
+            out[..n].copy_from_slice(&d[..n]);
+        };
+        Self(out)
     }
 }
 
-impl<L> ConstantTimeEq for &HmacKey<L> {
+impl<H: Hash + BlockSize> Clone for HmacKey<H> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<H: Hash + BlockSize> SecretKey for HmacKey<H> {
+    type Secret = SecretKeyBytes<H::BlockSize>;
+
+    /// Exports the raw key.
+    ///
+    /// Note: this returns `h(k)` if the original `k` passed to
+    /// [`HmacKey::new`] was longer than the block size of `h`.
+    #[inline]
+    fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+        Ok(SecretKeyBytes::new(self.0.clone()))
+    }
+}
+
+impl<H: Hash + BlockSize> FixedLength for HmacKey<H> {
+    type Size = H::BlockSize;
+}
+
+impl<H: Hash + BlockSize> Random for HmacKey<H> {
+    fn random<R: Csprng>(rng: &mut R) -> Self {
+        Self(Block::<H>::random(rng))
+    }
+}
+
+impl<H: Hash + BlockSize> Import<&[u8]> for HmacKey<H> {
+    #[inline]
+    fn import(data: &[u8]) -> Result<Self, ImportError> {
+        Ok(Self::new(data))
+    }
+}
+
+impl<H: Hash + BlockSize> ConstantTimeEq for HmacKey<H> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
-        self.key.ct_eq(&other.key)
+        self.0.ct_eq(&other.0)
     }
 }
 
-impl<L> ZeroizeOnDrop for HmacKey<L> {}
-impl<L> Drop for HmacKey<L> {
+impl<H: Hash + BlockSize> ZeroizeOnDrop for HmacKey<H> {}
+impl<H: Hash + BlockSize> Drop for HmacKey<H> {
+    #[inline]
     fn drop(&mut self) {
-        // TODO
+        self.0.zeroize();
     }
 }
 
@@ -222,9 +228,10 @@ impl<L> Drop for HmacKey<L> {
 ///
 /// ```rust
 /// use spideroak_crypto::{
-///     hash::{Block, Digest, Hash, HashId},
+///     block::BlockSize,
+///     hash::{Digest, Hash, HashId},
 ///     hmac_impl,
-///     typenum::U32,
+///     typenum::{U32, U64},
 /// };
 ///
 /// #[derive(Clone)]
@@ -233,8 +240,6 @@ impl<L> Drop for HmacKey<L> {
 /// impl Hash for Sha256 {
 ///     const ID: HashId = HashId::Sha256;
 ///     type DigestSize = U32;
-///     type Block = Block<64>;
-///     const BLOCK_SIZE: usize = 64;
 ///     fn new() -> Self {
 ///         Self
 ///     }
@@ -246,7 +251,11 @@ impl<L> Drop for HmacKey<L> {
 ///     }
 /// }
 ///
-/// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256, HmacSha256Key);
+/// impl BlockSize for Sha256 {
+///     type BlockSize = U64;
+/// }
+///
+/// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256);
 /// ```
 #[macro_export]
 macro_rules! hmac_impl {
@@ -258,16 +267,18 @@ macro_rules! hmac_impl {
         impl $crate::mac::Mac for $name {
             const ID: $crate::mac::MacId = $crate::mac::MacId::$name;
 
-            // Setting len(K) = L ensures that we're always in
-            // [L, B].
-            type Key = $crate::hmac::HmacKey<Self::KeySize>;
-            type KeySize = <$hash as $crate::hash::Hash>::DigestSize;
             type Tag = $crate::hmac::Tag<Self::TagSize>;
             type TagSize = <$hash as $crate::hash::Hash>::DigestSize;
 
+            type Key = $crate::hmac::HmacKey<$hash>;
+            type MinKeySize = <$hash as $crate::hash::Hash>::DigestSize;
+
             fn new(key: &Self::Key) -> Self {
-                let key = $crate::keys::RawSecretBytes::raw_secret_bytes(key);
                 Self($crate::hmac::Hmac::new(key))
+            }
+            fn try_new(key: &[u8]) -> ::core::result::Result<Self, $crate::keys::InvalidKey> {
+                let key = $crate::hmac::HmacKey::<$hash>::new(key);
+                Ok(Self::new(&key))
             }
 
             fn update(&mut self, data: &[u8]) {
@@ -289,9 +300,9 @@ mod tests {
         () => {
             use crate::test_util::test_mac;
 
-            hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256, HmacSha256Key);
-            hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384, HmacSha384Key);
-            hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512, HmacSha512Key);
+            hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256);
+            hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384);
+            hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512);
 
             test_mac!(hmac_sha256, HmacSha256, MacTest::HmacSha256);
             test_mac!(hmac_sha384, HmacSha384, MacTest::HmacSha384);

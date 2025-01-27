@@ -16,12 +16,12 @@ use subtle::{Choice, ConstantTimeEq};
 use typenum::U32;
 
 use crate::{
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     hex::ToHex,
     import::{try_import, ExportError, Import, ImportError},
-    keys::{PublicKey, SecretKey, SecretKeyBytes},
+    keys::{FixedLength, PublicKey, SecretKey, SecretKeyBytes},
     signer::{self, PkError, Signer, SignerError, SignerId},
-    zeroize::{ZeroizeOnDrop, Zeroizing},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// EdDSA using Ed25519.
@@ -68,14 +68,6 @@ impl signer::SigningKey<Ed25519> for SigningKey {
 }
 
 impl SecretKey for SigningKey {
-    type Size = U32;
-
-    fn new<R: Csprng>(rng: &mut R) -> Self {
-        let mut sk = dalek::SecretKey::default();
-        rng.fill_bytes(&mut sk);
-        Self(dalek::SigningKey::from_bytes(&sk))
-    }
-
     type Secret = SecretKeyBytes<U32>;
 
     #[inline]
@@ -84,11 +76,21 @@ impl SecretKey for SigningKey {
     }
 }
 
+impl FixedLength for SigningKey {
+    type Size = U32;
+}
+
+impl Random for SigningKey {
+    fn random<R: Csprng>(rng: &mut R) -> Self {
+        let mut sk = dalek::SecretKey::default();
+        rng.fill_bytes(&mut sk);
+        Self(dalek::SigningKey::from_bytes(&sk))
+    }
+}
+
 impl ConstantTimeEq for SigningKey {
     fn ct_eq(&self, other: &Self) -> Choice {
-        let lhs = Zeroizing::new(self.0.to_bytes());
-        let rhs = Zeroizing::new(other.0.to_bytes());
-        ConstantTimeEq::ct_eq(lhs.as_ref(), rhs.as_ref())
+        self.0.ct_eq(&other.0)
     }
 }
 

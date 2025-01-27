@@ -33,10 +33,10 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::{
     aead::{Aead, AeadId, Lifetime, OpenError, SealError},
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     import::{ExportError, Import, ImportError},
     kdf::{Kdf, KdfError, KdfId, Prk},
-    keys::{PublicKey, SecretKey},
+    keys::{FixedLength, InvalidKey, PublicKey, SecretKey},
     mac::{Mac, MacId},
     signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
 };
@@ -194,10 +194,13 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
     type TagSize = T::TagSize;
 
     type Key = T::Key;
-    type KeySize = T::KeySize;
+    type MinKeySize = T::MinKeySize;
 
     fn new(key: &Self::Key) -> Self {
         Self(T::new(key))
+    }
+    fn try_new(key: &[u8]) -> Result<Self, InvalidKey> {
+        Ok(Self(T::try_new(key)?))
     }
 
     fn update(&mut self, data: &[u8]) {
@@ -234,15 +237,23 @@ impl<T: Signer + ?Sized> SigningKey<SignerWithDefaults<T>> for SigningKeyWithDef
 }
 
 impl<T: Signer + ?Sized> SecretKey for SigningKeyWithDefaults<T> {
-    type Size = <T::SigningKey as SecretKey>::Size;
-
-    fn new<R: Csprng>(rng: &mut R) -> Self {
-        Self(T::SigningKey::new(rng))
-    }
-
     type Secret = <T::SigningKey as SecretKey>::Secret;
     fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
         self.0.try_export_secret()
+    }
+}
+
+impl<T: Signer + ?Sized> FixedLength for SigningKeyWithDefaults<T> {
+    type Size = <T::SigningKey as FixedLength>::Size;
+}
+
+impl<T> Random for SigningKeyWithDefaults<T>
+where
+    T: Signer + ?Sized,
+    T::SigningKey: Random,
+{
+    fn random<R: Csprng>(rng: &mut R) -> Self {
+        Self(<T::SigningKey as Random>::random(rng))
     }
 }
 
@@ -252,7 +263,10 @@ impl<T: Signer + ?Sized> ConstantTimeEq for SigningKeyWithDefaults<T> {
     }
 }
 
-impl<'a, T: Signer + ?Sized> Import<&'a [u8]> for SigningKeyWithDefaults<T> {
+impl<'a, T: Signer + ?Sized> Import<&'a [u8]> for SigningKeyWithDefaults<T>
+where
+    T::SigningKey: Import<&'a [u8]>,
+{
     fn import(data: &'a [u8]) -> Result<Self, ImportError> {
         Ok(Self(T::SigningKey::import(data)?))
     }

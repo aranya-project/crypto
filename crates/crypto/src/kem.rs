@@ -13,10 +13,10 @@ use core::{
 #[doc(inline)]
 pub use crate::hpke::KemId;
 use crate::{
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     import::{Import, ImportError},
     kdf::{Kdf, KdfError, Prk},
-    keys::{PublicKey, SecretKey},
+    keys::{FixedLength, PublicKey, SecretKey},
     signer::PkError,
     zeroize::ZeroizeOnDrop,
 };
@@ -191,7 +191,7 @@ pub trait Kem {
 }
 
 /// An asymmetric private key used to decapsulate keys.
-pub trait DecapKey: SecretKey {
+pub trait DecapKey: SecretKey + FixedLength + Random {
     /// The corresponding public key.
     type EncapKey: EncapKey;
 
@@ -350,7 +350,7 @@ impl<E: Ecdh, F: Kdf> DhKem<E, F> {
         rng: &mut R,
         pkR: &E::PublicKey,
     ) -> Result<(Prk<F::PrkSize>, PubKeyData<E>), KemError> {
-        let skE = E::PrivateKey::new(rng);
+        let skE = E::PrivateKey::random(rng);
         self.encap_deterministically(pkR, skE)
     }
 
@@ -413,7 +413,7 @@ impl<E: Ecdh, F: Kdf> DhKem<E, F> {
         pkR: &E::PublicKey,
         skS: &E::PrivateKey,
     ) -> Result<(Prk<F::PrkSize>, PubKeyData<E>), KemError> {
-        let skE = E::PrivateKey::new(rng);
+        let skE = E::PrivateKey::random(rng);
         self.auth_encap_deterministically(pkR, skS, skE)
     }
 
