@@ -240,8 +240,10 @@ macro_rules! ecdh_impl {
                 Self(sk)
             }
 
+            type Secret = SecretKeyBytes<FieldBytesSize<$curve>>;
+
             #[inline]
-            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
+            fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))
@@ -377,8 +379,10 @@ macro_rules! ecdsa_impl {
                 Self(sk)
             }
 
+            type Secret = SecretKeyBytes<FieldBytesSize<$curve>>;
+
             #[inline]
-            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
+            fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))

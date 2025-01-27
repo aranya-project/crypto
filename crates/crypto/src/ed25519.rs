@@ -76,8 +76,10 @@ impl SecretKey for SigningKey {
         Self(dalek::SigningKey::from_bytes(&sk))
     }
 
+    type Secret = SecretKeyBytes<U32>;
+
     #[inline]
-    fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
+    fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
         Ok(SecretKeyBytes::new(self.0.to_bytes().into()))
     }
 }

@@ -2,19 +2,23 @@
 //!
 //! [FIPS PUB 198-1]: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.198-1.pdf
 
-#![forbid(unsafe_code)]
-
 use core::{
     borrow::{Borrow, BorrowMut},
     cmp,
+    marker::PhantomData,
+    mem,
 };
 
 use generic_array::{ArrayLength, GenericArray, LengthError};
 use subtle::{Choice, ConstantTimeEq};
+use typenum::Unsigned;
 
 use crate::{
+    csprng::Csprng,
     hash::{Digest, Hash},
-    mac::MacKey,
+    import::{ExportError, Import, ImportError, InvalidSizeError},
+    keys::{RawSecretBytes, SecretKey, SecretKeyBytes},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// HMAC per [FIPS PUB 198-1] for some hash `H`.
@@ -92,9 +96,6 @@ impl<H: Hash> Hmac<H> {
     }
 }
 
-/// An [`Hmac`] key.
-pub type HmacKey<N> = MacKey<N>;
-
 /// An [`Hmac`] authentication code.
 #[derive(Clone, Debug)]
 #[repr(transparent)]
@@ -164,6 +165,57 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
     }
 }
 
+/// An [`Hmac`] key.
+#[repr(transparent)]
+pub struct HmacKey<L> {
+    _l: PhantomData<L>,
+    key: [u8],
+}
+
+impl<'a, L: ArrayLength> SecretKey for HmacKey<L> {
+    type Size = L;
+    fn new<R: Csprng>(_rng: &mut R) -> Self {
+        todo!()
+    }
+
+    type Secret = &'a [u8];
+    fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+        Ok(&self.key)
+    }
+}
+
+impl<L: ArrayLength> Import<&[u8]> for &HmacKey<L> {
+    fn import(data: &[u8]) -> Result<Self, ImportError> {
+        if data.len() < L::USIZE {
+            Err(ImportError::InvalidSize(InvalidSizeError {
+                got: data.len(),
+                // TODO(eric): `usize::MAX` is not the correct
+                // upper bound here.
+                want: L::USIZE..usize::MAX,
+            }))
+        } else {
+            // SAFETY: `&[u8]` and `Self` have the same layout in
+            // memory.
+            let key = unsafe { mem::transmute::<&[u8], Self>(data) };
+            Ok(key)
+        }
+    }
+}
+
+impl<L> ConstantTimeEq for &HmacKey<L> {
+    #[inline]
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.key.ct_eq(&other.key)
+    }
+}
+
+impl<L> ZeroizeOnDrop for HmacKey<L> {}
+impl<L> Drop for HmacKey<L> {
+    fn drop(&mut self) {
+        // TODO
+    }
+}
+
 /// Implements [`Hmac`].
 ///
 /// # Example
@@ -194,7 +246,7 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
 ///     }
 /// }
 ///
-/// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256);
+/// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256, HmacSha256Key);
 /// ```
 #[macro_export]
 macro_rules! hmac_impl {
@@ -214,7 +266,8 @@ macro_rules! hmac_impl {
             type TagSize = <$hash as $crate::hash::Hash>::DigestSize;
 
             fn new(key: &Self::Key) -> Self {
-                Self($crate::hmac::Hmac::new(key.as_slice()))
+                let key = $crate::keys::RawSecretBytes::raw_secret_bytes(key);
+                Self($crate::hmac::Hmac::new(key))
             }
 
             fn update(&mut self, data: &[u8]) {
@@ -236,9 +289,9 @@ mod tests {
         () => {
             use crate::test_util::test_mac;
 
-            hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256);
-            hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384);
-            hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512);
+            hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256, HmacSha256Key);
+            hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384, HmacSha384Key);
+            hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512, HmacSha512Key);
 
             test_mac!(hmac_sha256, HmacSha256, MacTest::HmacSha256);
             test_mac!(hmac_sha384, HmacSha384, MacTest::HmacSha384);

@@ -29,8 +29,31 @@ pub trait SecretKey: Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + Zeroize
     /// Shorthand for [`Size`][Self::Size];
     const SIZE: usize = Self::Size::USIZE;
 
+    /// The raw secret.
+    type Secret: RawSecretBytes;
+
     /// Attempts to export the key's secret data.
-    fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError>;
+    fn try_export_secret(&self) -> Result<Self::Secret, ExportError>;
+}
+
+/// Provides access to a secret's byte encoding.
+pub trait RawSecretBytes {
+    /// Returns the secret's byte encoding.
+    fn raw_secret_bytes(&self) -> &[u8];
+}
+
+impl<T: RawSecretBytes> RawSecretBytes for &T {
+    #[inline]
+    fn raw_secret_bytes(&self) -> &[u8] {
+        (&**self).raw_secret_bytes()
+    }
+}
+
+impl RawSecretBytes for [u8] {
+    #[inline]
+    fn raw_secret_bytes(&self) -> &[u8] {
+        self
+    }
 }
 
 /// A fixed-length byte encoding of a [`SecretKey`]'s data.
@@ -111,6 +134,13 @@ where
         I::IntoIter: Clone,
     {
         Ok(Self(Expand::expand_multi::<K, I>(prk, info)?))
+    }
+}
+
+impl<N: ArrayLength> RawSecretBytes for SecretKeyBytes<N> {
+    #[inline]
+    fn raw_secret_bytes(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 
@@ -196,6 +226,7 @@ macro_rules! raw_key {
 
         impl<N: ::generic_array::ArrayLength> $crate::keys::SecretKey for $name<N>
         {
+            type Secret = $crate::keys::SecretKeyBytes<N>;
             type Size = N;
 
             #[inline]
@@ -205,7 +236,7 @@ macro_rules! raw_key {
 
             #[inline]
             fn try_export_secret(&self) -> ::core::result::Result<
-                $crate::keys::SecretKeyBytes<Self::Size>,
+                Self::Secret,
                 $crate::import::ExportError,
             > {
                 ::core::result::Result::Ok(self.0.clone())
@@ -264,6 +295,13 @@ macro_rules! raw_key {
                 let bytes = $crate::import::Import::<_>::import(data)?;
                 let sk = $crate::keys::SecretKeyBytes::new(bytes);
                 ::core::result::Result::Ok(Self(sk))
+            }
+        }
+
+        impl<N: ::generic_array::ArrayLength> $crate::keys::RawSecretBytes for $name<N> {
+            #[inline]
+            fn raw_secret_bytes(&self) -> &[u8] {
+                self.0.as_bytes()
             }
         }
 

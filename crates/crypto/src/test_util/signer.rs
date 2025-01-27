@@ -8,7 +8,7 @@ use core::borrow::Borrow;
 use super::{assert_ct_eq, assert_ct_ne};
 use crate::{
     csprng::Csprng,
-    keys::SecretKey,
+    keys::{RawSecretBytes, SecretKey},
     signer::{Signer, SigningKey, VerifyingKey},
 };
 
@@ -143,8 +143,8 @@ pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
                 return;
             }
         };
-        let sk1 = K::import(data.as_bytes()).expect("should be able to import key");
-        let sk2 = K::import(data.as_bytes()).expect("should be able to import key");
+        let sk1 = K::import(data.raw_secret_bytes()).expect("should be able to import key");
+        let sk2 = K::import(data.raw_secret_bytes()).expect("should be able to import key");
         assert_ct_eq!(sk1, sk2);
     }
 

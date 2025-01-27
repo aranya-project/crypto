@@ -36,7 +36,7 @@ use crate::{
     csprng::Csprng,
     import::{ExportError, Import, ImportError},
     kdf::{Kdf, KdfError, KdfId, Prk},
-    keys::{PublicKey, SecretKey, SecretKeyBytes},
+    keys::{PublicKey, SecretKey},
     mac::{Mac, MacId},
     signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
 };
@@ -240,7 +240,8 @@ impl<T: Signer + ?Sized> SecretKey for SigningKeyWithDefaults<T> {
         Self(T::SigningKey::new(rng))
     }
 
-    fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
+    type Secret = <T::SigningKey as SecretKey>::Secret;
+    fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
         self.0.try_export_secret()
     }
 }
