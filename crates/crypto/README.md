@@ -23,7 +23,7 @@ those instead.
 
 See our [security policy].
 
-[Aranya Core]: https://github.com/aranya-project/aranya
+[Aranya Core]: https://github.com/aranya-project/aranya-core
 [Aranya]: https://github.com/aranya-project/aranya
 [`aranya-crypto`]: https://crates.io/crates/aranya-crypto
 [security policy]: https://github.com/aranya-project/aranya
