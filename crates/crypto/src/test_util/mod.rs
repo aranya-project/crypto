@@ -194,6 +194,7 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
     type TagSize = T::TagSize;
 
     type Key = T::Key;
+    type KeySize = T::KeySize;
     type MinKeySize = T::MinKeySize;
 
     fn new(key: &Self::Key) -> Self {

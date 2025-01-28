@@ -297,4 +297,4 @@ pub(crate) use raw_key;
 // TODO(eric): move this somewhere else.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("invalid key length")]
-pub struct InvalidKey(());
+pub struct InvalidKey;

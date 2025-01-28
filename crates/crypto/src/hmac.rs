@@ -267,20 +267,32 @@ macro_rules! hmac_impl {
             type TagSize = <$hash as $crate::hash::Hash>::DigestSize;
 
             type Key = $crate::hmac::HmacKey<$hash>;
+            type KeySize = <$hash as $crate::block::BlockSize>::BlockSize;
             type MinKeySize = <$hash as $crate::hash::Hash>::DigestSize;
 
+            #[inline]
             fn new(key: &Self::Key) -> Self {
                 Self($crate::hmac::Hmac::new(key))
             }
+
+            #[inline]
             fn try_new(key: &[u8]) -> ::core::result::Result<Self, $crate::keys::InvalidKey> {
-                let key = $crate::hmac::HmacKey::<$hash>::new(key);
-                Ok(Self::new(&key))
+                use $crate::typenum::Unsigned;
+
+                if key.len() < Self::MinKeySize::USIZE {
+                    ::core::result::Result::Err($crate::keys::InvalidKey)
+                } else {
+                    let key = $crate::hmac::HmacKey::<$hash>::new(key);
+                    ::core::result::Result::Ok(Self::new(&key))
+                }
             }
 
+            #[inline]
             fn update(&mut self, data: &[u8]) {
                 self.0.update(data)
             }
 
+            #[inline]
             fn tag(self) -> Self::Tag {
                 self.0.tag()
             }
