@@ -16,7 +16,7 @@ use crate::{
     csprng::{Csprng, Random},
     import::{Import, ImportError},
     kdf::{Kdf, KdfError, Prk},
-    keys::{PublicKey, SecretKey},
+    keys::{PublicKey, RawSecretBytes, SecretKey},
     signer::PkError,
     zeroize::ZeroizeOnDrop,
 };
@@ -102,7 +102,7 @@ pub trait Kem {
     /// An ephemeral, fixed-length symmetric key.
     ///
     /// The key must be at least 128 bits.
-    type Secret: AsRef<[u8]> + ZeroizeOnDrop;
+    type Secret: RawSecretBytes + ZeroizeOnDrop;
 
     /// An encapsulated [`Self::Secret`].
     type Encap: Borrow<[u8]> + for<'a> Import<&'a [u8]>;

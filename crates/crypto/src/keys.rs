@@ -38,6 +38,13 @@ impl<T: RawSecretBytes> RawSecretBytes for &T {
     }
 }
 
+impl RawSecretBytes for [u8] {
+    #[inline]
+    fn raw_secret_bytes(&self) -> &[u8] {
+        self
+    }
+}
+
 /// A fixed-length byte encoding of a [`SecretKey`]'s data.
 #[derive(Clone, Default, ZeroizeOnDrop)]
 #[repr(transparent)]
