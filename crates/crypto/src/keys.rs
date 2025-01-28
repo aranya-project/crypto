@@ -17,18 +17,12 @@ use crate::{
 ///
 /// Secret keys are either symmetric keys (e.g., for AES) or
 /// asymmetric private keys (e.g., for ECDH).
-pub trait SecretKey: Clone + ConstantTimeEq + ZeroizeOnDrop {
-    /// The raw secret.
-    type Secret: RawSecretBytes;
-
-    /// Attempts to export the key's secret data.
-    fn try_export_secret(&self) -> Result<Self::Secret, ExportError>;
-}
-
-/// A fixed-length secret key.
-pub trait FixedLength: SecretKey<Secret = SecretKeyBytes<Self::Size>> {
+pub trait SecretKey: Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + ZeroizeOnDrop {
     /// The size in octets of the key.
     type Size: ArrayLength + 'static;
+
+    /// Attempts to export the key's secret data.
+    fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError>;
 }
 
 /// Provides access to a secret's byte encoding.
@@ -41,13 +35,6 @@ impl<T: RawSecretBytes> RawSecretBytes for &T {
     #[inline]
     fn raw_secret_bytes(&self) -> &[u8] {
         (**self).raw_secret_bytes()
-    }
-}
-
-impl RawSecretBytes for [u8] {
-    #[inline]
-    fn raw_secret_bytes(&self) -> &[u8] {
-        self
     }
 }
 
@@ -220,19 +207,15 @@ macro_rules! raw_key {
         }
 
         impl<N: ::generic_array::ArrayLength> $crate::keys::SecretKey for $name<N> {
-            type Secret = $crate::keys::SecretKeyBytes<N>;
+            type Size = N;
 
             #[inline]
             fn try_export_secret(&self) -> ::core::result::Result<
-                Self::Secret,
+                $crate::keys::SecretKeyBytes<Self::Size>,
                 $crate::import::ExportError,
             > {
                 ::core::result::Result::Ok(self.0.clone())
             }
-        }
-
-        impl<N: ::generic_array::ArrayLength> $crate::keys::FixedLength for $name<N> {
-            type Size = N;
         }
 
         impl<N: ::generic_array::ArrayLength> $crate::csprng::Random for $name<N> {
@@ -242,6 +225,12 @@ macro_rules! raw_key {
             }
         }
 
+        impl<N: ::generic_array::ArrayLength> $crate::keys::RawSecretBytes for $name<N> {
+            #[inline]
+            fn raw_secret_bytes(&self) -> &[u8] {
+                $crate::keys::RawSecretBytes::raw_secret_bytes(&self.0)
+            }
+        }
 
         impl<N: ::generic_array::ArrayLength> $crate::kdf::Expand for $name<N>
         where
@@ -287,13 +276,6 @@ macro_rules! raw_key {
                 let bytes = $crate::import::Import::<_>::import(data)?;
                 let sk = $crate::keys::SecretKeyBytes::new(bytes);
                 ::core::result::Result::Ok(Self(sk))
-            }
-        }
-
-        impl<N: ::generic_array::ArrayLength> $crate::keys::RawSecretBytes for $name<N> {
-            #[inline]
-            fn raw_secret_bytes(&self) -> &[u8] {
-                self.0.as_bytes()
             }
         }
 

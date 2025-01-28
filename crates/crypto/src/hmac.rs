@@ -14,7 +14,7 @@ use crate::{
     csprng::{Csprng, Random},
     hash::{Digest, Hash},
     import::{ExportError, Import, ImportError},
-    keys::{FixedLength, SecretKey, SecretKeyBytes},
+    keys::{SecretKey, SecretKeyBytes},
     zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
@@ -178,20 +178,16 @@ impl<H: Hash + BlockSize> Clone for HmacKey<H> {
 }
 
 impl<H: Hash + BlockSize> SecretKey for HmacKey<H> {
-    type Secret = SecretKeyBytes<H::BlockSize>;
+    type Size = H::BlockSize;
 
     /// Exports the raw key.
     ///
     /// Note: this returns `h(k)` if the original `k` passed to
     /// [`HmacKey::new`] was longer than the block size of `h`.
     #[inline]
-    fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+    fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
         Ok(SecretKeyBytes::new(self.0.clone()))
     }
-}
-
-impl<H: Hash + BlockSize> FixedLength for HmacKey<H> {
-    type Size = H::BlockSize;
 }
 
 impl<H: Hash + BlockSize> Random for HmacKey<H> {

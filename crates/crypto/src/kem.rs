@@ -16,7 +16,7 @@ use crate::{
     csprng::{Csprng, Random},
     import::{Import, ImportError},
     kdf::{Kdf, KdfError, Prk},
-    keys::{FixedLength, PublicKey, SecretKey},
+    keys::{PublicKey, SecretKey},
     signer::PkError,
     zeroize::ZeroizeOnDrop,
 };
@@ -191,7 +191,7 @@ pub trait Kem {
 }
 
 /// An asymmetric private key used to decapsulate keys.
-pub trait DecapKey: SecretKey + FixedLength + Random {
+pub trait DecapKey: SecretKey + Random {
     /// The corresponding public key.
     type EncapKey: EncapKey;
 

@@ -19,7 +19,7 @@ use crate::{
     csprng::{Csprng, Random},
     hex::ToHex,
     import::{try_import, ExportError, Import, ImportError},
-    keys::{FixedLength, PublicKey, SecretKey, SecretKeyBytes},
+    keys::{PublicKey, SecretKey, SecretKeyBytes},
     signer::{self, PkError, Signer, SignerError, SignerId},
     zeroize::ZeroizeOnDrop,
 };
@@ -68,16 +68,12 @@ impl signer::SigningKey<Ed25519> for SigningKey {
 }
 
 impl SecretKey for SigningKey {
-    type Secret = SecretKeyBytes<U32>;
+    type Size = U32;
 
     #[inline]
-    fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+    fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
         Ok(SecretKeyBytes::new(self.0.to_bytes().into()))
     }
-}
-
-impl FixedLength for SigningKey {
-    type Size = U32;
 }
 
 impl Random for SigningKey {

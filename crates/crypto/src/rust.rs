@@ -38,7 +38,7 @@ use crate::{
     hmac::hmac_impl,
     import::{try_from_slice, ExportError, Import, ImportError},
     kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey},
-    keys::{FixedLength, PublicKey, SecretKey, SecretKeyBytes},
+    keys::{PublicKey, SecretKey, SecretKeyBytes},
     signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
     zeroize::ZeroizeOnDrop,
 };
@@ -233,18 +233,14 @@ macro_rules! ecdh_impl {
         }
 
         impl SecretKey for $sk {
-            type Secret = SecretKeyBytes<FieldBytesSize<$curve>>;
+            type Size = FieldBytesSize<$curve>;
 
             #[inline]
-            fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))
             }
-        }
-
-        impl FixedLength for $sk {
-            type Size = FieldBytesSize<$curve>;
         }
 
         impl Random for $sk {
@@ -376,18 +372,14 @@ macro_rules! ecdsa_impl {
         }
 
         impl SecretKey for $sk {
-            type Secret = SecretKeyBytes<FieldBytesSize<$curve>>;
+            type Size = FieldBytesSize<$curve>;
 
             #[inline]
-            fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))
             }
-        }
-
-        impl FixedLength for $sk {
-            type Size = FieldBytesSize<$curve>;
         }
 
         impl Random for $sk {

@@ -39,7 +39,7 @@ use crate::{
     hmac::hmac_impl,
     import::{ExportError, Import, ImportError},
     kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey, SharedSecret},
-    keys::{FixedLength, PublicKey, SecretKey, SecretKeyBytes},
+    keys::{PublicKey, SecretKey, SecretKeyBytes},
     signer::{PkError, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
     zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
 };
@@ -404,16 +404,12 @@ macro_rules! ecdh_impl {
         }
 
         impl SecretKey for $sk {
-            type Secret = SecretKeyBytes<<$curve as Curve>::ScalarSize>;
+            type Size = <$curve as Curve>::ScalarSize;
 
             #[inline]
-            fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 Ok(SecretKeyBytes::new(self.kbuf.0.into()))
             }
-        }
-
-        impl FixedLength for $sk {
-            type Size = <$curve as Curve>::ScalarSize;
         }
 
         impl Random for $sk {
@@ -465,10 +461,10 @@ macro_rules! ecdh_impl {
             }
         }
 
-        impl Import<SecretKeyBytes<<Self as FixedLength>::Size>> for $sk {
+        impl Import<SecretKeyBytes<<Self as SecretKey>::Size>> for $sk {
             #[inline]
             fn import(
-                data: SecretKeyBytes<<Self as FixedLength>::Size>,
+                data: SecretKeyBytes<<Self as SecretKey>::Size>,
             ) -> Result<Self, ImportError> {
                 Self::import(data.as_bytes())
             }
@@ -710,16 +706,12 @@ macro_rules! ecdsa_impl {
         }
 
         impl SecretKey for $sk {
-            type Secret = SecretKeyBytes<<$curve as Curve>::ScalarSize>;
+            type Size = <$curve as Curve>::ScalarSize;
 
             #[inline]
-            fn try_export_secret(&self) -> Result<Self::Secret, ExportError> {
+            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 Ok(SecretKeyBytes::new(self.kbuf.0.into()))
             }
-        }
-
-        impl FixedLength for $sk {
-            type Size = <$curve as Curve>::ScalarSize;
         }
 
         impl Random for $sk {

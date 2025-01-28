@@ -27,7 +27,7 @@ pub use crate::hpke::AeadId;
 use crate::{
     csprng::{Csprng, Random},
     kdf::{Expand, Kdf, KdfError, Prk},
-    keys::{raw_key, FixedLength, SecretKey, SecretKeyBytes},
+    keys::{raw_key, SecretKey, SecretKeyBytes},
     util::const_assert,
     zeroize::Zeroize,
 };
@@ -410,7 +410,7 @@ pub trait Aead {
         };
 
     /// The key used by the [`Aead`].
-    type Key: SecretKey + FixedLength<Size = Self::KeySize>;
+    type Key: SecretKey<Size = Self::KeySize>;
 
     /// Creates a new [`Aead`].
     fn new(key: &Self::Key) -> Self;
@@ -539,7 +539,7 @@ pub trait Aead {
 
 /// Shorthand which the compiler does not understand without
 /// a good amount of hand holding.
-pub type KeyData<A> = SecretKeyBytes<<<A as Aead>::Key as FixedLength>::Size>;
+pub type KeyData<A> = SecretKeyBytes<<<A as Aead>::Key as SecretKey>::Size>;
 
 /// An authentication tag.
 pub type Tag<A> = GenericArray<u8, <A as Aead>::Overhead>;
@@ -1358,7 +1358,7 @@ mod committing {
                     };
                     let mut key_bytes = $crate::generic_array::GenericArray::<
                         u8,
-                        <<$inner as $crate::aead::Aead>::Key as $crate::keys::FixedLength>::Size,
+                        <<$inner as $crate::aead::Aead>::Key as $crate::keys::SecretKey>::Size,
                     >::default();
                     let k = ::core::cmp::min(tag.len(), key_bytes.as_slice().len());
                     key_bytes
