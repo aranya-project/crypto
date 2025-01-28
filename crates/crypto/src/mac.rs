@@ -81,8 +81,8 @@ pub enum MacId {
 /// * Be a PRF
 ///
 /// Examples of keyed MAC algorithms that fulfill these
-/// requirements include HMAC-SHA-512 and KMAC256 (for |K| >=
-/// 256).
+/// requirements include HMAC-SHA-512 (for |K| >= 256) and
+/// KMAC256 (for |K| >= 256).
 pub trait Mac: Clone + Sized {
     /// Uniquely identifies the MAC algorithm.
     const ID: MacId;
