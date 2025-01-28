@@ -16,7 +16,7 @@ use subtle::{Choice, ConstantTimeEq};
 use typenum::U32;
 
 use crate::{
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     hex::ToHex,
     import::{try_import, ExportError, Import, ImportError},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
@@ -70,21 +70,23 @@ impl signer::SigningKey<Ed25519> for SigningKey {
 impl SecretKey for SigningKey {
     type Size = U32;
 
-    fn new<R: Csprng>(rng: &mut R) -> Self {
-        let mut sk = dalek::SecretKey::default();
-        rng.fill_bytes(&mut sk);
-        Self(dalek::SigningKey::from_bytes(&sk))
-    }
-
     #[inline]
     fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
         Ok(SecretKeyBytes::new(self.0.to_bytes().into()))
     }
 }
 
+impl Random for SigningKey {
+    fn random<R: Csprng>(rng: &mut R) -> Self {
+        let mut sk = dalek::SecretKey::default();
+        rng.fill_bytes(&mut sk);
+        Self(dalek::SigningKey::from_bytes(&sk))
+    }
+}
+
 impl ConstantTimeEq for SigningKey {
     fn ct_eq(&self, other: &Self) -> Choice {
-        self.0.as_bytes().ct_eq(other.0.as_bytes())
+        self.0.ct_eq(&other.0)
     }
 }
 

@@ -13,7 +13,7 @@ use typenum::{Prod, U255};
 use crate::{
     block::BlockSize,
     hash::Hash,
-    hmac::{Hmac, Tag},
+    hmac::{Hmac, HmacKey, Tag},
     kdf::{KdfError, Prk},
     keys::SecretKeyBytes,
 };
@@ -56,11 +56,15 @@ impl<H: Hash + BlockSize> Hkdf<H> {
         // salt: optional salt value (a non-secret random value);
         // if not provided, it is set to a string of HashLen
         // zeros.
-        let zero = GenericArray::<u8, H::DigestSize>::default();
-        let salt = if salt.is_empty() { &zero } else { salt };
+        let salt = if salt.is_empty() {
+            let zero = GenericArray::<u8, H::DigestSize>::default();
+            HmacKey::new(zero.as_slice())
+        } else {
+            HmacKey::new(salt)
+        };
 
         // PRK = HMAC-Hash(salt, IKM)
-        let prk = Hmac::<H>::mac_multi(salt, ikm).into_array();
+        let prk = Hmac::<H>::mac_multi(&salt, ikm).into_array();
         Prk::new(SecretKeyBytes::new(prk))
     }
 
@@ -111,7 +115,8 @@ impl<H: Hash + BlockSize> Hkdf<H> {
             return Err(KdfError::OutputTooLong);
         }
 
-        let expander = Hmac::<H>::new(prk.as_bytes());
+        let key = HmacKey::<H>::new(prk.as_bytes());
+        let expander = Hmac::<H>::new(&key);
         let info = info.into_iter();
 
         let mut prev: Option<Tag<H::DigestSize>> = None;
@@ -142,7 +147,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
 ///     block::BlockSize,
 ///     hash::{Digest, Hash, HashId},
 ///     hkdf_impl,
-///     typenum::U32,
+///     typenum::{U32, U64},
 /// };
 ///
 /// #[derive(Clone)]
@@ -163,7 +168,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
 /// }
 ///
 /// impl BlockSize for Sha256 {
-///     type BlockSize = U32;
+///     type BlockSize = U64;
 /// }
 ///
 /// hkdf_impl!(HkdfSha256, "HMAC-SHA-256", Sha256);

@@ -9,13 +9,10 @@ use core::{
 
 use generic_array::{ArrayLength, GenericArray};
 use subtle::{Choice, ConstantTimeEq};
-use typenum::{
-    type_operators::{IsGreaterOrEqual, IsLess},
-    U16, U32, U48, U64, U65536,
-};
+use typenum::{IsGreaterOrEqual, IsLess, U32, U48, U64, U65536};
 
 use crate::{
-    keys::{raw_key, SecretKey},
+    keys::{raw_key, InvalidKey, SecretKey},
     AlgId,
 };
 
@@ -77,7 +74,7 @@ pub enum MacId {
 /// * Produce tags at least 256 bits long
 /// * Have at minimum a 256-bit security level
 /// * Reject insecure keys
-/// * Be at least strongly EUF-CMA secure
+/// * Be at least strongly EUF-CMA (SUF-CMA) secure
 /// * Be a PRF
 ///
 /// Examples of keyed MAC algorithms that fulfill these
@@ -91,20 +88,48 @@ pub trait Mac: Clone + Sized {
     type Tag: ConstantTimeEq;
     /// The size in octets of a tag used by this [`Mac`].
     ///
-    /// Must be at least 32 octets and less than 2³² octets.
+    /// Must be at least 32 octets and less than 2¹⁶ octets.
     type TagSize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
 
-    /// The key used by the [`Mac`].
-    type Key: SecretKey<Size = Self::KeySize>;
-    /// The size in octets of a key used by this [`Mac`].
+    /// A fixed-length key used by [`new`][Self::new].
     ///
-    /// Must be at least 16 octets and less than 2¹⁶ octets.
-    type KeySize: ArrayLength + IsGreaterOrEqual<U16> + IsLess<U65536> + 'static;
+    /// # Note About Variable Length Keys
+    ///
+    /// Some MACs (HMAC, KMAC, etc.) accept variable length keys
+    /// and do not have a fixed key length. For these MACs,
+    /// [`Key`][Self::Key] should have an appropriate default key
+    /// length. For example, KMAC256 should use a 256-bit key.
+    type Key: SecretKey<Size = Self::KeySize>;
+    /// The size in octets of [`Key`][Self::Key].
+    ///
+    /// Must be at least [`MinKeySize`][Self::MinKeySize] or 32
+    /// octets (whichever is greater) and less than 2¹⁶ octets.
+    type KeySize: ArrayLength
+        + IsGreaterOrEqual<Self::MinKeySize>
+        + IsGreaterOrEqual<U32>
+        + IsLess<U65536>
+        + 'static;
 
-    /// Creates a new [`Mac`].
+    /// Creates a [`Mac`] with a fixed-length key.
     fn new(key: &Self::Key) -> Self;
 
-    /// Adds `data` to the running tag.
+    /// The minimum allowed size in octets of the variable length
+    /// key used by [`try_new`][Self::try_new].
+    ///
+    /// Must be at least 32 octets and less than 2¹⁶ octets.
+    type MinKeySize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
+
+    /// Attempts to create a new `Mac` with a variable-length
+    /// key.
+    ///
+    /// It returns [`InvalidKey`] if `key` is shorter than
+    /// [`MinKeySize`][Self::MinKeySize].
+    ///
+    /// A `Mac` is allowed to require `key.len()` to be exactly
+    /// [`KeySize`][Self::KeySize].
+    fn try_new(key: &[u8]) -> Result<Self, InvalidKey>;
+
+    /// Updates the current MAC with `data`.
     fn update(&mut self, data: &[u8]);
 
     /// Returns the current authentication tag.

@@ -11,8 +11,11 @@ use subtle::{Choice, ConstantTimeEq};
 
 use crate::{
     block::{Block, BlockSize},
+    csprng::{Csprng, Random},
     hash::{Digest, Hash},
-    mac::MacKey,
+    import::{ExportError, Import, ImportError},
+    keys::{SecretKey, SecretKeyBytes},
+    zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
 /// HMAC per [FIPS PUB 198-1] for some hash `H`.
@@ -28,30 +31,18 @@ pub struct Hmac<H> {
 
 impl<H: Hash + BlockSize> Hmac<H> {
     /// Creates an HMAC using the provided `key`.
-    pub fn new(key: &[u8]) -> Self {
-        let mut key = {
-            let mut tmp = Block::<H>::default();
-            if key.len() <= tmp.len() {
-                // Steps 1 and 3
-                tmp[..key.len()].copy_from_slice(key);
-            } else {
-                // Step 2
-                let d = H::hash(key);
-                let n = cmp::min(d.len(), tmp.len());
-                tmp[..n].copy_from_slice(&d[..n]);
-            };
-            tmp
-        };
+    pub fn new(key: &HmacKey<H>) -> Self {
+        let mut key = Zeroizing::new(key.0.clone());
 
         // Step 4: K_0 ^ ipad (0x36)
-        for v in &mut key {
+        for v in key.iter_mut() {
             *v ^= 0x36;
         }
         let mut ipad = H::new();
         ipad.update(key.as_slice());
 
         // Step 7: K_0 ^ opad (0x5c)
-        for v in &mut key {
+        for v in key.iter_mut() {
             *v ^= 0x36 ^ 0x5c;
         }
         let mut opad = H::new();
@@ -76,7 +67,7 @@ impl<H: Hash + BlockSize> Hmac<H> {
     }
 
     /// Computes the single-shot tag from `data` using `key`.
-    pub fn mac_multi<I>(key: &[u8], data: I) -> Tag<H::DigestSize>
+    pub fn mac_multi<I>(key: &HmacKey<H>, data: I) -> Tag<H::DigestSize>
     where
         I: IntoIterator,
         I::Item: AsRef<[u8]>,
@@ -88,12 +79,6 @@ impl<H: Hash + BlockSize> Hmac<H> {
         h.tag()
     }
 }
-
-/// An [`Hmac`] key.
-pub type HmacKey<N> = MacKey<N>;
-
-// /// An [`Hmac`] key.
-// pub struct HmacKey<'a>(&'a [u8]);
 
 /// An [`Hmac`] authentication code.
 #[derive(Clone, Debug)]
@@ -176,6 +161,75 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
     }
 }
 
+/// An [`Hmac`] key.
+#[repr(transparent)]
+pub struct HmacKey<H: Hash + BlockSize>(Block<H>);
+
+impl<H: Hash + BlockSize> HmacKey<H> {
+    /// Creates an `HmacKey`.
+    pub fn new(key: &[u8]) -> Self {
+        let mut out = Block::<H>::default();
+        if key.len() <= out.len() {
+            // Steps 1 and 3
+            out[..key.len()].copy_from_slice(key);
+        } else {
+            // Step 2
+            let d = H::hash(key);
+            let n = cmp::min(d.len(), out.len());
+            out[..n].copy_from_slice(&d[..n]);
+        };
+        Self(out)
+    }
+}
+
+impl<H: Hash + BlockSize> Clone for HmacKey<H> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<H: Hash + BlockSize> SecretKey for HmacKey<H> {
+    type Size = H::BlockSize;
+
+    /// Exports the raw key.
+    ///
+    /// Note: this returns `h(k)` if the original `k` passed to
+    /// [`HmacKey::new`] was longer than the block size of `h`.
+    #[inline]
+    fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
+        Ok(SecretKeyBytes::new(self.0.clone()))
+    }
+}
+
+impl<H: Hash + BlockSize> Random for HmacKey<H> {
+    fn random<R: Csprng>(rng: &mut R) -> Self {
+        Self(Block::<H>::random(rng))
+    }
+}
+
+impl<H: Hash + BlockSize> Import<&[u8]> for HmacKey<H> {
+    #[inline]
+    fn import(data: &[u8]) -> Result<Self, ImportError> {
+        Ok(Self::new(data))
+    }
+}
+
+impl<H: Hash + BlockSize> ConstantTimeEq for HmacKey<H> {
+    #[inline]
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.0.ct_eq(&other.0)
+    }
+}
+
+impl<H: Hash + BlockSize> ZeroizeOnDrop for HmacKey<H> {}
+impl<H: Hash + BlockSize> Drop for HmacKey<H> {
+    #[inline]
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
+
 /// Implements [`Hmac`].
 ///
 /// # Example
@@ -185,7 +239,7 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
 ///     block::BlockSize,
 ///     hash::{Digest, Hash, HashId},
 ///     hmac_impl,
-///     typenum::U32,
+///     typenum::{U32, U64},
 /// };
 ///
 /// #[derive(Clone)]
@@ -206,7 +260,7 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
 /// }
 ///
 /// impl BlockSize for Sha256 {
-///     type BlockSize = U32;
+///     type BlockSize = U64;
 /// }
 ///
 /// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256);
@@ -221,21 +275,36 @@ macro_rules! hmac_impl {
         impl $crate::mac::Mac for $name {
             const ID: $crate::mac::MacId = $crate::mac::MacId::$name;
 
-            // Setting len(K) = L ensures that we're always in
-            // [L, B].
-            type Key = $crate::hmac::HmacKey<Self::KeySize>;
-            type KeySize = <$hash as $crate::hash::Hash>::DigestSize;
             type Tag = $crate::hmac::Tag<Self::TagSize>;
             type TagSize = <$hash as $crate::hash::Hash>::DigestSize;
 
+            type Key = $crate::hmac::HmacKey<$hash>;
+            type KeySize = <$hash as $crate::block::BlockSize>::BlockSize;
+            type MinKeySize = <$hash as $crate::hash::Hash>::DigestSize;
+
+            #[inline]
             fn new(key: &Self::Key) -> Self {
-                Self($crate::hmac::Hmac::new(key.as_slice()))
+                Self($crate::hmac::Hmac::new(key))
             }
 
+            #[inline]
+            fn try_new(key: &[u8]) -> ::core::result::Result<Self, $crate::keys::InvalidKey> {
+                use $crate::typenum::Unsigned;
+
+                if key.len() < Self::MinKeySize::USIZE {
+                    ::core::result::Result::Err($crate::keys::InvalidKey)
+                } else {
+                    let key = $crate::hmac::HmacKey::<$hash>::new(key);
+                    ::core::result::Result::Ok(Self::new(&key))
+                }
+            }
+
+            #[inline]
             fn update(&mut self, data: &[u8]) {
                 self.0.update(data)
             }
 
+            #[inline]
             fn tag(self) -> Self::Tag {
                 self.0.tag()
             }

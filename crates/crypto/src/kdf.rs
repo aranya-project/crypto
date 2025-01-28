@@ -14,7 +14,10 @@ use typenum::{
 
 #[doc(inline)]
 pub use crate::hpke::KdfId;
-use crate::{keys::SecretKeyBytes, zeroize::ZeroizeOnDrop};
+use crate::{
+    keys::{RawSecretBytes, SecretKeyBytes},
+    zeroize::ZeroizeOnDrop,
+};
 
 /// An error from a [`Kdf`].
 #[derive(Debug, Eq, PartialEq)]
@@ -227,10 +230,9 @@ impl<N: ArrayLength> ConstantTimeEq for Prk<N> {
     }
 }
 
-// TODO(eric): get rid of this. The only use is `Kem::Secret`.
-impl<N: ArrayLength> AsRef<[u8]> for Prk<N> {
+impl<N: ArrayLength> RawSecretBytes for Prk<N> {
     #[inline]
-    fn as_ref(&self) -> &[u8] {
+    fn raw_secret_bytes(&self) -> &[u8] {
         self.as_bytes()
     }
 }

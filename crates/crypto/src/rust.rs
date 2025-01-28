@@ -30,7 +30,7 @@ use crate::{
         Lifetime, OpenError, SealError,
     },
     block::BlockSize,
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     ec::{Curve, Secp256r1, Secp384r1},
     hash::{Digest, Hash, HashId},
     hex,
@@ -236,16 +236,18 @@ macro_rules! ecdh_impl {
             type Size = FieldBytesSize<$curve>;
 
             #[inline]
-            fn new<R: Csprng>(rng: &mut R) -> Self {
-                let sk = NonZeroScalar::random(&mut RngWrapper(rng));
-                Self(sk)
-            }
-
-            #[inline]
             fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))
+            }
+        }
+
+        impl Random for $sk {
+            #[inline]
+            fn random<R: Csprng>(rng: &mut R) -> Self {
+                let sk = NonZeroScalar::random(&mut RngWrapper(rng));
+                Self(sk)
             }
         }
 
@@ -373,16 +375,18 @@ macro_rules! ecdsa_impl {
             type Size = FieldBytesSize<$curve>;
 
             #[inline]
-            fn new<R: Csprng>(rng: &mut R) -> Self {
-                let sk = ecdsa::SigningKey::random(&mut RngWrapper(rng));
-                Self(sk)
-            }
-
-            #[inline]
             fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))
+            }
+        }
+
+        impl Random for $sk {
+            #[inline]
+            fn random<R: Csprng>(rng: &mut R) -> Self {
+                let sk = ecdsa::SigningKey::random(&mut RngWrapper(rng));
+                Self(sk)
             }
         }
 

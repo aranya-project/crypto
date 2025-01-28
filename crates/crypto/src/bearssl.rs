@@ -31,7 +31,7 @@ use crate::{
     },
     asn1::{max_sig_len, raw_sig_len, RawSig, Sig},
     block::BlockSize,
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     ec::{Curve, Curve25519, Scalar, Secp256r1, Secp384r1, Secp521r1, Uncompressed},
     hash::{Digest, Hash, HashId},
     hex::ToHex,
@@ -404,7 +404,16 @@ macro_rules! ecdh_impl {
         }
 
         impl SecretKey for $sk {
-            fn new<R: Csprng>(rng: &mut R) -> Self {
+            type Size = <$curve as Curve>::ScalarSize;
+
+            #[inline]
+            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
+                Ok(SecretKeyBytes::new(self.kbuf.0.into()))
+            }
+        }
+
+        impl Random for $sk {
+            fn random<R: Csprng>(rng: &mut R) -> Self {
                 // We don't know what `rng` is, so construct our
                 // own.
                 let mut rng = RngWrapper::new(rng);
@@ -436,13 +445,6 @@ macro_rules! ecdh_impl {
                     );
                 }
                 Self { kbuf }
-            }
-
-            type Size = <$curve as Curve>::ScalarSize;
-
-            #[inline]
-            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
-                Ok(SecretKeyBytes::new(self.kbuf.0.into()))
             }
         }
 
@@ -704,8 +706,17 @@ macro_rules! ecdsa_impl {
         }
 
         impl SecretKey for $sk {
+            type Size = <$curve as Curve>::ScalarSize;
+
             #[inline]
-            fn new<R: Csprng>(rng: &mut R) -> Self {
+            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
+                Ok(SecretKeyBytes::new(self.kbuf.0.into()))
+            }
+        }
+
+        impl Random for $sk {
+            #[inline]
+            fn random<R: Csprng>(rng: &mut R) -> Self {
                 // We don't know what `rng` is, so construct our
                 // own.
                 let mut rng = RngWrapper::new(rng);
@@ -744,13 +755,6 @@ macro_rules! ecdsa_impl {
                 assert!(len == kbuf.len());
 
                 Self { kbuf }
-            }
-
-            type Size = <$curve as Curve>::ScalarSize;
-
-            #[inline]
-            fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
-                Ok(SecretKeyBytes::new(self.kbuf.0.into()))
             }
         }
 
