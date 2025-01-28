@@ -90,10 +90,14 @@ pub trait Mac: Clone + Sized {
     /// Must be at least 32 octets and less than 2¹⁶ octets.
     type MinKeySize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
 
-    /// Creates a new [`Mac`].
+    /// Creates a [`Mac`] with a fixed-length key.
     fn new(key: &Self::Key) -> Self;
 
-    /// Attempts to create a new [`Mac`].
+    /// Attempts to create a new [`Mac`] with a variable-length
+    /// key.
+    ///
+    /// It returns [`InvalidKey`] if `key` is shorter than
+    /// [`MinKeySize`][Self::MinKeySize].
     fn try_new(key: &[u8]) -> Result<Self, InvalidKey>;
 
     /// Adds `data` to the running tag.

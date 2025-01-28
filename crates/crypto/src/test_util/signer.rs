@@ -132,10 +132,7 @@ pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
 /// Test `Signer::SigningKey::ct_eq`.
 ///
 /// It also tests `Signer::SigningKey::import`.
-pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R)
-where
-    T::SigningKey: for<'a> Import<&'a [u8]>,
-{
+pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
     let sk1 = T::SigningKey::random(rng);
     let sk2 = T::SigningKey::random(rng);
 

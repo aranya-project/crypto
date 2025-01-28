@@ -125,10 +125,7 @@ pub use test_hpke;
 
 /// Tests the full encryption-decryption cycle.
 #[allow(non_snake_case)]
-pub fn test_round_trip<K: Kem, F: Kdf, A: Aead + IndCca2, R: Csprng>(rng: &mut R)
-where
-    A::Key: for<'a> Import<&'a [u8]>,
-{
+pub fn test_round_trip<K: Kem, F: Kdf, A: Aead + IndCca2, R: Csprng>(rng: &mut R) {
     const GOLDEN: &[u8] = b"some plaintext";
     const AD: &[u8] = b"some additional data";
     const INFO: &[u8] = b"some contextual binding";

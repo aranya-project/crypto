@@ -222,18 +222,12 @@ pub mod hpke {
 /// Tests an [`Aead`] against Project Wycheproof test vectors.
 ///
 /// It tests both `A` and [`AeadWithDefaults<T>`].
-pub fn test_aead<A: Aead>(name: AeadTest)
-where
-    A::Key: for<'a> Import<&'a [u8]>,
-{
+pub fn test_aead<A: Aead>(name: AeadTest) {
     test_aead_inner::<A>(name);
     test_aead_inner::<AeadWithDefaults<A>>(name);
 }
 
-fn test_aead_inner<A: Aead>(name: AeadTest)
-where
-    A::Key: for<'a> Import<&'a [u8]>,
-{
+fn test_aead_inner<A: Aead>(name: AeadTest) {
     let set = aead::TestSet::load(name).expect("should be able to load tests");
     for g in &set.test_groups {
         if g.nonce_size / 8 != A::NONCE_SIZE
@@ -310,10 +304,7 @@ where
 
 /// Tests an [`Ecdh`] against Project Wycheproof test
 /// vectors.
-pub fn test_ecdh<T: Ecdh>(name: EcdhTest)
-where
-    T::PrivateKey: for<'a> Import<&'a [u8]>,
-{
+pub fn test_ecdh<T: Ecdh>(name: EcdhTest) {
     let set = ecdh::TestSet::load(name).expect("should be able to load tests");
     for g in &set.test_groups {
         for tc in &g.tests {
@@ -466,11 +457,8 @@ fn test_hkdf_inner<T: Kdf>(name: HkdfTest) {
 pub fn test_hpke<K, F, A>(name: HpkeTest)
 where
     K: Kem,
-    K::DecapKey: for<'a> Import<&'a [u8]>,
-    K::EncapKey: for<'a> Import<&'a [u8]>,
     F: Kdf,
     A: Aead + IndCca2,
-    A::Key: for<'a> Import<&'a [u8]>,
 {
     let set = hpke::TestSet::load(name).expect("should be able to load tests");
     for (i, g) in set.test_groups.iter().enumerate() {
@@ -554,7 +542,7 @@ where
     test_mac_inner::<MacWithDefaults<T>>(name);
 }
 
-fn test_mac_inner<T: Mac>(name: MacTest)
+fn test_mac_inner<T>(name: MacTest)
 where
     T: Mac,
     T::Tag: for<'a> TryFrom<&'a [u8]>,

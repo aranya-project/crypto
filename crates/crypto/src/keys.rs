@@ -17,7 +17,9 @@ use crate::{
 ///
 /// Secret keys are either symmetric keys (e.g., for AES) or
 /// asymmetric private keys (e.g., for ECDH).
-pub trait SecretKey: Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + ZeroizeOnDrop {
+pub trait SecretKey:
+    Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + Random + ZeroizeOnDrop
+{
     /// The size in octets of the key.
     type Size: ArrayLength + 'static;
 
