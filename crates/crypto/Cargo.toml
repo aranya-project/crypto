@@ -204,7 +204,7 @@ sha3 = { version = "0.10", default-features = false }
 sha3-utils = { version = "0.3.0", default-features = false }
 spin = { version = "0.9", default-features = false, features = ["mutex", "once", "spin_mutex"], optional = true }
 subtle = { version = "2.5", default-features = false, features = ["core_hint_black_box"] }
-thiserror = { version = "2", default-features = false }
+thiserror = { workspace = true, default-features = false }
 typenum = { version = "1", default-features = false, features = ["const-generics"] }
 # Only pulled into non-dev builds if `test_util` is enabled. It
 # won't bloat release builds, though, since users of this crati

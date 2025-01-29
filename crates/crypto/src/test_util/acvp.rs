@@ -5,8 +5,11 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::unwrap_used, reason = "This is test code")]
 
+use core::marker::PhantomData;
+
 pub use acvp;
 use acvp::vectors::{hmac, sha2, sha3};
+use typenum::Unsigned;
 
 use crate::{
     hash::{Digest, Hash, HashId},
@@ -33,6 +36,7 @@ macro_rules! map_ids {
         }
     };
 }
+
 map_ids! {
     MacId => hmac;
     HmacSha2_256 => HmacSha2_256,
@@ -43,6 +47,7 @@ map_ids! {
     HmacSha3_384 => HmacSha3_384,
     HmacSha3_512 => HmacSha3_512,
 }
+
 map_ids! {
     HashId => sha2;
     Sha256 => Sha2_256,
@@ -51,6 +56,7 @@ map_ids! {
     Sha512 => Sha2_512,
     Sha512_256 => Sha2_512_256,
 }
+
 map_ids! {
     HashId => sha3;
     Sha3_256 => Sha3_256,
@@ -66,7 +72,23 @@ where
     M: Mac,
     M::Tag: AsRef<[u8]>,
 {
-    hmac::test(vectors, |key, msg| Ok(M::try_mac(&key, msg)?)).unwrap();
+    hmac::test::<AcvpMac<M>>(vectors).unwrap();
+}
+
+struct AcvpMac<M>(PhantomData<M>);
+
+impl<M> acvp::traits::Mac for AcvpMac<M>
+where
+    M: Mac,
+    M::Tag: AsRef<[u8]>,
+{
+    type Tag = M::Tag;
+    fn min_key_len() -> Option<usize> {
+        Some(M::MinKeySize::USIZE)
+    }
+    fn try_mac(key: &[u8], msg: &[u8]) -> acvp::anyhow::Result<Self::Tag> {
+        Ok(M::try_mac(key, msg)?)
+    }
 }
 
 /// Tests `H` against SHA-2 test vectors.

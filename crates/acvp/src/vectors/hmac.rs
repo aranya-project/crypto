@@ -12,7 +12,10 @@ use alloc::{format, vec::Vec};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
-use crate::util::ensure_eq;
+use crate::{
+    traits::Mac,
+    util::{dprintln, ensure_eq},
+};
 
 super::define_tests! {
     HmacSha2_256 => "hmac_sha2_256",
@@ -72,18 +75,20 @@ pub struct Aft {
     pub mac: Vec<u8>,
 }
 
-/// Tests `F` against the HMAC test vectors.
-///
-/// The first argument to `F` is the key, the second is the
-/// message.
-pub fn test<F, T>(vectors: &TestVectors, f: F) -> anyhow::Result<()>
-where
-    F: Fn(&[u8], &[u8]) -> anyhow::Result<T>,
-    T: AsRef<[u8]>,
-{
+/// Tests `M` against the HMAC test vectors.
+pub fn test<M: Mac>(vectors: &TestVectors) -> anyhow::Result<()> {
     use crate::vectors::hmac::{Aft, Tests};
 
     for group in &vectors.test_groups {
+        let key_len_bytes = (group.key_len + 7) / 8;
+        if M::min_key_len().is_some_and(|min| key_len_bytes < min) {
+            dprintln!(
+                "skipping group #{tg_id}; key size too small: {key_len_bytes} < {min:?}",
+                tg_id = group.tg_id,
+                min = M::min_key_len(),
+            );
+            continue;
+        }
         match &group.tests {
             Tests::Aft(tests) => {
                 for Aft {
@@ -93,8 +98,17 @@ where
                     mac,
                 } in tests.iter()
                 {
-                    let got = f(key, msg).with_context(|| format!("#{tc_id}: `F` failed"))?;
-                    ensure_eq!(got.as_ref(), mac, "#{tc_id}");
+                    let tag = M::try_mac(key, msg)
+                        .with_context(|| format!("#{tc_id}: `try_mac` failed"))?;
+                    let mac_len_bytes = (group.mac_len + 7) / 8;
+                    let got = tag.as_ref().get(..mac_len_bytes).with_context(|| {
+                        ::alloc::format!(
+                            "#{tc_id}: tag is too short: `{} < {mac_len_bytes}` (mac = `{:?}`)",
+                            tag.as_ref().len(),
+                            tag.as_ref(),
+                        )
+                    })?;
+                    ensure_eq!(got, mac, "#{tc_id}");
 
                     // TODO(eric): test using `ConstantTimeEq`.
                 }

@@ -33,6 +33,7 @@ std = [
 	"hex/std",
 	"serde/std",
 	"serde_json/std",
+	"thiserror/std",
 ]
 
 # Enable vectors.
@@ -49,6 +50,7 @@ either = { version = "1.13", default-features = false, optional = true }
 hex = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
 serde = { workspace = true, features = ["alloc", "derive"], optional = true }
 serde_json = { version = "1", default-features = false, features = ["alloc"], optional = true }
+thiserror = { workspace = true, default-features = false }
 
 [build-dependencies]
 prettyplease = { workspace = true }

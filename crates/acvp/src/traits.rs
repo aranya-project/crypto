@@ -23,3 +23,19 @@ pub trait Hash: Clone {
         h.digest()
     }
 }
+
+/// A MAC.
+pub trait Mac {
+    /// The resulting authentication tag.
+    type Tag: AsRef<[u8]>;
+
+    /// Returns the minimum allowed size in octets of keys used
+    /// by [`try_mac`][Self::try_mac], or [`None`] if there is no
+    /// minimum size.
+    fn min_key_len() -> Option<usize> {
+        None
+    }
+
+    /// Attempts to compute the MAC over `msg` with `key`.
+    fn try_mac(key: &[u8], msg: &[u8]) -> anyhow::Result<Self::Tag>;
+}
