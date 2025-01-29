@@ -51,7 +51,7 @@ mod tests {
     use super::*;
     use crate::test_util::test_hash;
 
-    test_hash!(mod sha3_256, Sha3_256, SHA3_256);
-    test_hash!(mod sha3_384, Sha3_384, SHA3_384);
-    test_hash!(mod sha3_512, Sha3_512, SHA3_512);
+    test_hash!(mod sha3_256, Sha3_256);
+    test_hash!(mod sha3_384, Sha3_384);
+    test_hash!(mod sha3_512, Sha3_512);
 }

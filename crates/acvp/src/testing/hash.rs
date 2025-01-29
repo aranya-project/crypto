@@ -1,5 +1,7 @@
 //! Hash test utilities.
 
+#![cfg(any(feature = "sha2", feature = "sha3"))]
+
 use core::fmt;
 
 use anyhow::{ensure, Context};

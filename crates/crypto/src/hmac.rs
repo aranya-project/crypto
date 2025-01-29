@@ -268,12 +268,15 @@ impl<H: Hash + BlockSize> Drop for HmacKey<H> {
 #[macro_export]
 macro_rules! hmac_impl {
     ($name:ident, $doc:expr, $hash:ident) => {
+        $crate::hmac_impl!($name, $doc, $hash, $name);
+    };
+    ($name:ident, $doc:expr, $hash:ident, $id:ident) => {
         #[doc = concat!($doc, ".")]
         #[derive(Clone)]
         pub struct $name($crate::hmac::Hmac<$hash>);
 
         impl $crate::mac::Mac for $name {
-            const ID: $crate::mac::MacId = $crate::mac::MacId::$name;
+            const ID: $crate::mac::MacId = $crate::mac::MacId::$id;
 
             type Tag = $crate::hmac::Tag<Self::TagSize>;
             type TagSize = <$hash as $crate::hash::Hash>::DigestSize;
@@ -320,13 +323,13 @@ mod tests {
         () => {
             use crate::test_util::test_mac;
 
-            hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256);
-            hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384);
-            hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512);
+            hmac_impl!(HmacSha2_256, "HMAC-SHA256", Sha256);
+            hmac_impl!(HmacSha2_384, "HMAC-SHA384", Sha384);
+            hmac_impl!(HmacSha2_512, "HMAC-SHA512", Sha512);
 
-            test_mac!(mod hmac_sha256, HmacSha256, HMAC_SHA_256);
-            test_mac!(mod hmac_sha384, HmacSha384, HMAC_SHA_384);
-            test_mac!(mod hmac_sha512, HmacSha512, HMAC_SHA_512);
+            test_mac!(mod hmac_sha256, HmacSha2_256);
+            test_mac!(mod hmac_sha384, HmacSha2_384);
+            test_mac!(mod hmac_sha512, HmacSha2_512);
         };
     }
 

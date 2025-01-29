@@ -176,11 +176,14 @@ impl<H: Hash + BlockSize> Hkdf<H> {
 #[macro_export]
 macro_rules! hkdf_impl {
     ($name:ident, $doc_name:expr, $hash:ident) => {
+        $crate::hkdf_impl!($name, $doc_name, $hash, $name);
+    };
+    ($name:ident, $doc_name:expr, $hash:ident, $id:ident) => {
         #[doc = concat!($doc_name, ".")]
         pub struct $name;
 
         impl $crate::kdf::Kdf for $name {
-            const ID: $crate::kdf::KdfId = $crate::kdf::KdfId::$name;
+            const ID: $crate::kdf::KdfId = $crate::kdf::KdfId::$id;
 
             type MaxOutput = $crate::hkdf::MaxOutput<<$hash as $crate::hash::Hash>::DigestSize>;
 
@@ -222,9 +225,9 @@ mod tests {
             hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384);
             hkdf_impl!(HkdfSha512, "HKDF-SHA512", Sha512);
 
-            test_kdf!(mod hkdf_sha256, HkdfSha256, HKDF_SHA_256);
-            test_kdf!(mod hkdf_sha384, HkdfSha384, HKDF_SHA_384);
-            test_kdf!(mod hkdf_sha512, HkdfSha512, HKDF_SHA_512);
+            test_kdf!(mod hkdf_sha256, HkdfSha256);
+            test_kdf!(mod hkdf_sha384, HkdfSha384);
+            test_kdf!(mod hkdf_sha512, HkdfSha512);
         };
     }
 

@@ -11,6 +11,7 @@ use crate::{
     hpke::{Hpke, Mode, OpenCtx, SealCtx},
     kdf::{Expand, Kdf, KdfError, Prk},
     kem::{DecapKey, Kem},
+    test_util::wycheproof,
 };
 
 /// Invokes `callback` for each HPKE test.
@@ -46,6 +47,7 @@ macro_rules! for_each_hpke_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
             test_round_trip,
             test_export,
         }
@@ -70,32 +72,23 @@ pub use for_each_hpke_test;
 ///     test_hpke,
 /// };
 ///
-/// // Without test vectors.
-/// test_hpke!(dhkemp256hkdfsha256_hkdfsha256_aes256gcm,
+/// test_hpke!(mod dhkemp256hkdfsha256_hkdfsha256_aes256gcm,
 ///     DhKemP256HkdfSha256,
 ///     HkdfSha256,
 ///     Aes256Gcm,
-/// );
-///
-/// // With test vectors.
-/// test_hpke!(dhkemp256hkdfsha256_hkdfsha256_aes256gcm_with_vecs,
-///     DhKemP256HkdfSha256,
-///     HkdfSha256,
-///     Aes256Gcm,
-///     HpkeTest::HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm,
 /// );
 /// ```
 #[macro_export]
 macro_rules! test_hpke {
-    ($name:ident, $kem:ty, $kdf:ty, $aead:ty $(, HpkeTest::$vectors:ident)? $(,)?) => {
+    (mod $name:ident, $kem:ty, $kdf:ty, $aead:ty $(,)?) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_hpke!($kem, $kdf, $aead $(, HpkeTest::$vectors)?);
+            $crate::test_hpke!($kem, $kdf, $aead);
         }
     };
-    ($kem:ty, $kdf:ty, $aead:ty $(, HpkeTest::$vectors:ident)? $(,)?) => {
+    ($kem:ty, $kdf:ty, $aead:ty $(,)?) => {
         macro_rules! __hpke_test {
             ($test:ident) => {
                 #[test]
@@ -107,18 +100,17 @@ macro_rules! test_hpke {
             };
         }
         $crate::for_each_hpke_test!(__hpke_test);
-
-        // $(
-        //     #[test]
-        //     fn vectors() {
-        //         $crate::test_util::vectors::test_hpke::<$kem, $kdf, $aead>(
-        //             $crate::test_util::vectors::HpkeTest::$vectors,
-        //         );
-        //     }
-        // )?
     };
 }
 pub use test_hpke;
+
+/// Tests against HPKE-specific vectors.
+pub fn test_vectors<K: Kem, F: Kdf, A: Aead + IndCca2, R: Csprng>(_rng: &mut R) {
+    let id = wycheproof::hpke::HpkeId::from((K::ID, F::ID, A::ID));
+    if let Ok(name) = wycheproof::HpkeTest::try_from(id) {
+        wycheproof::test_hpke::<K, F, A>(name);
+    }
+}
 
 /// Tests the full encryption-decryption cycle.
 #[allow(non_snake_case)]

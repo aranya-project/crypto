@@ -197,5 +197,5 @@ mod tests {
     use super::*;
     use crate::test_util::test_signer;
 
-    test_signer!(mod ed25519, Ed25519, Ed25519);
+    test_signer!(mod ed25519, Ed25519);
 }

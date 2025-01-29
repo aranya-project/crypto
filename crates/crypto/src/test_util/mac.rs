@@ -46,19 +46,19 @@ macro_rules! for_each_mac_test {
 /// ```
 /// use spideroak_crypto::{test_mac, rust::HmacSha256};
 ///
-/// test_mac!(mod hmac_sha256, HmacSha256, HMAC_SHA_256);
+/// test_mac!(mod hmac_sha256, HmacSha256);
 /// ```
 #[macro_export]
 macro_rules! test_mac {
-    (mod $name:ident, $mac:ty, $alg:ident) => {
+    (mod $name:ident, $mac:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_mac!($mac, $alg);
+            $crate::test_mac!($mac);
         }
     };
-    ($mac:ty, $alg:ident) => {
+    ($mac:ty) => {
         macro_rules! __mac_test {
             ($test:ident) => {
                 #[test]

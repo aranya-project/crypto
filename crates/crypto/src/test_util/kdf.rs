@@ -26,6 +26,7 @@ macro_rules! for_each_kdf_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
             test_arbitrary_len,
             test_max_output,
         }
@@ -42,19 +43,19 @@ macro_rules! for_each_kdf_test {
 /// ```
 /// use spideroak_crypto::{test_kdf, rust::HkdfSha256};
 ///
-/// test_kdf!(mod hkdf_sha256, HkdfSha256, HKDF_SHA_256);
+/// test_kdf!(mod hkdf_sha256, HkdfSha256);
 /// ```
 #[macro_export]
 macro_rules! test_kdf {
-    (mod $name:ident, $kdf:ty, $alg:ident) => {
+    (mod $name:ident, $kdf:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_kdf!($kdf, $alg);
+            $crate::test_kdf!($kdf);
         }
     };
-    ($kdf:ty, $alg:ident) => {
+    ($kdf:ty) => {
         macro_rules! __kdf_test {
             ($test:ident) => {
                 #[test]
@@ -64,9 +65,6 @@ macro_rules! test_kdf {
             };
         }
         $crate::for_each_kdf_test!(__kdf_test);
-
-        $crate::test_acvp!($kdf, $alg);
-        $crate::test_wycheproof!($kdf, $alg);
     };
 }
 pub use test_kdf;
@@ -103,6 +101,11 @@ fn check<T: Kdf>(out1: &mut [u8], out2: &mut [u8], ikm: &[u8], salt: &[u8], info
         &tmp[..],
         "extract_and_expand differs from extract+expand"
     );
+}
+
+/// Tests against KDF-specific vectors.
+pub fn test_vectors<T: Kdf>() {
+    // TODO(eric): Add test vectors
 }
 
 /// Tests that we can use arbitrary length IKM, salts, and

@@ -41,16 +41,16 @@ impl core::error::Error for MacError {}
 pub enum MacId {
     /// HMAC-SHA2-256.
     #[alg_id(1)]
-    HmacSha256,
+    HmacSha2_256,
     /// HMAC-SHA2-384.
     #[alg_id(2)]
-    HmacSha384,
+    HmacSha2_384,
     /// HMAC-SHA2-512.
     #[alg_id(3)]
-    HmacSha512,
+    HmacSha2_512,
     /// HMAC-SHA2-512/256.
     #[alg_id(4)]
-    HmacSha512_256,
+    HmacSha2_512_256,
     /// HMAC-SHA3-256.
     #[alg_id(5)]
     HmacSha3_256,
@@ -145,7 +145,7 @@ pub trait Mac: Clone + Sized {
         }
     }
 
-    /// Returns the tag for `data` using `key`.
+    /// Computes the tag for `data` using `key`.
     ///
     /// While this function is provided by default,
     /// implementations of [`Mac`] are encouraged to provide
@@ -154,6 +154,17 @@ pub trait Mac: Clone + Sized {
         let mut h = Self::new(key);
         h.update(data);
         h.tag()
+    }
+
+    /// Attempts to compute tag for `data` using `key`.
+    ///
+    /// While this function is provided by default,
+    /// implementations of [`Mac`] are encouraged to provide
+    /// optimized "single-shot" implementations.
+    fn try_mac(key: &[u8], data: &[u8]) -> Result<Self::Tag, InvalidKey> {
+        let mut h = Self::try_new(key)?;
+        h.update(data);
+        Ok(h.tag())
     }
 }
 

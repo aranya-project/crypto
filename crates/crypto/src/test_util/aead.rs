@@ -10,7 +10,6 @@ use more_asserts::assert_ge;
 use crate::{
     aead::{Aead, Nonce, OpenError},
     csprng::{Csprng, Random},
-    keys::SecretKey,
     test_util::{assert_all_zero, assert_ct_ne, wycheproof},
 };
 
@@ -59,19 +58,19 @@ pub use for_each_aead_test;
 /// ```
 /// use spideroak_crypto::{test_aead, rust::Aes256Gcm};
 ///
-/// test_aead!(mod aes256gcm, Aes256Gcm, AES_256_GCM);
+/// test_aead!(mod aes256gcm, Aes256Gcm);
 /// ```
 #[macro_export]
 macro_rules! test_aead {
-    (mod $name:ident, $aead:ty, $alg:ident) => {
+    (mod $name:ident, $aead:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_aead!($aead, $alg);
+            $crate::test_aead!($aead);
         }
     };
-    ($aead:ty, $alg:ident) => {
+    ($aead:ty) => {
         macro_rules! __aead_test {
             ($test:ident) => {
                 #[test]

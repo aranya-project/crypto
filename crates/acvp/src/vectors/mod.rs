@@ -6,6 +6,8 @@
 //! # Example
 //!
 //! ```rust
+//! #[cfg(all(feature = "sha2", feature = "vectors"))]
+//! # {
 //! use acvp::vectors::sha2::{self, Algorithm, Tests};
 //!
 //! let vectors = sha2::load(Algorithm::Sha2_256).unwrap();
@@ -18,6 +20,7 @@
 //!         Tests::Ldt(_tests) => {}
 //!     }
 //! }
+//! # }
 //! ```
 //!
 //! [ACVP]: https://pages.nist.gov/ACVP/
@@ -51,6 +54,7 @@ pub struct Vectors<G> {
     pub test_groups: Vec<G>,
 }
 
+#[allow(unused_macros, reason = "Depends which features are enabled")]
 macro_rules! define_tests {
     ($($name:ident => $prefix:literal),* $(,)?) => {
         /// A cryptographic algorithm.
@@ -103,4 +107,5 @@ macro_rules! define_tests {
         }
     };
 }
+#[allow(unused_imports, reason = "Depends which features are enabled")]
 pub(super) use define_tests;

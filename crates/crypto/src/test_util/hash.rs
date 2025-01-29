@@ -38,19 +38,19 @@ pub use for_each_hash_test;
 /// ```
 /// use spideroak_crypto::{test_hash, rust::Sha256};
 ///
-/// test_hash!(mod sha256, Sha256, SHA2_256);
+/// test_hash!(mod sha256, Sha256);
 /// ```
 #[macro_export]
 macro_rules! test_hash {
-    (mod $name:ident, $hash:ty, $alg:ident) => {
+    (mod $name:ident, $hash:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_hash!($hash, $alg);
+            $crate::test_hash!($hash);
         }
     };
-    ($hash:ty, $alg:ident) => {
+    ($hash:ty) => {
         macro_rules! __hash_test {
             ($test:ident) => {
                 #[test]

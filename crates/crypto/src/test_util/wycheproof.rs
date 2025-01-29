@@ -5,22 +5,24 @@
 use alloc::{string::ToString, vec};
 use core::borrow::Borrow;
 
+use hpke::HpkeId;
 pub use hpke::TestName as HpkeTest;
 use subtle::ConstantTimeEq;
 pub use wycheproof::{
     self, aead::TestName as AeadTest, ecdh::TestName as EcdhTest, ecdsa::TestName as EcdsaTest,
-    eddsa::TestName as EdDsaTest, hkdf::TestName as HkdfTest, mac::TestName as MacTest, TestResult,
+    eddsa::TestName as EddsaTest, hkdf::TestName as HkdfTest, mac::TestName as MacTest,
+    xdh::TestName as XdhTest, TestResult,
 };
-use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac};
+use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac, xdh};
 
 use crate::{
     aead::{Aead, AeadId, IndCca2, Nonce},
     hpke::{Hpke, SealCtx},
     import::Import,
-    kdf::Kdf,
-    kem::{Ecdh, Kem},
+    kdf::{Kdf, KdfId},
+    kem::{Ecdh, EcdhId, Kem},
     mac::Mac,
-    signer::{Signer, VerifyingKey},
+    signer::{Signer, SignerId, VerifyingKey},
     test_util::UnknownAlgId,
 };
 
@@ -33,121 +35,96 @@ macro_rules! msg {
     };
 }
 
-impl TryFrom<AeadId> for AeadTest {
-    type Error = UnknownAlgId;
+macro_rules! map_ids {
+    (
+        $from:ident => $to:ident;
+        $($pat:pat => $test:ident),+ $(,)?
+    ) => {
+        impl TryFrom<$from> for $to {
+            type Error = UnknownAlgId<$from>;
 
-    fn try_from(id: AeadId) -> Result<Self, Self::Error> {
-        match id {
-            AeadId::Aes128Gcm | AeadId::Aes256Gcm => Ok(AeadTest::AesGcm),
-            _ => Err(UnknownAlgId(id.to_u16())),
+            fn try_from(id: $from) -> Result<Self, Self::Error> {
+                #[allow(unused_imports)]
+                use $from::*;
+
+                match id {
+                    $(
+                        $pat => Ok($to::$test),
+                    )+
+                    #[allow(unreachable_patterns)]
+                    id => Err(UnknownAlgId(id)),
+                }
+            }
         }
     }
 }
 
-/// Tests a particular algorithm against the Project Wycheproof
-/// test vectors.
-///
-/// # Example
-///
-/// ```
-/// use spideroak_crypto::{test_wycheproof, rust::{Aes256Gcm, Sha256}};
-///
-/// test_wycheproof!(Aes256Gcm, AES_256_GCM);
-/// test_wycheproof!(Sha256, SHA2_256);
-/// ```
-#[macro_export]
-macro_rules! test_wycheproof {
-    // AEAD
-    (@aead $name:ident, $aead:ty, $test:ident) => {
-        #[test]
-        fn $name() {
-            use $crate::test_util::wycheproof::{test_aead, AeadTest};
-            use $crate::test_util::AeadWithDefaults;
-            test_aead::<$aead>(AeadTest::$test);
-            test_aead::<AeadWithDefaults<$aead>>(AeadTest::$test);
-        }
-    };
-    ($aead:ty, AES_128_GCM) => {
-        $crate::test_wycheproof!(@aead test_aes_128_gcm_wycheproof, $aead, AesGcm);
-    };
-    ($aead:ty, AES_256_GCM) => {
-        $crate::test_wycheproof!(@aead test_aes_256_gcm_wycheproof, $aead, AesGcm);
-    };
-
-    // ECDH
-    (@ecdh $name:ident, $ecdh:ty, $test:ident) => {
-        #[test]
-        fn $name() {
-            use $crate::test_util::wycheproof::{test_ecdh, EcdhTest};
-            test_ecdh::<$ecdh>(EcdhTest::$test);
-        }
-    };
-    ($ecdh:ty, ECDH_secp256r1) => {
-        $crate::test_wycheproof!(@ecdh test_ecdh_secp256r1_wycheproof, $ecdh, EcdhSecp256r1);
-    };
-    ($ecdh:ty, ECDH_secp384r1) => {
-        $crate::test_wycheproof!(@ecdh test_ecdh_secp384r1_wycheproof, $ecdh, EcdhSecp384r1);
-    };
-    ($ecdh:ty, ECDH_secp521r1) => {
-        $crate::test_wycheproof!(@ecdh test_ecdh_secp521r1_wycheproof, $ecdh, EcdhSecp521r1);
-    };
-
-    // ECDSA
-    (@ecdsa $name:ident, $ecdsa:ty, $test:ident) => {
-        #[test]
-        fn $name() {
-            use $crate::test_util::wycheproof::{test_ecdsa, EcdsaTest};
-            test_ecdsa::<$ecdsa>(EcdsaTest::$test);
-        }
-    };
-    ($ecdsa:ty, ECDSA_secp256r1_SHA_256) => {
-        $crate::test_wycheproof!(@ecdsa test_ecdsa_secp256r1_wycheproof, $ecdsa, EcdsaSecp256r1Sha256);
-    };
-    ($ecdsa:ty, ECDSA_secp384r1_SHA_384) => {
-        $crate::test_wycheproof!(@ecdsa test_ecdsa_secp384r1_wycheproof, $ecdsa, EcdsaSecp384r1Sha384);
-    };
-    ($ecdsa:ty, ECDSA_secp521r1_SHA_512) => {
-        $crate::test_wycheproof!(@ecdsa test_ecdsa_secp521r1_wycheproof, $ecdsa, EcdsaSecp521r1Sha512);
-    };
-
-    // EdDSA
-    (@eddsa $name:ident, $eddsa:ty, $test:ident) => {
-        #[test]
-        fn $name() {
-            use $crate::test_util::wycheproof::{test_ecdsa, EdDsaTest};
-            test_eddsa::<$eddsa>(EdDsaTest::$test);
-        }
-    };
-    ($eddsa:ty, ED25519) => {
-        $crate::test_wycheproof!(@eddsa test_ed25519_wycheproof, $eddsa, Ed25519);
-    };
-    ($eddsa:ty, ED448) => {
-        $crate::test_wycheproof!(@eddsa test_ed448_wycheproof, $eddsa, Ed448);
-    };
-
-    // HKDF
-    (@hkdf $name:ident, $eddsa:ty, $test:ident) => {
-        #[test]
-        fn $name() {
-            use $crate::test_util::wycheproof::{test_hkdf, HkdfTest};
-            test_hkdf::<$hkdf>(HkdfTest::$test);
-        }
-    };
-    ($hkdf:ty, HKDF_SHA2_256) => {
-        $crate::test_wycheproof!(@hkdf test_hkdf_sha256, $hkdf, HkdfSha256);
-    };
-    ($hkdf:ty, HKDF_SHA2_384) => {
-        $crate::test_wycheproof!(@hkdf test_hkdf_sha384, $hkdf, HkdfSha384);
-    };
-    ($hkdf:ty, HKDF_SHA2_512) => {
-        $crate::test_wycheproof!(@hkdf test_hkdf_sha512, $hkdf, HkdfSha512);
-    };
-
-    ($ty:ty, $alg:expr) => {
-        // Unsupported
-    }
+map_ids! {
+    AeadId => AeadTest;
+    AeadId::Aes128Gcm | AeadId::Aes256Gcm => AesGcm,
 }
-pub use test_wycheproof;
+
+map_ids! {
+    EcdhId => EcdhTest;
+    Secp256r1 => EcdhSecp256r1,
+    Secp384r1 => EcdhSecp384r1,
+    Secp521r1 => EcdhSecp521r1,
+}
+
+map_ids! {
+    SignerId => EcdsaTest;
+    Secp256r1Sha2_256 => EcdsaSecp256r1Sha256,
+    Secp256r1Sha2_512 => EcdsaSecp256r1Sha512,
+    Secp384r1Sha2_384 => EcdsaSecp384r1Sha384,
+    Secp521r1Sha2_512 => EcdsaSecp521r1Sha512,
+}
+
+map_ids! {
+    SignerId => EddsaTest;
+    Ed25519 => Ed25519,
+    Ed448 => Ed448,
+}
+
+map_ids! {
+    KdfId => HkdfTest;
+    HkdfSha256 => HkdfSha256,
+    HkdfSha384 => HkdfSha384,
+    HkdfSha512 => HkdfSha512,
+}
+
+map_ids! {
+    EcdhId => XdhTest;
+    X25519 => X25519,
+    X448 => X448,
+}
+
+map_ids! {
+    HpkeId => HpkeTest;
+    HpkeDhKemP256HkdfSha256HkdfSha256Aes128Gcm => HpkeDhKemP256HkdfSha256HkdfSha256Aes128Gcm,
+    HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm => HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm,
+    HpkeDhKemP256HkdfSha256HkdfSha256ChaCha20Poly1305 => HpkeDhKemP256HkdfSha256HkdfSha256ChaCha20Poly1305,
+    HpkeDhKemP256HkdfSha256HkdfSha512Aes128Gcm => HpkeDhKemP256HkdfSha256HkdfSha512Aes128Gcm,
+    HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm => HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm,
+    HpkeDhKemP256HkdfSha256HkdfSha512ChaCha20Poly1305 => HpkeDhKemP256HkdfSha256HkdfSha512ChaCha20Poly1305,
+    HpkeDhKemP521HkdfSha512HkdfSha256Aes128Gcm => HpkeDhKemP521HkdfSha512HkdfSha256Aes128Gcm,
+    HpkeDhKemP521HkdfSha512HkdfSha256Aes256Gcm => HpkeDhKemP521HkdfSha512HkdfSha256Aes256Gcm,
+    HpkeDhKemP521HkdfSha512HkdfSha256ChaCha20Poly1305 => HpkeDhKemP521HkdfSha512HkdfSha256ChaCha20Poly1305,
+    HpkeDhKemP521HkdfSha512HkdfSha512Aes128Gcm => HpkeDhKemP521HkdfSha512HkdfSha512Aes128Gcm,
+    HpkeDhKemP521HkdfSha512HkdfSha512Aes256Gcm => HpkeDhKemP521HkdfSha512HkdfSha512Aes256Gcm,
+    HpkeDhKemP521HkdfSha512HkdfSha512ChaCha20Poly1305 => HpkeDhKemP521HkdfSha512HkdfSha512ChaCha20Poly1305,
+    HpkeDhKemX25519HkdfSha256HkdfSha256Aes128Gcm => HpkeDhKemX25519HkdfSha256HkdfSha256Aes128Gcm,
+    HpkeDhKemX25519HkdfSha256HkdfSha256Aes256Gcm => HpkeDhKemX25519HkdfSha256HkdfSha256Aes256Gcm,
+    HpkeDhKemX25519HkdfSha256HkdfSha256ChaCha20Poly1305 => HpkeDhKemX25519HkdfSha256HkdfSha256ChaCha20Poly1305,
+    HpkeDhKemX25519HkdfSha256HkdfSha512Aes128Gcm => HpkeDhKemX25519HkdfSha256HkdfSha512Aes128Gcm,
+    HpkeDhKemX25519HkdfSha256HkdfSha512Aes256Gcm => HpkeDhKemX25519HkdfSha256HkdfSha512Aes256Gcm,
+    HpkeDhKemX25519HkdfSha256HkdfSha512ChaCha20Poly1305 => HpkeDhKemX25519HkdfSha256HkdfSha512ChaCha20Poly1305,
+    HpkeDhKemX448HkdfSha512HkdfSha256Aes128Gcm => HpkeDhKemX448HkdfSha512HkdfSha256Aes128Gcm,
+    HpkeDhKemX448HkdfSha512HkdfSha256Aes256Gcm => HpkeDhKemX448HkdfSha512HkdfSha256Aes256Gcm,
+    HpkeDhKemX448HkdfSha512HkdfSha256ChaCha20Poly1305 => HpkeDhKemX448HkdfSha512HkdfSha256ChaCha20Poly1305,
+    HpkeDhKemX448HkdfSha512HkdfSha512Aes128Gcm => HpkeDhKemX448HkdfSha512HkdfSha512Aes128Gcm,
+    HpkeDhKemX448HkdfSha512HkdfSha512Aes256Gcm => HpkeDhKemX448HkdfSha512HkdfSha512Aes256Gcm,
+    HpkeDhKemX448HkdfSha512HkdfSha512ChaCha20Poly1305 => HpkeDhKemX448HkdfSha512HkdfSha512ChaCha20Poly1305,
+}
 
 /// Tests an [`Aead`] against Project Wycheproof test vectors.
 pub fn test_aead<A: Aead>(name: AeadTest) {
@@ -287,7 +264,7 @@ pub fn test_ecdsa<T: Signer>(name: EcdsaTest) {
 
 /// Tests a [`Signer`] that implements EdDSA against Project
 /// Wycheproof test vectors.
-pub fn test_eddsa<T: Signer>(name: EdDsaTest) {
+pub fn test_eddsa<T: Signer>(name: EddsaTest) {
     fn sig_len(name: eddsa::TestName) -> usize {
         match name {
             eddsa::TestName::Ed25519 => 64,
@@ -477,6 +454,37 @@ where
     }
 }
 
+/// Tests an [`Ecdh`] against Project Wycheproof test
+/// vectors.
+pub fn test_xdh<T: Ecdh>(name: XdhTest) {
+    let set = xdh::TestSet::load(name).expect("should be able to load tests");
+    for g in &set.test_groups {
+        for tc in &g.tests {
+            let id = tc.tc_id;
+
+            let sk = match T::PrivateKey::import(&tc.private_key[..]) {
+                Ok(sk) => sk,
+                Err(_) => continue,
+            };
+            let pk = match T::PublicKey::import(&tc.public_key[..]) {
+                Ok(pk) => pk,
+                Err(_) => continue,
+            };
+
+            let res = T::ecdh(&sk, &pk);
+            match tc.result {
+                TestResult::Valid | TestResult::Acceptable => {
+                    let got = res.unwrap_or_else(|_| panic!("{id}"));
+                    assert_eq!(got.borrow(), &tc.shared_secret[..]);
+                }
+                TestResult::Invalid => {
+                    res.err().unwrap_or_else(|| panic!("{id}"));
+                }
+            };
+        }
+    }
+}
+
 /// HPKE tests.
 #[allow(missing_docs)]
 pub mod hpke {
@@ -488,40 +496,43 @@ pub mod hpke {
     use wycheproof::{ByteString, WycheproofError};
 
     use crate::{
+        aead::AeadId,
         hpke::{Mode, Psk},
         import::Import,
+        kdf::KdfId,
+        kem::KemId,
     };
 
     macro_rules! test_names {
-            ($($name:ident),* $(,)?) => {
-                pub enum TestName {
-                    $($name,)*
-                }
+        ($($name:ident),* $(,)?) => {
+            pub enum TestName {
+                $($name,)*
+            }
 
-                impl TestName {
-                    fn json_data(&self) -> &'static str {
-                        match self {
-                            $(
-                                Self::$name => include_str!(concat!("testdata/", stringify!($name), ".json")),
-                            )*
-                        }
+            impl TestName {
+                fn json_data(&self) -> &'static str {
+                    match self {
+                        $(
+                            Self::$name => include_str!(concat!("testdata/", stringify!($name), ".json")),
+                        )*
                     }
                 }
+            }
 
-                impl FromStr for TestName {
-                    type Err = WycheproofError;
+            impl FromStr for TestName {
+                type Err = WycheproofError;
 
-                    fn from_str(s: &str) -> Result<Self, Self::Err> {
-                        match s {
-                            $(
-                                stringify!($name) => Ok(Self::$name),
-                            )*
-                            _ => Err(WycheproofError::NoDataSet),
-                        }
+                fn from_str(s: &str) -> Result<Self, Self::Err> {
+                    match s {
+                        $(
+                            stringify!($name) => Ok(Self::$name),
+                        )*
+                        _ => Err(WycheproofError::NoDataSet),
                     }
                 }
-            };
-        }
+            }
+        };
+    }
 
     test_names! {
         HpkeDhKemP256HkdfSha256HkdfSha256Aes128Gcm,
@@ -556,6 +567,122 @@ pub mod hpke {
         HpkeDhKemX448HkdfSha512HkdfSha512Aes256Gcm,
         HpkeDhKemX448HkdfSha512HkdfSha512ChaCha20Poly1305,
         HpkeDhKemX448HkdfSha512HkdfSha512ExportOnly,
+    }
+
+    macro_rules! hpke_ids {
+        ($($id:ident),* $(,)?) => {
+            pub enum HpkeId {
+                $($id,)*
+                Other(KemId, KdfId, AeadId),
+            }
+        };
+    }
+
+    hpke_ids! {
+        HpkeDhKemP256HkdfSha256HkdfSha256Aes128Gcm,
+        HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm,
+        HpkeDhKemP256HkdfSha256HkdfSha256ChaCha20Poly1305,
+        HpkeDhKemP256HkdfSha256HkdfSha512Aes128Gcm,
+        HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm,
+        HpkeDhKemP256HkdfSha256HkdfSha512ChaCha20Poly1305,
+        HpkeDhKemP521HkdfSha512HkdfSha256Aes128Gcm,
+        HpkeDhKemP521HkdfSha512HkdfSha256Aes256Gcm,
+        HpkeDhKemP521HkdfSha512HkdfSha256ChaCha20Poly1305,
+        HpkeDhKemP521HkdfSha512HkdfSha512Aes128Gcm,
+        HpkeDhKemP521HkdfSha512HkdfSha512Aes256Gcm,
+        HpkeDhKemP521HkdfSha512HkdfSha512ChaCha20Poly1305,
+        HpkeDhKemX25519HkdfSha256HkdfSha256Aes128Gcm,
+        HpkeDhKemX25519HkdfSha256HkdfSha256Aes256Gcm,
+        HpkeDhKemX25519HkdfSha256HkdfSha256ChaCha20Poly1305,
+        HpkeDhKemX25519HkdfSha256HkdfSha512Aes128Gcm,
+        HpkeDhKemX25519HkdfSha256HkdfSha512Aes256Gcm,
+        HpkeDhKemX25519HkdfSha256HkdfSha512ChaCha20Poly1305,
+        HpkeDhKemX448HkdfSha512HkdfSha256Aes128Gcm,
+        HpkeDhKemX448HkdfSha512HkdfSha256Aes256Gcm,
+        HpkeDhKemX448HkdfSha512HkdfSha256ChaCha20Poly1305,
+        HpkeDhKemX448HkdfSha512HkdfSha512Aes128Gcm,
+        HpkeDhKemX448HkdfSha512HkdfSha512Aes256Gcm,
+        HpkeDhKemX448HkdfSha512HkdfSha512ChaCha20Poly1305,
+    }
+
+    impl From<(KemId, KdfId, AeadId)> for HpkeId {
+        fn from((kem, kdf, aead): (KemId, KdfId, AeadId)) -> Self {
+            match (kem, kdf, aead) {
+                (KemId::DhKemP256HkdfSha256, KdfId::HkdfSha256, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemP256HkdfSha256HkdfSha256Aes128Gcm
+                }
+                (KemId::DhKemP256HkdfSha256, KdfId::HkdfSha256, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm
+                }
+                (KemId::DhKemP256HkdfSha256, KdfId::HkdfSha256, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemP256HkdfSha256HkdfSha256ChaCha20Poly1305
+                }
+                (KemId::DhKemP256HkdfSha256, KdfId::HkdfSha512, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemP256HkdfSha256HkdfSha512Aes128Gcm
+                }
+                (KemId::DhKemP256HkdfSha256, KdfId::HkdfSha512, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm
+                }
+                (KemId::DhKemP256HkdfSha256, KdfId::HkdfSha512, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemP256HkdfSha256HkdfSha512ChaCha20Poly1305
+                }
+                (KemId::DhKemP521HkdfSha512, KdfId::HkdfSha256, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemP521HkdfSha512HkdfSha256Aes128Gcm
+                }
+                (KemId::DhKemP521HkdfSha512, KdfId::HkdfSha256, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemP521HkdfSha512HkdfSha256Aes256Gcm
+                }
+                (KemId::DhKemP521HkdfSha512, KdfId::HkdfSha256, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemP521HkdfSha512HkdfSha256ChaCha20Poly1305
+                }
+                (KemId::DhKemP521HkdfSha512, KdfId::HkdfSha512, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemP521HkdfSha512HkdfSha512Aes128Gcm
+                }
+                (KemId::DhKemP521HkdfSha512, KdfId::HkdfSha512, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemP521HkdfSha512HkdfSha512Aes256Gcm
+                }
+                (KemId::DhKemP521HkdfSha512, KdfId::HkdfSha512, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemP521HkdfSha512HkdfSha512ChaCha20Poly1305
+                }
+                (KemId::DhKemX25519HkdfSha256, KdfId::HkdfSha256, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemX25519HkdfSha256HkdfSha256Aes128Gcm
+                }
+                (KemId::DhKemX25519HkdfSha256, KdfId::HkdfSha256, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemX25519HkdfSha256HkdfSha256Aes256Gcm
+                }
+                (KemId::DhKemX25519HkdfSha256, KdfId::HkdfSha256, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemX25519HkdfSha256HkdfSha256ChaCha20Poly1305
+                }
+                (KemId::DhKemX25519HkdfSha256, KdfId::HkdfSha512, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemX25519HkdfSha256HkdfSha512Aes128Gcm
+                }
+                (KemId::DhKemX25519HkdfSha256, KdfId::HkdfSha512, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemX25519HkdfSha256HkdfSha512Aes256Gcm
+                }
+                (KemId::DhKemX25519HkdfSha256, KdfId::HkdfSha512, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemX25519HkdfSha256HkdfSha512ChaCha20Poly1305
+                }
+                (KemId::DhKemX448HkdfSha512, KdfId::HkdfSha256, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemX448HkdfSha512HkdfSha256Aes128Gcm
+                }
+                (KemId::DhKemX448HkdfSha512, KdfId::HkdfSha256, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemX448HkdfSha512HkdfSha256Aes256Gcm
+                }
+                (KemId::DhKemX448HkdfSha512, KdfId::HkdfSha256, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemX448HkdfSha512HkdfSha256ChaCha20Poly1305
+                }
+                (KemId::DhKemX448HkdfSha512, KdfId::HkdfSha512, AeadId::Aes128Gcm) => {
+                    Self::HpkeDhKemX448HkdfSha512HkdfSha512Aes128Gcm
+                }
+                (KemId::DhKemX448HkdfSha512, KdfId::HkdfSha512, AeadId::Aes256Gcm) => {
+                    Self::HpkeDhKemX448HkdfSha512HkdfSha512Aes256Gcm
+                }
+                (KemId::DhKemX448HkdfSha512, KdfId::HkdfSha512, AeadId::ChaCha20Poly1305) => {
+                    Self::HpkeDhKemX448HkdfSha512HkdfSha512ChaCha20Poly1305
+                }
+                (kem, kdf, aead) => Self::Other(kem, kdf, aead),
+            }
+        }
     }
 
     #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]

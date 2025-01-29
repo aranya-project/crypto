@@ -74,21 +74,44 @@ impl From<Bug> for SignerError {
 /// Digital signature algorithm identifiers.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
 pub enum SignerId {
-    /// ECDSA using NIST Curve P-256.
-    #[alg_id(0x0001)]
-    P256,
-    /// ECDSA using NIST Curve P-384.
-    #[alg_id(0x0002)]
-    P384,
-    /// ECDSA using NIST Curve P-521.
-    #[alg_id(0x0003)]
-    P521,
+    /// ECDSA using NIST Curve P-256 and SHA2-256 as the hash
+    /// function.
+    #[alg_id(1)]
+    Secp256r1Sha2_256,
+    /// ECDSA using NIST Curve P-256 and SHA2-384 as the hash
+    /// function.
+    #[alg_id(2)]
+    Secp256r1Sha2_384,
+    /// ECDSA using NIST Curve P-256 and SHA2-512 as the hash
+    /// function.
+    #[alg_id(3)]
+    Secp256r1Sha2_512,
+    /// ECDSA using NIST Curve P-256 and SHA2-512/256 as the hash
+    /// function.
+    #[alg_id(4)]
+    Secp256r1Sha2_512_256,
+
+    /// ECDSA using NIST Curve P-384 and SHA2-384 as the hash
+    /// function.
+    #[alg_id(5)]
+    Secp384r1Sha2_384,
+    /// ECDSA using NIST Curve P-384 and SHA2-512 as the hash
+    /// function.
+    #[alg_id(6)]
+    Secp384r1Sha2_512,
+
+    /// ECDSA using NIST Curve P-521 and SHA2-512 as the hash
+    /// function.
+    #[alg_id(7)]
+    Secp521r1Sha2_512,
+
     /// EdDSA using Ed25519.
-    #[alg_id(0x0004)]
+    #[alg_id(8)]
     Ed25519,
     /// EdDSA using Ed448.
-    #[alg_id(0x0005)]
+    #[alg_id(9)]
     Ed448,
+
     /// Some other digital signature algorithm.
     #[alg_id(Other)]
     Other(NonZeroU16),

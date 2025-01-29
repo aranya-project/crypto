@@ -10,42 +10,41 @@ use acvp::vectors::{hmac, sha2, sha3};
 
 use crate::{
     hash::{Digest, Hash, HashId},
-    import::Import,
     mac::{Mac, MacId},
     test_util::UnknownAlgId,
 };
 
 macro_rules! map_ids {
     (
-        $from:ty => $to:ty;
+        $from:ident => $krate:ident;
         $($id:ident => $alg:ident),+ $(,)?
     ) => {
-        impl TryFrom<$from> for $to {
-            type Error = UnknownAlgId;
+        impl TryFrom<$from> for $krate::Algorithm {
+            type Error = UnknownAlgId<$from>;
 
             fn try_from(id: $from) -> Result<Self, Self::Error> {
                 match id {
                     $(
-                        <$from>::$id => Ok(<$to>::$alg),
+                        $from::$id => Ok($krate::Algorithm::$alg),
                     )+
-                    id => Err(UnknownAlgId(id.to_u16())),
+                    id => Err(UnknownAlgId(id)),
                 }
             }
         }
     };
 }
 map_ids! {
-    MacId => hmac::Algorithm;
-    HmacSha256 => HmacSha2_256,
-    HmacSha384 => HmacSha2_384,
-    HmacSha512 => HmacSha2_512,
-    HmacSha512 => HmacSha2_512_256,
+    MacId => hmac;
+    HmacSha2_256 => HmacSha2_256,
+    HmacSha2_384 => HmacSha2_384,
+    HmacSha2_512 => HmacSha2_512,
+    HmacSha2_512_256 => HmacSha2_512_256,
     HmacSha3_256 => HmacSha3_256,
     HmacSha3_384 => HmacSha3_384,
     HmacSha3_512 => HmacSha3_512,
 }
 map_ids! {
-    HashId => sha2::Algorithm;
+    HashId => sha2;
     Sha256 => Sha2_256,
     // `acvp` currently doesn't support SHA-384.
     // Sha384 => Sha2_384,
@@ -53,88 +52,12 @@ map_ids! {
     Sha512_256 => Sha2_512_256,
 }
 map_ids! {
-    HashId => sha3::Algorithm;
+    HashId => sha3;
     Sha3_256 => Sha3_256,
     // `acvp` currently doesn't support SHA3-384 or SHA3-512.
     // Sha3_384 => Sha3_256,
     // Sha3_512 => Sha3_512,
 }
-
-/// Tests a particular algorithm against the ACVP test vectors.
-///
-/// # Example
-///
-/// ```
-/// use spideroak_crypto::{test_acvp, rust::{Aes256Gcm, Sha256}};
-///
-/// test_acvp!(Aes256Gcm, AES_256_GCM);
-/// test_acvp!(Sha256, SHA2_256);
-/// ```
-#[macro_export]
-macro_rules! test_acvp {
-    // AES-GCM
-    ($aead:ty, AES_128_GCM) => {};
-    ($aead:ty, AES_256_GCM) => {};
-
-    // SHA-2
-    (@sha2 $name:ident, $hash:ty, $test:ident) => {
-        #[test]
-        fn $name() {
-            use $crate::test_util::{
-                acvp::acvp::vectors::sha2::{self, Algorithm},
-                HashWithDefaults,
-            };
-            let vectors = sha2::load(Algorithm::$test)
-                .expect("should be able to load SHA-2 test vectors");
-            $crate::test_util::acvp::test_sha2::<$hash>(&vectors);
-            $crate::test_util::acvp::test_sha2::<HashWithDefaults<$hash>>(&vectors);
-        }
-    };
-    ($hash:ty, SHA2_256) => {
-        $crate::test_acvp!(@sha2 test_sha2_256_acvp, $hash, Sha2_256);
-    };
-    ($hash:ty, SHA2_384) => {
-        // Currently don't have any SHA2-384 test vectors.
-    };
-    ($hash:ty, SHA2_512) => {
-        $crate::test_acvp!(@sha2 test_sha2_512_acvp, $hash, Sha2_512);
-    };
-    ($hash:ty, SHA2_512_256) => {
-        $crate::test_acvp!(@sha2 test_sha2_512_256_acvp, $hash, Sha2_512_256);
-    };
-
-    // SHA-3
-    (@sha3 $name:ident, $hash:ty, $test:ident) => {
-        #[test]
-        fn $name() {
-            use $crate::test_util::{
-                acvp::acvp::vectors::sha3::{self, Algorithm},
-                HashWithDefaults,
-            };
-            let vectors = sha3::load(Algorithm::$test)
-                .expect("should be able to load SHA-3 test vectors");
-            $crate::test_util::acvp::test_sha3::<$hash>(&vectors);
-            $crate::test_util::acvp::test_sha3::<HashWithDefaults<$hash>>(&vectors);
-        }
-    };
-    ($hash:ty, SHA3_256) => {
-        $crate::test_acvp!(@sha3 test_sha3_256_acvp, $hash, Sha3_256);
-    };
-    ($hash:ty, SHA3_384) => {
-        // Currently don't have any SHA3-384 test vectors.
-    };
-    ($hash:ty, SHA3_512) => {
-        // Currently don't have any SHA3-512 test vectors.
-    };
-    ($hash:ty, SHA3_512_256) => {
-        $crate::test_acvp!(@sha2 test_sha3_512_256_acvp, $hash, Sha3_512_256);
-    };
-
-    ($ty:ty, $alg:expr) => {
-        // Unsupported
-    }
-}
-pub use test_acvp;
 
 /// Tests `M` against HMAC test vectors.
 #[track_caller]
@@ -143,11 +66,7 @@ where
     M: Mac,
     M::Tag: AsRef<[u8]>,
 {
-    hmac::test(vectors, |key, msg| {
-        let key = <M::Key as Import<_>>::import(key)?;
-        Ok(M::mac(&key, msg))
-    })
-    .unwrap();
+    hmac::test(vectors, |key, msg| Ok(M::try_mac(&key, msg)?)).unwrap();
 }
 
 /// Tests `H` against SHA-2 test vectors.

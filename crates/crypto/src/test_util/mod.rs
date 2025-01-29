@@ -18,13 +18,8 @@ pub mod mac;
 pub mod signer;
 pub mod wycheproof;
 
-use core::{
-    error,
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
+use core::{error, fmt, marker::PhantomData};
 
-pub use acvp::test_acvp;
 pub use aead::test_aead;
 pub use ecdh::test_ecdh;
 pub use hash::test_hash;
@@ -33,7 +28,6 @@ pub use kdf::test_kdf;
 pub use mac::test_mac;
 pub use signer::test_signer;
 use subtle::{Choice, ConstantTimeEq};
-pub use wycheproof::test_wycheproof;
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
@@ -115,11 +109,11 @@ macro_rules! __doctest_os_hardware_rand {
 
 /// The algorithm ID is unknown.
 #[derive(Debug)]
-pub struct UnknownAlgId(u16);
+pub struct UnknownAlgId<T>(pub(crate) T);
 
-impl error::Error for UnknownAlgId {}
+impl<T: fmt::Debug + fmt::Display> error::Error for UnknownAlgId<T> {}
 
-impl fmt::Display for UnknownAlgId {
+impl<T: fmt::Display> fmt::Display for UnknownAlgId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "unknown algorithm ID: {}", self.0)
     }
@@ -348,9 +342,9 @@ impl<T: Signer + ?Sized> Clone for VerifyingKeyWithDefaults<T> {
     }
 }
 
-impl<T: Signer + ?Sized> Debug for VerifyingKeyWithDefaults<T> {
+impl<T: Signer + ?Sized> fmt::Debug for VerifyingKeyWithDefaults<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 
@@ -378,9 +372,9 @@ impl<T: Signer + ?Sized> Clone for SignatureWithDefaults<T> {
     }
 }
 
-impl<T: Signer + ?Sized> Debug for SignatureWithDefaults<T> {
+impl<T: Signer + ?Sized> fmt::Debug for SignatureWithDefaults<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 

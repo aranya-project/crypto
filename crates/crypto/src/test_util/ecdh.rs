@@ -1,5 +1,7 @@
 //! ECDH tests.
 
+use crate::{csprng::Csprng, kem::Ecdh, test_util::wycheproof};
+
 /// Invokes `callback` for each test in this module.
 ///
 /// # Example
@@ -20,6 +22,7 @@ macro_rules! for_each_ecdh_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
         }
     };
 }
@@ -35,19 +38,19 @@ pub use for_each_ecdh_test;
 /// ```
 /// use spideroak_crypto::{test_signer, rust::P256};
 ///
-/// test_signer!(mod p256, P256, ECDH_secp256r1);
+/// test_signer!(mod p256, P256);
 /// ```
 #[macro_export]
 macro_rules! test_ecdh {
-    (mod $name:ident, $ecdh:ty, $alg:ident) => {
+    (mod $name:ident, $ecdh:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_ecdh!($ecdh, $alg);
+            $crate::test_ecdh!($ecdh);
         }
     };
-    ($ecdh:ty, $alg:ident) => {
+    ($ecdh:ty) => {
         macro_rules! __ecdh_test {
             ($test:ident) => {
                 #[test]
@@ -57,9 +60,15 @@ macro_rules! test_ecdh {
             };
         }
         $crate::for_each_ecdh_test!(__ecdh_test);
-
-        $crate::test_acvp!($ecdh, $alg);
-        $crate::test_wycheproof!($ecdh, $alg);
     };
 }
 pub use test_ecdh;
+
+/// Tests against ECDH-specific vectors.
+pub fn test_vectors<E: Ecdh, R: Csprng>(_rng: &mut R) {
+    if let Ok(name) = wycheproof::EcdhTest::try_from(E::ID) {
+        wycheproof::test_ecdh::<E>(name);
+    } else if let Ok(name) = wycheproof::XdhTest::try_from(E::ID) {
+        wycheproof::test_xdh::<E>(name);
+    }
+}

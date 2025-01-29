@@ -1,3 +1,4 @@
+#[allow(unused_macros, reason = "Depends which features are enabled")]
 macro_rules! dprintln {
     () => {
         #[cfg(feature = "std")] {
@@ -10,8 +11,10 @@ macro_rules! dprintln {
         }
     };
 }
+#[allow(unused_imports, reason = "Depends which features are enabled")]
 pub(crate) use dprintln;
 
+#[allow(unused_macros, reason = "Depends which features are enabled")]
 macro_rules! ensure_eq {
     ($left:expr, $right:expr $(,)?) => {
         match (&$left, &$right) {
@@ -43,4 +46,5 @@ right: {:?}"#,
         }
     };
 }
+#[allow(unused_imports, reason = "Depends which features are enabled")]
 pub(crate) use ensure_eq;

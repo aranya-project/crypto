@@ -38,7 +38,7 @@ use crate::{
     hkdf::hkdf_impl,
     hmac::hmac_impl,
     import::{ExportError, Import, ImportError},
-    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey, SharedSecret},
+    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EcdhId, EncapKey, SharedSecret},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     signer::{PkError, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
     zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
@@ -343,7 +343,8 @@ macro_rules! ecdh_impl {
         $curve:ident,
         $doc:expr,
         $sk:ident,
-        $pk:ident $(,)?
+        $pk:ident,
+        $id:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
         #[derive(Clone, ZeroizeOnDrop)]
@@ -570,6 +571,7 @@ macro_rules! ecdh_impl {
         }
 
         impl Ecdh for $curve {
+            const ID: EcdhId = EcdhId::$id;
             const SCALAR_SIZE: usize = <$curve as Curve>::ScalarSize::USIZE;
 
             type PrivateKey = $sk;
@@ -608,10 +610,10 @@ macro_rules! ecdh_impl {
         }
     };
 }
-ecdh_impl!(P256, "P-256", P256PrivateKey, P256PublicKey);
-ecdh_impl!(P384, "P-384", P384PrivateKey, P384PublicKey);
-ecdh_impl!(P521, "P-521", P521PrivateKey, P521PublicKey);
-ecdh_impl!(X25519, "X25519", X25519PrivateKey, X25519PublicKey);
+ecdh_impl!(P256, "P-256", P256PrivateKey, P256PublicKey, Secp256r1);
+ecdh_impl!(P384, "P-384", P384PrivateKey, P384PublicKey, Secp384r1);
+ecdh_impl!(P521, "P-521", P521PrivateKey, P521PublicKey, Secp521r1);
+ecdh_impl!(X25519, "X25519", X25519PrivateKey, X25519PublicKey, X25519);
 
 macro_rules! ecdsa_impl {
     (
@@ -620,7 +622,8 @@ macro_rules! ecdsa_impl {
         $hash:ident,
         $sk:ident,
         $pk:ident,
-        $sig:ident $(,)?
+        $sig:ident,
+        $id:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
         #[derive(Clone, ZeroizeOnDrop)]
@@ -912,7 +915,7 @@ macro_rules! ecdsa_impl {
         pub type $sig = Sig<$curve, { max_sig_len::<{ $curve::SCALAR_SIZE * 8 }>() }>;
 
         impl Signer for $curve {
-            const ID: SignerId = SignerId::$curve;
+            const ID: SignerId = SignerId::$id;
 
             type SigningKey = $sk;
             type VerifyingKey = $pk;
@@ -927,6 +930,7 @@ ecdsa_impl!(
     P256SigningKey,
     P256VerifyingKey,
     P256Signature,
+    Secp256r1Sha2_256,
 );
 ecdsa_impl!(
     P384,
@@ -935,6 +939,7 @@ ecdsa_impl!(
     P384SigningKey,
     P384VerifyingKey,
     P384Signature,
+    Secp384r1Sha2_384,
 );
 ecdsa_impl!(
     P521,
@@ -943,6 +948,7 @@ ecdsa_impl!(
     P521SigningKey,
     P521VerifyingKey,
     P521Signature,
+    Secp521r1Sha2_512,
 );
 
 macro_rules! hash_impl {
@@ -1050,9 +1056,9 @@ hkdf_impl!(HkdfSha256, "HKDF-SHA256", Sha256);
 hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384);
 hkdf_impl!(HkdfSha512, "HKDF-SHA512", Sha512);
 
-hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256);
-hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384);
-hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512);
+hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256, HmacSha2_256);
+hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384, HmacSha2_384);
+hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512, HmacSha2_512);
 
 /// A `HMAC_DRBG`-based CSPRNG.
 pub struct HmacDrbg(br_hmac_drbg_context);
@@ -1204,57 +1210,50 @@ mod tests {
         use super::*;
         use crate::test_util::test_aead;
 
-        test_aead!(aes256gcm, Aes256Gcm, AeadTest::AesGcm);
+        test_aead!(mod aes256gcm, Aes256Gcm);
 
         #[cfg(feature = "committing-aead")]
         mod committing {
             use super::*;
 
-            test_aead!(cmd1_aead_aes256_gcm, Cmt1Aes256Gcm);
-            test_aead!(cmd4_aead_aes256_gcm, Cmt4Aes256Gcm);
+            test_aead!(mod cmd1_aead_aes256_gcm, Cmt1Aes256Gcm);
+            test_aead!(mod cmd4_aead_aes256_gcm, Cmt4Aes256Gcm);
         }
     }
 
     mod ecdh_tests {
         use super::*;
-        use crate::test_util::vectors::{test_ecdh, EcdhTest};
+        use crate::test_util::test_ecdh;
 
-        #[test]
-        fn test_ecdh_p256() {
-            test_ecdh::<P256>(EcdhTest::EcdhSecp256r1Ecpoint);
-        }
-
-        #[test]
-        fn test_ecdh_p384() {
-            test_ecdh::<P384>(EcdhTest::EcdhSecp384r1Ecpoint);
-        }
+        test_ecdh!(mod p256, P256);
+        test_ecdh!(mod p384, P384);
     }
 
     mod ecdsa_tests {
         use super::*;
         use crate::test_util::test_signer;
 
-        test_signer!(p256, P256, EcdsaTest::EcdsaSecp256r1Sha256);
-        test_signer!(p384, P384, EcdsaTest::EcdsaSecp384r1Sha384);
-        test_signer!(p521, P521, EcdsaTest::EcdsaSecp521r1Sha512);
+        test_signer!(mod p256, P256);
+        test_signer!(mod p384, P384);
+        test_signer!(mod p521, P521);
     }
 
     mod hkdf_tests {
         use super::*;
         use crate::test_util::test_kdf;
 
-        test_kdf!(test_hkdf_sha256, HkdfSha256, HkdfTest::HkdfSha256);
-        test_kdf!(test_hkdf_sha384, HkdfSha384, HkdfTest::HkdfSha384);
-        test_kdf!(test_hkdf_sha512, HkdfSha512, HkdfTest::HkdfSha512);
+        test_kdf!(mod hkdf_sha256, HkdfSha256);
+        test_kdf!(mod hkdf_sha384, HkdfSha384);
+        test_kdf!(mod hkdf_sha512, HkdfSha512);
     }
 
     mod hmac_tests {
         use super::*;
         use crate::test_util::test_mac;
 
-        test_mac!(test_hmac_sha256, HmacSha256, MacTest::HmacSha256);
-        test_mac!(test_hmac_sha384, HmacSha384, MacTest::HmacSha384);
-        test_mac!(test_hmac_sha512, HmacSha512, MacTest::HmacSha512);
+        test_mac!(mod hmac_sha256, HmacSha256);
+        test_mac!(mod hmac_sha384, HmacSha384);
+        test_mac!(mod hmac_sha512, HmacSha512);
     }
 
     mod hpke_tests {
@@ -1262,32 +1261,28 @@ mod tests {
         use crate::test_util::test_hpke;
 
         test_hpke!(
-            p256_hkdf_sha256,
+            mod p256_hkdf_sha256,
             DhKemP256HkdfSha256,
             HkdfSha256,
             Aes256Gcm,
-            HpkeTest::HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm,
         );
         test_hpke!(
-            p256_hkdf_sha512,
+            mod p256_hkdf_sha512,
             DhKemP256HkdfSha256,
             HkdfSha512,
             Aes256Gcm,
-            HpkeTest::HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm,
         );
         test_hpke!(
-            p521_hkdf_sha256,
+            mod p521_hkdf_sha256,
             DhKemP521HkdfSha512,
             HkdfSha256,
             Aes256Gcm,
-            HpkeTest::HpkeDhKemP521HkdfSha512HkdfSha256Aes256Gcm,
         );
         test_hpke!(
-            p521_hkdf_sha512,
+            mod p521_hkdf_sha512,
             DhKemP521HkdfSha512,
             HkdfSha512,
             Aes256Gcm,
-            HpkeTest::HpkeDhKemP521HkdfSha512HkdfSha512Aes256Gcm,
         );
     }
 }
