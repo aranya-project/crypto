@@ -7,6 +7,7 @@ use core::{
     borrow::Borrow,
     fmt::{self, Debug, Display},
     marker::PhantomData,
+    num::NonZeroU16,
     result::Result,
 };
 
@@ -19,6 +20,7 @@ use crate::{
     keys::{PublicKey, RawSecretBytes, SecretKey},
     signer::PkError,
     zeroize::ZeroizeOnDrop,
+    AlgId,
 };
 
 /// An error from a [`Kem`].
@@ -219,6 +221,44 @@ impl Display for EcdhError {
 
 impl core::error::Error for EcdhError {}
 
+/// ECDH algorithm identifiers.
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
+pub enum EcdhId {
+    /// ECDH using NIST Curve P-256.
+    #[alg_id(1)]
+    Secp256r1,
+    /// ECDH using NIST Curve P-384.
+    #[alg_id(2)]
+    Secp384r1,
+    /// ECDH using NIST Curve P-521.
+    #[alg_id(3)]
+    Secp521r1,
+    /// X25519.
+    #[alg_id(4)]
+    X25519,
+    /// X25519.
+    #[alg_id(5)]
+    X448,
+    /// Some other KDF.
+    ///
+    /// Non-zero since 0x0000 is marked as 'reserved'.
+    #[alg_id(Other)]
+    Other(NonZeroU16),
+}
+
+impl Display for EcdhId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Secp256r1 => write!(f, "Secp256r1"),
+            Self::Secp384r1 => write!(f, "Secp384r1"),
+            Self::Secp521r1 => write!(f, "Secp521r1"),
+            Self::X25519 => write!(f, "X25519"),
+            Self::X448 => write!(f, "X448"),
+            Self::Other(id) => write!(f, "EcdhId({:#02x})", id),
+        }
+    }
+}
+
 /// Elliptic Curve Diffie Hellman key exchange.
 ///
 /// # Requirements
@@ -227,6 +267,9 @@ impl core::error::Error for EcdhError {}
 ///
 /// * Have at least a 128-bit security level
 pub trait Ecdh {
+    /// Uniquely identifies the ECDH algorithm.
+    const ID: EcdhId;
+
     /// The size in bytes of a scalar.
     const SCALAR_SIZE: usize;
 

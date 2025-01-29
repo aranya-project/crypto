@@ -1,15 +1,16 @@
 //! [`Aead`] tests.
 
-extern crate alloc;
+// TODO(eric): add tests for boundaries. E.g., nonce is too long,
+// tag is too short, etc.
 
 use alloc::vec;
 
 use more_asserts::assert_ge;
 
-use super::{assert_all_zero, assert_ct_ne};
 use crate::{
     aead::{Aead, Nonce, OpenError},
     csprng::{Csprng, Random},
+    test_util::{assert_all_zero, assert_ct_ne, wycheproof},
 };
 
 /// Invokes `callback` for each AEAD test.
@@ -32,6 +33,7 @@ macro_rules! for_each_aead_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
             test_basic,
             test_new_key,
             test_round_trip,
@@ -46,7 +48,7 @@ macro_rules! for_each_aead_test {
 }
 pub use for_each_aead_test;
 
-/// Performs all of the tests in this module.
+/// Performs AEAD tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -56,50 +58,41 @@ pub use for_each_aead_test;
 /// ```
 /// use spideroak_crypto::{test_aead, rust::Aes256Gcm};
 ///
-/// // Without test vectors.
-/// test_aead!(aes256gcm, Aes256Gcm);
-///
-/// // With test vectors.
-/// test_aead!(aes256gcm_with_vecs, Aes256Gcm, AeadTest::AesGcm);
+/// test_aead!(mod aes256gcm, Aes256Gcm);
 /// ```
 #[macro_export]
 macro_rules! test_aead {
-    ($name:ident, $aead:ty $(, AeadTest::$vectors:ident)?) => {
+    (mod $name:ident, $aead:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_aead!($aead $(, AeadTest::$vectors)?);
+            $crate::test_aead!($aead);
         }
     };
-    ($aead:ty $(, AeadTest::$vectors:ident)?) => {
+    ($aead:ty) => {
         macro_rules! __aead_test {
             ($test:ident) => {
                 #[test]
                 fn $test() {
                     $crate::test_util::aead::$test::<$aead, _>(&mut $crate::default::Rng)
                 }
-            }
+            };
         }
         $crate::for_each_aead_test!(__aead_test);
-
-        // TODO(eric): add tests for boundaries. E.g., nonce is
-        // too long, tag is too short, etc.
-
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::test_aead::<$aead>(
-                    $crate::test_util::vectors::AeadTest::$vectors,
-                );
-            }
-        )?
     };
 }
 pub use test_aead;
 
 const GOLDEN: &[u8] = b"hello, world!";
 const AD: &[u8] = b"some additional data";
+
+/// Tests against AEAD-specific vectors.
+pub fn test_vectors<A: Aead, R: Csprng>(_rng: &mut R) {
+    if let Ok(name) = wycheproof::AeadTest::try_from(A::ID) {
+        wycheproof::test_aead::<A>(name);
+    }
+}
 
 /// A basic positive test.
 pub fn test_basic<A: Aead, R: Csprng>(_rng: &mut R) {

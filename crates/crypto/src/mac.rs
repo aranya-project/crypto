@@ -39,16 +39,28 @@ impl core::error::Error for MacError {}
 /// MAC algorithm identifiers.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
 pub enum MacId {
-    /// HMAC-SHA256.
-    #[alg_id(0x0001)]
-    HmacSha256,
-    /// HMAC-SHA384.
-    #[alg_id(0x0002)]
-    HmacSha384,
-    /// HMAC-SHA512.
-    #[alg_id(0x0003)]
-    HmacSha512,
-    /// Some other digital signature algorithm.
+    /// HMAC-SHA2-256.
+    #[alg_id(1)]
+    HmacSha2_256,
+    /// HMAC-SHA2-384.
+    #[alg_id(2)]
+    HmacSha2_384,
+    /// HMAC-SHA2-512.
+    #[alg_id(3)]
+    HmacSha2_512,
+    /// HMAC-SHA2-512/256.
+    #[alg_id(4)]
+    HmacSha2_512_256,
+    /// HMAC-SHA3-256.
+    #[alg_id(5)]
+    HmacSha3_256,
+    /// HMAC-SHA3-384.
+    #[alg_id(6)]
+    HmacSha3_384,
+    /// HMAC-SHA3-512.
+    #[alg_id(7)]
+    HmacSha3_512,
+    /// Some other message authentication code algorithm.
     #[alg_id(Other)]
     Other(NonZeroU16),
 }
@@ -133,7 +145,7 @@ pub trait Mac: Clone + Sized {
         }
     }
 
-    /// Returns the tag for `data` using `key`.
+    /// Computes the tag for `data` using `key`.
     ///
     /// While this function is provided by default,
     /// implementations of [`Mac`] are encouraged to provide
@@ -142,6 +154,17 @@ pub trait Mac: Clone + Sized {
         let mut h = Self::new(key);
         h.update(data);
         h.tag()
+    }
+
+    /// Attempts to compute tag for `data` using `key`.
+    ///
+    /// While this function is provided by default,
+    /// implementations of [`Mac`] are encouraged to provide
+    /// optimized "single-shot" implementations.
+    fn try_mac(key: &[u8], data: &[u8]) -> Result<Self::Tag, InvalidKey> {
+        let mut h = Self::try_new(key)?;
+        h.update(data);
+        Ok(h.tag())
     }
 }
 

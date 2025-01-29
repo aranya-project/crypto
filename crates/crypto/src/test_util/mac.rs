@@ -26,6 +26,7 @@ macro_rules! for_each_mac_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
             test_default,
             test_update,
             test_verify,
@@ -35,7 +36,7 @@ macro_rules! for_each_mac_test {
     };
 }
 
-/// Performs all of the tests in this module.
+/// Performs MAC tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -45,46 +46,58 @@ macro_rules! for_each_mac_test {
 /// ```
 /// use spideroak_crypto::{test_mac, rust::HmacSha256};
 ///
-/// // Without test vectors.
-/// test_mac!(hmac_sha256, HmacSha256);
-///
-/// // With test vectors.
-/// test_mac!(hmac_sha256_with_vecs, HmacSha256, MacTest::HmacSha256);
+/// test_mac!(mod hmac_sha256, HmacSha256);
 /// ```
 #[macro_export]
 macro_rules! test_mac {
-    ($name:ident, $mac:ty $(, MacTest::$vectors:ident)?) => {
+    (mod $name:ident, $mac:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_mac!($mac $(, MacTest::$vectors)?);
+            $crate::test_mac!($mac);
         }
     };
-    ($mac:ty $(, MacTest::$vectors:ident)?) => {
+    ($mac:ty) => {
         macro_rules! __mac_test {
             ($test:ident) => {
                 #[test]
                 fn $test() {
-                    $crate::test_util::mac::$test::<$mac, _>(&mut $crate::default::Rng)
+                    use $crate::{
+                        default::Rng,
+                        test_util::{mac::$test, MacWithDefaults},
+                    };
+
+                    $test::<$mac, _>(&mut Rng);
+                    $test::<MacWithDefaults<$mac>, _>(&mut Rng);
                 }
             };
         }
         $crate::for_each_mac_test!(__mac_test);
-
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::test_mac::<$mac>(
-                    $crate::test_util::vectors::MacTest::$vectors,
-                );
-            }
-        )?
     };
 }
 pub use test_mac;
 
 const DATA: &[u8] = b"hello, world!";
+
+/// Tests against MAC-specific vectors.
+///
+/// Unknown hash algorithms are ignored.
+pub fn test_vectors<T, R>(_rng: &mut R)
+where
+    T: Mac,
+    T::Tag: AsRef<[u8]>,
+    R: Csprng,
+{
+    use acvp::vectors::hmac;
+
+    use crate::test_util::acvp::test_hmac;
+
+    if let Ok(alg) = T::ID.try_into() {
+        let vectors = hmac::load(alg).expect("should be able to load HMAC test vectors");
+        test_hmac::<T>(&vectors);
+    }
+}
 
 /// Basic positive test.
 pub fn test_default<T: Mac, R: Csprng>(rng: &mut R) {

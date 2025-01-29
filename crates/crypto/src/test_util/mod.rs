@@ -7,22 +7,21 @@
 #![allow(clippy::panic)]
 #![cfg(any(test, feature = "test_util"))]
 #![cfg_attr(docsrs, doc(cfg(feature = "test_util")))]
-#![forbid(unsafe_code)]
 
+pub mod acvp;
 pub mod aead;
+pub mod ecdh;
 pub mod hash;
 pub mod hpke;
 pub mod kdf;
 pub mod mac;
 pub mod signer;
-pub mod vectors;
+pub mod wycheproof;
 
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
+use core::{error, fmt, marker::PhantomData};
 
 pub use aead::test_aead;
+pub use ecdh::test_ecdh;
 pub use hash::test_hash;
 pub use hpke::test_hpke;
 pub use kdf::test_kdf;
@@ -34,6 +33,7 @@ use zeroize::ZeroizeOnDrop;
 use crate::{
     aead::{Aead, AeadId, Lifetime, OpenError, SealError},
     csprng::{Csprng, Random},
+    hash::{Digest, Hash, HashId},
     import::{ExportError, Import, ImportError},
     kdf::{Kdf, KdfError, KdfId, Prk},
     keys::{InvalidKey, PublicKey, SecretKey, SecretKeyBytes},
@@ -107,6 +107,18 @@ macro_rules! __doctest_os_hardware_rand {
     };
 }
 
+/// The algorithm ID is unknown.
+#[derive(Debug)]
+pub struct UnknownAlgId<T>(pub(crate) T);
+
+impl<T: fmt::Debug + fmt::Display> error::Error for UnknownAlgId<T> {}
+
+impl<T: fmt::Display> fmt::Display for UnknownAlgId<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown algorithm ID: {}", self.0)
+    }
+}
+
 /// An [`Aead`] that that uses the default trait methods.
 pub struct AeadWithDefaults<T>(T);
 
@@ -152,6 +164,29 @@ impl<T: Aead> Aead for AeadWithDefaults<T> {
         additional_data: &[u8],
     ) -> Result<(), OpenError> {
         self.0.open_in_place(nonce, data, tag, additional_data)
+    }
+}
+
+/// A [`Hash`] that that uses the default trait methods.
+#[derive(Clone)]
+pub struct HashWithDefaults<T>(T);
+
+impl<T: Hash> Hash for HashWithDefaults<T> {
+    const ID: HashId = <T as Hash>::ID;
+
+    type DigestSize = <T as Hash>::DigestSize;
+    const DIGEST_SIZE: usize = <T as Hash>::DIGEST_SIZE;
+
+    fn new() -> Self {
+        Self(T::new())
+    }
+
+    fn update(&mut self, data: &[u8]) {
+        self.0.update(data);
+    }
+
+    fn digest(self) -> Digest<Self::DigestSize> {
+        self.0.digest()
     }
 }
 
@@ -307,9 +342,9 @@ impl<T: Signer + ?Sized> Clone for VerifyingKeyWithDefaults<T> {
     }
 }
 
-impl<T: Signer + ?Sized> Debug for VerifyingKeyWithDefaults<T> {
+impl<T: Signer + ?Sized> fmt::Debug for VerifyingKeyWithDefaults<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 
@@ -337,9 +372,9 @@ impl<T: Signer + ?Sized> Clone for SignatureWithDefaults<T> {
     }
 }
 
-impl<T: Signer + ?Sized> Debug for SignatureWithDefaults<T> {
+impl<T: Signer + ?Sized> fmt::Debug for SignatureWithDefaults<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 

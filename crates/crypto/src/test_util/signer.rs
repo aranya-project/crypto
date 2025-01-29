@@ -1,16 +1,14 @@
 //! [`Signer`] tests.
 
-extern crate alloc;
-
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 
-use super::{assert_ct_eq, assert_ct_ne};
 use crate::{
     csprng::{Csprng, Random},
     import::Import,
     keys::RawSecretBytes,
     signer::{Signer, SigningKey, VerifyingKey},
+    test_util::{assert_ct_eq, assert_ct_ne, wycheproof},
 };
 
 /// Invokes `callback` for each signer test.
@@ -33,6 +31,7 @@ macro_rules! for_each_signer_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
+            test_vectors,
             test_default,
             test_pk_eq,
             test_sk_ct_eq,
@@ -44,7 +43,7 @@ macro_rules! for_each_signer_test {
 }
 pub use for_each_signer_test;
 
-/// Performs all of the tests in this module.
+/// Performs signer (digital signature) tests.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -54,15 +53,19 @@ pub use for_each_signer_test;
 /// ```
 /// use spideroak_crypto::{test_signer, rust::P256};
 ///
-/// // Without test vectors.
-/// test_signer!(p256, P256);
-///
-/// // With test vectors.
-/// test_signer!(p256_with_vecs, P256, EcdsaTest::Secp256r1Sha256);
+/// test_signer!(mod p256, P256);
 /// ```
 #[macro_export]
 macro_rules! test_signer {
-    (@test $signer:ty $(, $f:ident, $which:ident, $vectors:ident)? $(,)?) => {
+    (mod $name:ident, $signer:ty) => {
+        mod $name {
+            #[allow(unused_imports)]
+            use super::*;
+
+            $crate::test_signer!($signer);
+        }
+    };
+    ($signer:ty) => {
         macro_rules! __signer_test {
             ($test:ident) => {
                 #[test]
@@ -72,51 +75,19 @@ macro_rules! test_signer {
             };
         }
         $crate::for_each_signer_test!(__signer_test);
-
-        $(
-            #[test]
-            fn vectors() {
-                $crate::test_util::vectors::$f::<$signer>(
-                    $crate::test_util::vectors::$which::$vectors,
-                );
-            }
-        )?
-    };
-    ($name:ident, $signer:ty) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            $crate::test_signer!($signer);
-        }
-    };
-    ($signer:ty) => {
-        $crate::test_signer!(@test $signer);
-    };
-    ($name:ident, $signer:ty, EcdsaTest::$vectors:ident $(,)?) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            $crate::test_signer!($signer, EcdsaTest::$vectors);
-        }
-    };
-    ($signer:ty, EcdsaTest::$vectors:ident $(,)?) => {
-        $crate::test_signer!(@test $signer, test_ecdsa, EcdsaTest, $vectors);
-    };
-    ($name:ident, $signer:ty, EddsaTest::$vectors:ident $(,)?) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            $crate::test_signer!($signer, EddsaTest::$vectors);
-        }
-    };
-    ($signer:ty, EddsaTest::$vectors:ident $(,)?) => {
-        $crate::test_signer!(@test $signer, test_eddsa, EddsaTest, $vectors);
     };
 }
 pub use test_signer;
+
+/// Tests against signer-specific vectors.
+pub fn test_vectors<T: Signer, R: Csprng>(_rng: &mut R) {
+    if let Ok(name) = wycheproof::EcdsaTest::try_from(T::ID) {
+        wycheproof::test_ecdsa::<T>(name);
+    }
+    if let Ok(name) = wycheproof::EddsaTest::try_from(T::ID) {
+        wycheproof::test_eddsa::<T>(name);
+    }
+}
 
 /// The base positive test.
 pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
