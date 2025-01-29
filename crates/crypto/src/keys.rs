@@ -4,7 +4,7 @@ use core::{borrow::Borrow, fmt::Debug, iter::IntoIterator, mem, result::Result};
 
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use subtle::{Choice, ConstantTimeEq};
-use typenum::{generic_const_mappings::Const, IsLess, Unsigned, U65536};
+use typenum::{generic_const_mappings::Const, IsLess, U65536};
 
 use crate::{
     csprng::{Csprng, Random},
@@ -17,20 +17,34 @@ use crate::{
 ///
 /// Secret keys are either symmetric keys (e.g., for AES) or
 /// asymmetric private keys (e.g., for ECDH).
-pub trait SecretKey: Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + ZeroizeOnDrop {
-    /// Creates a random key, possibly using entropy from `rng`.
-    ///
-    /// Implementations are free to ignore `rng` and callers must
-    /// not rely on this function reading from `rng`.
-    fn new<R: Csprng>(rng: &mut R) -> Self;
-
-    /// The size of the key.
+pub trait SecretKey:
+    Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + Random + ZeroizeOnDrop
+{
+    /// The size in octets of the key.
     type Size: ArrayLength + 'static;
-    /// Shorthand for [`Size`][Self::Size];
-    const SIZE: usize = Self::Size::USIZE;
 
     /// Attempts to export the key's secret data.
     fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError>;
+}
+
+/// Provides access to a secret's byte encoding.
+pub trait RawSecretBytes {
+    /// Returns the secret's byte encoding.
+    fn raw_secret_bytes(&self) -> &[u8];
+}
+
+impl<T: RawSecretBytes> RawSecretBytes for &T {
+    #[inline]
+    fn raw_secret_bytes(&self) -> &[u8] {
+        (**self).raw_secret_bytes()
+    }
+}
+
+impl RawSecretBytes for [u8] {
+    #[inline]
+    fn raw_secret_bytes(&self) -> &[u8] {
+        self
+    }
 }
 
 /// A fixed-length byte encoding of a [`SecretKey`]'s data.
@@ -114,6 +128,13 @@ where
     }
 }
 
+impl<N: ArrayLength> RawSecretBytes for SecretKeyBytes<N> {
+    #[inline]
+    fn raw_secret_bytes(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
 /// A fixed-length asymmetric public key.
 pub trait PublicKey: Clone + Debug + Eq + for<'a> Import<&'a [u8]> {
     /// The fixed-length byte encoding of the key.
@@ -194,14 +215,8 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> $crate::keys::SecretKey for $name<N>
-        {
+        impl<N: ::generic_array::ArrayLength> $crate::keys::SecretKey for $name<N> {
             type Size = N;
-
-            #[inline]
-            fn new<R: $crate::csprng::Csprng>(rng: &mut R) -> Self {
-                Self($crate::csprng::Random::random(rng))
-            }
 
             #[inline]
             fn try_export_secret(&self) -> ::core::result::Result<
@@ -219,6 +234,12 @@ macro_rules! raw_key {
             }
         }
 
+        impl<N: ::generic_array::ArrayLength> $crate::keys::RawSecretBytes for $name<N> {
+            #[inline]
+            fn raw_secret_bytes(&self) -> &[u8] {
+                $crate::keys::RawSecretBytes::raw_secret_bytes(&self.0)
+            }
+        }
 
         impl<N: ::generic_array::ArrayLength> $crate::kdf::Expand for $name<N>
         where
@@ -271,3 +292,9 @@ macro_rules! raw_key {
     };
 }
 pub(crate) use raw_key;
+
+/// The provided key is invalid.
+// TODO(eric): move this somewhere else.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("invalid key length")]
+pub struct InvalidKey;

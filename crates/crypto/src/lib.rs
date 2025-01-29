@@ -17,6 +17,7 @@ pub(crate) use spideroak_crypto_derive::AlgId;
 pub mod aead;
 pub mod asn1;
 pub mod bearssl;
+pub mod block;
 pub mod csprng;
 pub mod default;
 pub mod ec;

@@ -7,8 +7,9 @@ use core::borrow::Borrow;
 
 use super::{assert_ct_eq, assert_ct_ne};
 use crate::{
-    csprng::Csprng,
-    keys::SecretKey,
+    csprng::{Csprng, Random},
+    import::Import,
+    keys::RawSecretBytes,
     signer::{Signer, SigningKey, VerifyingKey},
 };
 
@@ -120,7 +121,7 @@ pub use test_signer;
 /// The base positive test.
 pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
     const MSG: &[u8] = b"hello, world!";
-    let sk = T::SigningKey::new(rng);
+    let sk = T::SigningKey::random(rng);
     let sig = sk.sign(MSG).expect("unable to create signature");
     sk.public()
         .expect("signing key should be valid")
@@ -132,10 +133,10 @@ pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
 ///
 /// It also tests `Signer::SigningKey::import`.
 pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
-    let sk1 = T::SigningKey::new(rng);
-    let sk2 = T::SigningKey::new(rng);
+    let sk1 = T::SigningKey::random(rng);
+    let sk2 = T::SigningKey::random(rng);
 
-    fn same_key<T: Signer, K: SigningKey<T>>(k: K) {
+    fn same_key<T: Signer, K: SigningKey<T> + for<'a> Import<&'a [u8]>>(k: K) {
         let data = match k.try_export_secret() {
             Ok(data) => data,
             Err(_) => {
@@ -143,8 +144,8 @@ pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
                 return;
             }
         };
-        let sk1 = K::import(data.as_bytes()).expect("should be able to import key");
-        let sk2 = K::import(data.as_bytes()).expect("should be able to import key");
+        let sk1 = K::import(data.raw_secret_bytes()).expect("should be able to import key");
+        let sk2 = K::import(data.raw_secret_bytes()).expect("should be able to import key");
         assert_ct_eq!(sk1, sk2);
     }
 
@@ -159,10 +160,10 @@ pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
 ///
 /// It also tests `Signer::VerifyingKey::import`.
 pub fn test_pk_eq<T: Signer, R: Csprng>(rng: &mut R) {
-    let pk1 = T::SigningKey::new(rng)
+    let pk1 = T::SigningKey::random(rng)
         .public()
         .expect("signing key should be valid");
-    let pk2 = T::SigningKey::new(rng)
+    let pk2 = T::SigningKey::random(rng)
         .public()
         .expect("signing key should be valid");
 
@@ -181,7 +182,7 @@ pub fn test_pk_eq<T: Signer, R: Csprng>(rng: &mut R) {
 
 /// [`SigningKey::public`] should always return the same key.
 pub fn test_public<T: Signer, R: Csprng>(rng: &mut R) {
-    let sk = T::SigningKey::new(rng);
+    let sk = T::SigningKey::random(rng);
     assert_eq!(sk.public(), sk.public());
 }
 
@@ -201,7 +202,7 @@ pub fn test_batch_simple_good<T: Signer, R: Csprng>(rng: &mut R) {
     let (pks, sigs): (Vec<_>, Vec<_>) = MSGS
         .iter()
         .map(|msg| {
-            let sk = T::SigningKey::new(rng);
+            let sk = T::SigningKey::random(rng);
             let sig = sk.sign(msg).expect("should not fail");
             (sk.public().expect("signer key should be valid"), sig)
         })
@@ -225,7 +226,7 @@ pub fn test_batch_simple_bad<T: Signer, R: Csprng>(rng: &mut R) {
     let (pks, sigs): (Vec<_>, Vec<_>) = msgs
         .iter()
         .map(|msg| {
-            let sk = T::SigningKey::new(rng);
+            let sk = T::SigningKey::random(rng);
             let sig = sk.sign(msg).expect("should not fail");
             (sk.public().expect("signing key should be valid"), sig)
         })

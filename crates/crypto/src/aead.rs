@@ -1347,8 +1347,11 @@ mod committing {
                     // The nonce length is fixed, so use
                     // HMAC(K || N || A)[1 : k] per Theorem 3.2.
                     let tag = {
-                        let key = $crate::keys::SecretKey::try_export_secret(&self.key)?;
-                        let mut hmac = $crate::hmac::Hmac::<$hash>::new(key.as_bytes());
+                        let bytes = $crate::keys::SecretKey::try_export_secret(&self.key)?;
+                        let key = $crate::hmac::HmacKey::<$hash>::new(
+                            $crate::keys::RawSecretBytes::raw_secret_bytes(&bytes),
+                        );
+                        let mut hmac = $crate::hmac::Hmac::<$hash>::new(&key);
                         hmac.update(nonce);
                         hmac.update(ad);
                         hmac.tag()

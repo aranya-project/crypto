@@ -533,18 +533,18 @@ where
 /// Tests a [`Mac`] against Project Wycheproof test vectors.
 ///
 /// It tests both `T` and [`MacWithDefaults<T>`].
-pub fn test_mac<T: Mac>(name: MacTest)
+pub fn test_mac<T>(name: MacTest)
 where
-    T::Key: ConstantTimeEq,
+    T: Mac,
     T::Tag: for<'a> TryFrom<&'a [u8]>,
 {
     test_mac_inner::<T>(name);
     test_mac_inner::<MacWithDefaults<T>>(name);
 }
 
-fn test_mac_inner<T: Mac>(name: MacTest)
+fn test_mac_inner<T>(name: MacTest)
 where
-    T::Key: ConstantTimeEq,
+    T: Mac,
     T::Tag: for<'a> TryFrom<&'a [u8]>,
 {
     let set = mac::TestSet::load(name).expect("should be able to load tests");
@@ -558,12 +558,11 @@ where
                 Err(_) => continue,
             };
 
-            let key = match T::Key::import(&tc.key[..]) {
+            let mut h = match T::try_new(&tc.key[..]) {
                 Ok(h) => h,
                 // Skip insecure keys.
                 Err(_) => continue,
             };
-            let mut h = T::new(&key);
 
             // Update one character at a time.
             for c in tc.msg.iter() {

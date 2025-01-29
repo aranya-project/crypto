@@ -29,9 +29,10 @@ use crate::{
         check_open_in_place_params, check_seal_in_place_params, Aead, AeadId, AeadKey, IndCca2,
         Lifetime, OpenError, SealError,
     },
-    csprng::Csprng,
+    block::BlockSize,
+    csprng::{Csprng, Random},
     ec::{Curve, Secp256r1, Secp384r1},
-    hash::{Block, Digest, Hash, HashId},
+    hash::{Digest, Hash, HashId},
     hex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
@@ -235,16 +236,18 @@ macro_rules! ecdh_impl {
             type Size = FieldBytesSize<$curve>;
 
             #[inline]
-            fn new<R: Csprng>(rng: &mut R) -> Self {
-                let sk = NonZeroScalar::random(&mut RngWrapper(rng));
-                Self(sk)
-            }
-
-            #[inline]
             fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))
+            }
+        }
+
+        impl Random for $sk {
+            #[inline]
+            fn random<R: Csprng>(rng: &mut R) -> Self {
+                let sk = NonZeroScalar::random(&mut RngWrapper(rng));
+                Self(sk)
             }
         }
 
@@ -372,16 +375,18 @@ macro_rules! ecdsa_impl {
             type Size = FieldBytesSize<$curve>;
 
             #[inline]
-            fn new<R: Csprng>(rng: &mut R) -> Self {
-                let sk = ecdsa::SigningKey::random(&mut RngWrapper(rng));
-                Self(sk)
-            }
-
-            #[inline]
             fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
                 // Mismatched GenericArray versions, yay.
                 let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
                 Ok(SecretKeyBytes::new(secret.into()))
+            }
+        }
+
+        impl Random for $sk {
+            #[inline]
+            fn random<R: Csprng>(rng: &mut R) -> Self {
+                let sk = ecdsa::SigningKey::random(&mut RngWrapper(rng));
+                Self(sk)
             }
         }
 
@@ -504,9 +509,6 @@ macro_rules! hash_impl {
             const DIGEST_SIZE: usize =
                 <<sha2::$name as OutputSizeUser>::OutputSize as Unsigned>::USIZE;
 
-            const BLOCK_SIZE: usize = <sha2::$name as BlockSizeUser>::BlockSize::USIZE;
-            type Block = Block<{ Self::BLOCK_SIZE }>;
-
             #[inline]
             fn new() -> Self {
                 Self(<sha2::$name as sha2::Digest>::new())
@@ -526,6 +528,10 @@ macro_rules! hash_impl {
             fn hash(data: &[u8]) -> Digest<Self::DigestSize> {
                 Digest::from_array(<sha2::$name as sha2::Digest>::digest(data).into())
             }
+        }
+
+        impl BlockSize for $name {
+            type BlockSize = <sha2::$name as BlockSizeUser>::BlockSize;
         }
     };
 }

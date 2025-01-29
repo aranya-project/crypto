@@ -13,6 +13,7 @@ use buggy::Bug;
 
 use crate::{
     asn1::EncodingError,
+    csprng::Random,
     import::Import,
     keys::{PublicKey, SecretKey},
     AlgId,
@@ -148,7 +149,7 @@ pub trait Signer {
 }
 
 /// An asymmetric secret key used to create digital signatures.
-pub trait SigningKey<T: Signer + ?Sized>: SecretKey {
+pub trait SigningKey<T: Signer + ?Sized>: SecretKey + Random {
     /// Returns the signature over `msg`, which must NOT be
     /// pre-hashed.
     fn sign(&self, msg: &[u8]) -> Result<T::Signature, SignerError>;

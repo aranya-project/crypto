@@ -32,6 +32,7 @@ use crate::{
     import::{ExportError, Import, ImportError},
     kdf::{Context, Expand, Kdf, KdfError, Prk},
     kem::{Kem, KemError},
+    keys::RawSecretBytes,
     AlgId,
 };
 
@@ -526,7 +527,7 @@ impl<K: Kem, F: Kdf, A: Aead + IndCca2> Hpke<K, F, A> {
         let ks_ctx = [&[mode.id()], psk_id_hash.as_bytes(), info_hash.as_bytes()];
 
         //  secret = LabeledExtract(shared_secret, "secret", psk)
-        let secret = Self::labeled_extract(shared_secret.as_ref(), "secret", psk);
+        let secret = Self::labeled_extract(shared_secret.raw_secret_bytes(), "secret", psk);
 
         // key = LabeledExpand(secret, "key", key_schedule_context, Nk)
         let key = Self::labeled_expand(&secret, "key", &ks_ctx)?;
