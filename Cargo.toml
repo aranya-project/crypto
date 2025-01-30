@@ -46,7 +46,6 @@ quote = { version = "1.0" }
 syn = { version = "2.0.59" }
 
 [profile.dev]
-panic = "abort"
 # Required for some of the tests to run in a reasonable amount of
 # time.
 opt-level = 2

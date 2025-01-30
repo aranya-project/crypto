@@ -35,6 +35,7 @@ pub mod kdf;
 pub mod kem;
 pub mod keys;
 pub mod mac;
+pub mod oid;
 pub mod rust;
 pub(crate) mod sha3;
 pub mod signer;
