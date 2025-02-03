@@ -33,12 +33,14 @@ use zeroize::ZeroizeOnDrop;
 use crate::{
     aead::{Aead, AeadId, Lifetime, OpenError, SealError},
     csprng::{Csprng, Random},
-    hash::{Digest, Hash, HashId},
+    hash::{Digest, Hash},
+    hpke::{HpkeAead, HpkeKdf, HpkeKem},
     import::{ExportError, Import, ImportError},
     kdf::{Kdf, KdfError, KdfId, Prk},
     keys::{InvalidKey, PublicKey, SecretKey, SecretKeyBytes},
-    mac::{Mac, MacId},
-    signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    mac::Mac,
+    oid::Oid,
+    signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
 };
 
 #[macro_export]
@@ -109,11 +111,11 @@ macro_rules! __doctest_os_hardware_rand {
 
 /// The algorithm ID is unknown.
 #[derive(Debug)]
-pub struct UnknownAlgId<T>(pub(crate) T);
+pub struct UnknownAlgId(pub(crate) Oid);
 
-impl<T: fmt::Debug + fmt::Display> error::Error for UnknownAlgId<T> {}
+impl error::Error for UnknownAlgId {}
 
-impl<T: fmt::Display> fmt::Display for UnknownAlgId<T> {
+impl fmt::Display for UnknownAlgId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "unknown algorithm ID: {}", self.0)
     }
@@ -123,7 +125,7 @@ impl<T: fmt::Display> fmt::Display for UnknownAlgId<T> {
 pub struct AeadWithDefaults<T>(T);
 
 impl<T: Aead> Aead for AeadWithDefaults<T> {
-    const ID: AeadId = T::ID;
+    const OID: Oid = T::OID;
 
     const LIFETIME: Lifetime = T::LIFETIME;
 
@@ -167,12 +169,16 @@ impl<T: Aead> Aead for AeadWithDefaults<T> {
     }
 }
 
+impl<T: HpkeAead> HpkeAead for AeadWithDefaults<T> {
+    const ID: AeadId = T::ID;
+}
+
 /// A [`Hash`] that that uses the default trait methods.
 #[derive(Clone)]
 pub struct HashWithDefaults<T>(T);
 
 impl<T: Hash> Hash for HashWithDefaults<T> {
-    const ID: HashId = <T as Hash>::ID;
+    const OID: Oid = <T as Hash>::OID;
 
     type DigestSize = <T as Hash>::DigestSize;
     const DIGEST_SIZE: usize = <T as Hash>::DIGEST_SIZE;
@@ -223,7 +229,7 @@ impl<T: Kdf> Kdf for KdfWithDefaults<T> {
 pub struct MacWithDefaults<T>(T);
 
 impl<T: Mac> Mac for MacWithDefaults<T> {
-    const ID: MacId = T::ID;
+    const OID: Oid = T::OID;
 
     type Tag = T::Tag;
     type TagSize = T::TagSize;
@@ -252,7 +258,7 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
 pub struct SignerWithDefaults<T: ?Sized>(T);
 
 impl<T: Signer + ?Sized> Signer for SignerWithDefaults<T> {
-    const ID: SignerId = T::ID;
+    const OID: Oid = T::OID;
 
     type SigningKey = SigningKeyWithDefaults<T>;
     type VerifyingKey = VerifyingKeyWithDefaults<T>;

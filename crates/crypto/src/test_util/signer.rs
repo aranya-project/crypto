@@ -81,10 +81,10 @@ pub use test_signer;
 
 /// Tests against signer-specific vectors.
 pub fn test_vectors<T: Signer, R: Csprng>(_rng: &mut R) {
-    if let Ok(name) = wycheproof::EcdsaTest::try_from(T::ID) {
+    if let Ok(name) = wycheproof::EcdsaTest::try_from(T::OID) {
         wycheproof::test_ecdsa::<T>(name);
     }
-    if let Ok(name) = wycheproof::EddsaTest::try_from(T::ID) {
+    if let Ok(name) = wycheproof::EddsaTest::try_from(T::OID) {
         wycheproof::test_eddsa::<T>(name);
     }
 }

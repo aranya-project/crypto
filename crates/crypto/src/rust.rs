@@ -26,20 +26,25 @@ use typenum::{Unsigned, U12, U16};
 
 use crate::{
     aead::{
-        check_open_in_place_params, check_seal_in_place_params, Aead, AeadId, AeadKey, IndCca2,
-        Lifetime, OpenError, SealError,
+        check_open_in_place_params, check_seal_in_place_params, Aead, AeadKey, IndCca2, Lifetime,
+        OpenError, SealError,
     },
     block::BlockSize,
     csprng::{Csprng, Random},
     ec::{Curve, Secp256r1, Secp384r1},
-    hash::{Digest, Hash, HashId},
+    hash::{Digest, Hash},
     hex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
+    hpke::{AeadId, HpkeAead},
     import::{try_from_slice, ExportError, Import, ImportError},
-    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EcdhId, EncapKey},
+    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
-    signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    oid::{
+        consts::{AES_256_GCM, SECP256R1, SECP384R1},
+        Oid,
+    },
+    signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
     zeroize::ZeroizeOnDrop,
 };
 
@@ -48,7 +53,7 @@ use crate::{
 pub struct Aes256Gcm(aes_gcm::Aes256Gcm);
 
 impl Aead for Aes256Gcm {
-    const ID: AeadId = AeadId::Aes256Gcm;
+    const OID: Oid = AES_256_GCM;
 
     // Assumes a random nonce.
     const LIFETIME: Lifetime = Lifetime::Messages(u32::MAX as u64);
@@ -122,6 +127,10 @@ impl Aead for Aes256Gcm {
 }
 
 impl IndCca2 for Aes256Gcm {}
+
+impl HpkeAead for Aes256Gcm {
+    const ID: AeadId = AeadId::Aes256Gcm;
+}
 
 #[cfg(feature = "committing-aead")]
 mod committing {
@@ -215,6 +224,7 @@ macro_rules! ecdh_impl {
     (
         $curve:ident,
         $doc:expr,
+        $oid:expr,
         $sk:ident,
         $pk:ident,
         $point:ident,
@@ -305,7 +315,7 @@ macro_rules! ecdh_impl {
         }
 
         impl Ecdh for $curve {
-            const ID: EcdhId = EcdhId::$id;
+            const OID: Oid = $oid;
             const SCALAR_SIZE: usize = <$curve as Curve>::ScalarSize::USIZE;
 
             type PrivateKey = $sk;
@@ -325,6 +335,7 @@ macro_rules! ecdh_impl {
 ecdh_impl!(
     P256,
     "P-256",
+    SECP256R1,
     P256PrivateKey,
     P256PublicKey,
     P256Point,
@@ -333,6 +344,7 @@ ecdh_impl!(
 ecdh_impl!(
     P384,
     "P-384",
+    SECP384R1,
     P384PrivateKey,
     P384PublicKey,
     P384Point,
@@ -366,6 +378,7 @@ macro_rules! ecdsa_impl {
     (
         $curve:ident,
         $doc:expr,
+        $oid:expr,
         $sk:ident,
         $pk:ident,
         $sig:ident,
@@ -485,7 +498,7 @@ macro_rules! ecdsa_impl {
         }
 
         impl Signer for $curve {
-            const ID: SignerId = SignerId::$id;
+            const OID: Oid = $oid;
 
             type SigningKey = $sk;
             type VerifyingKey = $pk;
@@ -496,6 +509,7 @@ macro_rules! ecdsa_impl {
 ecdsa_impl!(
     P256,
     "P-256 with SHA2-256",
+    (),
     P256SigningKey,
     P256VerifyingKey,
     P256Signature,
@@ -505,6 +519,7 @@ ecdsa_impl!(
 ecdsa_impl!(
     P384,
     "P-384 with SHA2-384",
+    (),
     P384SigningKey,
     P384VerifyingKey,
     P384Signature,

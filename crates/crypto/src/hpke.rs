@@ -163,6 +163,12 @@ impl ConstantTimeEq for Psk<'_> {
     }
 }
 
+/// TODO
+pub trait HpkeKem: Kem {
+    /// Uniquely identifies the KEM.
+    const ID: KemId;
+}
+
 /// KEM algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
@@ -223,6 +229,12 @@ impl Display for KemId {
     }
 }
 
+/// TODO
+pub trait HpkeKdf: Kdf {
+    /// Uniquely identifies the KEM.
+    const ID: KdfId;
+}
+
 /// KDF algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
@@ -253,6 +265,12 @@ impl Display for KdfId {
             Self::Other(id) => write!(f, "Kdf({:#02x})", id),
         }
     }
+}
+
+/// TODO
+pub trait HpkeAead: Aead {
+    /// Uniquely identifies the AEAD algorithm.
+    const ID: AeadId;
 }
 
 /// AEAD algorithm identifiers per [IANA].
@@ -412,7 +430,7 @@ pub struct Hpke<K, F, A> {
     _aead: PhantomData<A>,
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> Hpke<K, F, A> {
+impl<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2> Hpke<K, F, A> {
     /// Creates a randomized encryption context for encrypting
     /// messages for the receiver, `pkR`.
     ///

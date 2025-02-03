@@ -3,7 +3,6 @@
 use core::{
     array::TryFromSliceError,
     fmt::{self, Debug},
-    num::NonZeroU16,
     result::Result,
 };
 
@@ -13,7 +12,7 @@ use typenum::{IsGreaterOrEqual, IsLess, U32, U48, U64, U65536};
 
 use crate::{
     keys::{raw_key, InvalidKey, SecretKey},
-    AlgId,
+    oid::Oid,
 };
 
 /// An error from a [`Mac`].
@@ -36,35 +35,6 @@ impl fmt::Display for MacError {
 
 impl core::error::Error for MacError {}
 
-/// MAC algorithm identifiers.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
-pub enum MacId {
-    /// HMAC-SHA2-256.
-    #[alg_id(1)]
-    HmacSha2_256,
-    /// HMAC-SHA2-384.
-    #[alg_id(2)]
-    HmacSha2_384,
-    /// HMAC-SHA2-512.
-    #[alg_id(3)]
-    HmacSha2_512,
-    /// HMAC-SHA2-512/256.
-    #[alg_id(4)]
-    HmacSha2_512_256,
-    /// HMAC-SHA3-256.
-    #[alg_id(5)]
-    HmacSha3_256,
-    /// HMAC-SHA3-384.
-    #[alg_id(6)]
-    HmacSha3_384,
-    /// HMAC-SHA3-512.
-    #[alg_id(7)]
-    HmacSha3_512,
-    /// Some other message authentication code algorithm.
-    #[alg_id(Other)]
-    Other(NonZeroU16),
-}
-
 /// A keyed Message Authentication Code Function (MAC).
 ///
 /// # Requirements
@@ -82,7 +52,7 @@ pub enum MacId {
 /// KMAC256 (for |K| >= 256).
 pub trait Mac: Clone + Sized {
     /// Uniquely identifies the MAC algorithm.
-    const ID: MacId;
+    const OID: Oid;
 
     /// An authentication tag.
     type Tag: ConstantTimeEq;

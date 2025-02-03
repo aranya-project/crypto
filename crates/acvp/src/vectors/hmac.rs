@@ -80,7 +80,7 @@ pub fn test<M: Mac>(vectors: &TestVectors) -> anyhow::Result<()> {
     use crate::vectors::hmac::{Aft, Tests};
 
     for group in &vectors.test_groups {
-        let key_len_bytes = (group.key_len + 7) / 8;
+        let key_len_bytes = group.key_len.div_ceil(8);
         if M::min_key_len().is_some_and(|min| key_len_bytes < min) {
             dprintln!(
                 "skipping group #{tg_id}; key size too small: {key_len_bytes} < {min:?}",
@@ -100,7 +100,7 @@ pub fn test<M: Mac>(vectors: &TestVectors) -> anyhow::Result<()> {
                 {
                     let tag = M::try_mac(key, msg)
                         .with_context(|| format!("#{tc_id}: `try_mac` failed"))?;
-                    let mac_len_bytes = (group.mac_len + 7) / 8;
+                    let mac_len_bytes = group.mac_len.div_ceil(8);
                     let got = tag.as_ref().get(..mac_len_bytes).with_context(|| {
                         ::alloc::format!(
                             "#{tc_id}: tag is too short: `{} < {mac_len_bytes}` (mac = `{:?}`)",

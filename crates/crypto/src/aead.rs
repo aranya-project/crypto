@@ -22,12 +22,11 @@ use typenum::{
     Unsigned, U16, U65536,
 };
 
-#[doc(inline)]
-pub use crate::hpke::AeadId;
 use crate::{
     csprng::{Csprng, Random},
     kdf::{Expand, Kdf, KdfError, Prk},
     keys::{raw_key, SecretKey, SecretKeyBytes},
+    oid::Oid,
     util::const_assert,
     zeroize::Zeroize,
 };
@@ -356,7 +355,7 @@ impl PartialEq<u64> for Lifetime {
 /// [RFC 5116]: https://www.rfc-editor.org/rfc/rfc5116.html
 pub trait Aead {
     /// Uniquely identifies the AEAD algorithm.
-    const ID: AeadId;
+    const OID: Oid;
 
     /// The lifetime of a cryptographic key.
     const LIFETIME: Lifetime;
@@ -1057,7 +1056,7 @@ mod committing {
     #[cfg_attr(feature = "committing-aead", macro_export)]
     #[cfg_attr(docsrs, doc(cfg(feature = "committing-aead")))]
     macro_rules! utc_aead {
-        ($name:ident, $inner:ty, $cipher:ty, $doc:expr) => {
+        ($name:ident, $inner:ty, $cipher:ty, $oid:expr, $doc:expr) => {
             #[doc = $doc]
             pub struct $name {
                 key: <$inner as $crate::aead::Aead>::Key,
@@ -1073,7 +1072,7 @@ mod committing {
             impl $crate::aead::Cmt1Aead for $name {}
 
             impl $crate::aead::Aead for $name {
-                const ID: $crate::aead::AeadId = $crate::aead::AeadId::$name;
+                const OID: $crate::oid::Oid = $oid;
                 const LIFETIME: $crate::aead::Lifetime = <$inner as $crate::aead::Aead>::LIFETIME;
 
                 type KeySize = <$inner as $crate::aead::Aead>::KeySize;
@@ -1329,7 +1328,7 @@ mod committing {
     #[cfg_attr(feature = "committing-aead", macro_export)]
     #[cfg_attr(docsrs, doc(cfg(feature = "committing-aead")))]
     macro_rules! hte_aead {
-        ($name:ident, $inner:ty, $hash:ty, $doc:expr) => {
+        ($name:ident, $inner:ty, $hash:ty, $oid:expr, $doc:expr) => {
             #[doc = $doc]
             pub struct $name {
                 key: <$inner as $crate::aead::Aead>::Key,
@@ -1383,7 +1382,7 @@ mod committing {
             impl $crate::aead::Cmt4Aead for $name where $inner: $crate::aead::Cmt1Aead {}
 
             impl $crate::aead::Aead for $name {
-                const ID: $crate::aead::AeadId = $crate::aead::AeadId::$name;
+                const OID: $crate::aead::AeadId = $oid;
                 const LIFETIME: $crate::aead::Lifetime = <$inner as $crate::aead::Aead>::LIFETIME;
 
                 type KeySize = <$inner as $crate::aead::Aead>::KeySize;

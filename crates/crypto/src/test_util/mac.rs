@@ -93,7 +93,7 @@ where
 
     use crate::test_util::acvp::test_hmac;
 
-    if let Ok(alg) = T::ID.try_into() {
+    if let Ok(alg) = T::OID.try_into() {
         let vectors = hmac::load(alg).expect("should be able to load HMAC test vectors");
         test_hmac::<T>(&vectors);
     }

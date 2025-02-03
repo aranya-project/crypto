@@ -17,11 +17,15 @@ use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac, xdh};
 
 use crate::{
     aead::{Aead, AeadId, IndCca2, Nonce},
-    hpke::{Hpke, SealCtx},
+    hpke::{Hpke, HpkeAead, HpkeKdf, HpkeKem, SealCtx},
     import::Import,
     kdf::{Kdf, KdfId},
     kem::{Ecdh, EcdhId, Kem},
     mac::Mac,
+    oid::{
+        consts::{AES_128_GCM, AES_192_GCM, AES_256_GCM},
+        Oid,
+    },
     signer::{Signer, SignerId, VerifyingKey},
     test_util::UnknownAlgId,
 };
@@ -41,9 +45,9 @@ macro_rules! map_ids {
         $($pat:pat => $test:ident),+ $(,)?
     ) => {
         impl TryFrom<$from> for $to {
-            type Error = UnknownAlgId<$from>;
+            type Error = UnknownAlgId;
 
-            fn try_from(id: $from) -> Result<Self, Self::Error> {
+            fn try_from(id: Oid) -> Result<Self, Self::Error> {
                 #[allow(unused_imports)]
                 use $from::*;
 
@@ -61,7 +65,7 @@ macro_rules! map_ids {
 
 map_ids! {
     AeadId => AeadTest;
-    AeadId::Aes128Gcm | AeadId::Aes256Gcm => AesGcm,
+    AES_128_GCM | AES_192_GCM | AES_256_GCM => AesGcm,
 }
 
 map_ids! {
@@ -335,9 +339,9 @@ pub fn test_hkdf<T: Kdf>(name: HkdfTest) {
 #[allow(non_snake_case)]
 pub fn test_hpke<K, F, A>(name: HpkeTest)
 where
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead + IndCca2,
 {
     let set = hpke::TestSet::load(name).expect("should be able to load tests");
     for (i, g) in set.test_groups.iter().enumerate() {
