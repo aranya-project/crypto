@@ -7,8 +7,15 @@ use crate::{
     csprng::{Csprng, Random},
     import::Import,
     keys::RawSecretBytes,
+    oid::{
+        consts::{
+            ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512, ED25519, ED448,
+            SECP256R1, SECP384R1, SECP521R1,
+        },
+        Identified,
+    },
     signer::{Signer, SigningKey, VerifyingKey},
-    test_util::{assert_ct_eq, assert_ct_ne, wycheproof},
+    test_util::{assert_ct_eq, assert_ct_ne},
 };
 
 /// Invokes `callback` for each signer test.
@@ -80,12 +87,25 @@ macro_rules! test_signer {
 pub use test_signer;
 
 /// Tests against signer-specific vectors.
-pub fn test_vectors<T: Signer, R: Csprng>(_rng: &mut R) {
-    if let Ok(name) = wycheproof::EcdsaTest::try_from(T::OID) {
-        wycheproof::test_ecdsa::<T>(name);
+pub fn test_vectors<T, R>(_rng: &mut R)
+where
+    T: Signer + Identified,
+    T::Signature: Identified,
+    R: Csprng,
+{
+    use crate::test_util::wycheproof::{test_ecdsa, test_eddsa, EcdsaTest, EddsaTest};
+
+    match (T::OID, <T::Signature as Identified>::OID) {
+        (SECP256R1, ECDSA_WITH_SHA2_256) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp256r1Sha256),
+        (SECP256R1, ECDSA_WITH_SHA2_512) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp256r1Sha512),
+        (SECP384R1, ECDSA_WITH_SHA2_384) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp384r1Sha384),
+        (SECP521R1, ECDSA_WITH_SHA2_512) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp521r1Sha512),
+        _ => {}
     }
-    if let Ok(name) = wycheproof::EddsaTest::try_from(T::OID) {
-        wycheproof::test_eddsa::<T>(name);
+    match T::OID {
+        ED25519 => test_eddsa::<T>(EddsaTest::Ed25519),
+        ED448 => test_eddsa::<T>(EddsaTest::Ed448),
+        _ => {}
     }
 }
 

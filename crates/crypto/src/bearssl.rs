@@ -26,21 +26,30 @@ use typenum::{Unsigned, U, U12, U16, U32};
 
 use crate::{
     aead::{
-        check_open_in_place_params, check_seal_in_place_params, Aead, AeadId, AeadKey, IndCca2,
-        Lifetime, OpenError, SealError,
+        check_open_in_place_params, check_seal_in_place_params, Aead, AeadKey, IndCca2, Lifetime,
+        OpenError, SealError,
     },
     asn1::{max_sig_len, raw_sig_len, RawSig, Sig},
     block::BlockSize,
     csprng::{Csprng, Random},
     ec::{Curve, Curve25519, Scalar, Secp256r1, Secp384r1, Secp521r1, Uncompressed},
-    hash::{Digest, Hash, HashId},
+    hash::{Digest, Hash},
     hex::ToHex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
+    hpke::{AeadId, AlgId, KdfId, KemId},
     import::{ExportError, Import, ImportError},
-    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EcdhId, EncapKey, SharedSecret},
+    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey, SharedSecret},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
-    signer::{PkError, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    oid::{
+        consts::{
+            AES_256_GCM, ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512,
+            HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512, SECP256R1, SECP384R1,
+            SECP521R1, SHA2_256, SHA2_384, SHA2_512, X25519 as OID_X25519,
+        },
+        Identified, Oid,
+    },
+    signer::{PkError, Signature, Signer, SignerError, SigningKey, VerifyingKey},
     zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
@@ -98,8 +107,6 @@ impl Drop for Aes256Gcm {
 impl IndCca2 for Aes256Gcm {}
 
 impl Aead for Aes256Gcm {
-    const ID: AeadId = AeadId::Aes256Gcm;
-
     // Assumes a random nonce.
     const LIFETIME: Lifetime = Lifetime::Messages(u32::MAX as u64);
 
@@ -227,20 +234,43 @@ impl Aead for Aes256Gcm {
     }
 }
 
+impl Identified for Aes256Gcm {
+    const OID: Oid = AES_256_GCM;
+}
+
+impl AlgId<AeadId> for Aes256Gcm {
+    const ID: AeadId = AeadId::Aes256Gcm;
+}
+
 #[cfg(feature = "committing-aead")]
 mod committing {
     use super::{Aes256Gcm, Sha256};
-    use crate::rust::Aes256;
+    use crate::{
+        oid::consts::{HTE_AES_256_GCM, UTC_AES_256_GCM},
+        rust::Aes256,
+    };
 
-    crate::aead::utc_aead!(Cmt1Aes256Gcm, Aes256Gcm, Aes256, "CMT-1 AES-256-GCM.");
-    crate::aead::hte_aead!(Cmt4Aes256Gcm, Cmt1Aes256Gcm, Sha256, "CMT-4 AES-256-GCM.");
+    crate::aead::utc_aead!(
+        Cmt1Aes256Gcm,
+        Aes256Gcm,
+        Aes256,
+        "CMT-1 AES-256-GCM.",
+        UTC_AES_256_GCM,
+    );
+    crate::aead::hte_aead!(
+        Cmt4Aes256Gcm,
+        Cmt1Aes256Gcm,
+        Sha256,
+        "CMT-4 AES-256-GCM.",
+        HTE_AES_256_GCM,
+    );
 }
 #[cfg(feature = "committing-aead")]
 #[cfg_attr(docsrs, doc(cfg(feature = "committing-aead")))]
 pub use committing::*;
 
 macro_rules! curve_impl {
-    ($name:ident, $doc:expr, $id:expr, $curve:ident) => {
+    ($name:ident, $doc:expr, $id:expr, $oid:expr, $curve:ident $(,)?) => {
         #[doc = concat!($doc, ".")]
         #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
         pub struct $name;
@@ -249,6 +279,10 @@ macro_rules! curve_impl {
             type ScalarSize = <$curve as Curve>::ScalarSize;
             type CompressedSize = <$curve as Curve>::CompressedSize;
             type UncompressedSize = <$curve as Curve>::UncompressedSize;
+        }
+
+        impl Identified for $name {
+            const OID: Oid = $oid;
         }
 
         impl $name {
@@ -316,14 +350,39 @@ macro_rules! curve_impl {
         }
     };
 }
-curve_impl!(P256, "NIST Curve P-256", BR_EC_secp256r1, Secp256r1);
-curve_impl!(P384, "NIST Curve P-384", BR_EC_secp384r1, Secp384r1);
-curve_impl!(P521, "NIST Curve P-521", BR_EC_secp521r1, Secp521r1);
-curve_impl!(X25519, "Curve25519", BR_EC_curve25519, Curve25519);
+curve_impl!(
+    P256,
+    "NIST Curve P-256",
+    BR_EC_secp256r1,
+    SECP256R1,
+    Secp256r1,
+);
+curve_impl!(
+    P384,
+    "NIST Curve P-384",
+    BR_EC_secp384r1,
+    SECP384R1,
+    Secp384r1,
+);
+curve_impl!(
+    P521,
+    "NIST Curve P-521",
+    BR_EC_secp521r1,
+    SECP521R1,
+    Secp521r1,
+);
+curve_impl!(
+    X25519,
+    "Curve25519",
+    BR_EC_curve25519,
+    OID_X25519,
+    Curve25519
+);
 
 dhkem_impl!(
     DhKemP256HkdfSha256,
     "DHKEM(P256, HKDF-SHA256)",
+    KemId::DhKemP256HkdfSha256,
     P256,
     HkdfSha256,
     P256PrivateKey,
@@ -332,6 +391,7 @@ dhkem_impl!(
 dhkem_impl!(
     DhKemP521HkdfSha512,
     "DHKEM(P521, HKDF-SHA512)",
+    KemId::DhKemP521HkdfSha512,
     P521,
     HkdfSha512,
     P521PrivateKey,
@@ -571,7 +631,6 @@ macro_rules! ecdh_impl {
         }
 
         impl Ecdh for $curve {
-            const ID: EcdhId = EcdhId::$id;
             const SCALAR_SIZE: usize = <$curve as Curve>::ScalarSize::USIZE;
 
             type PrivateKey = $sk;
@@ -623,7 +682,7 @@ macro_rules! ecdsa_impl {
         $sk:ident,
         $pk:ident,
         $sig:ident,
-        $id:ident $(,)?
+        $sig_oid:expr $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
         #[derive(Clone, ZeroizeOnDrop)]
@@ -658,7 +717,7 @@ macro_rules! ecdsa_impl {
                 // supported, which is a programmer error.
                 assert!(len != 0);
 
-                Ok($sig::from_raw(raw)?)
+                Ok($sig(Sig::from_raw(raw)?))
             }
 
             /// Used to implement [`SigningKey`].
@@ -838,7 +897,7 @@ macro_rules! ecdsa_impl {
             fn verify(self: Pin<&Self>, msg: &[u8], sig: &$sig) -> Result<(), SignerError> {
                 let digest = $hash::hash(msg);
                 let pk = self.into();
-                let raw: RawSig<{ raw_sig_len($curve::SCALAR_SIZE * 8) }> = sig.to_raw()?;
+                let raw: RawSig<{ raw_sig_len($curve::SCALAR_SIZE * 8) }> = sig.0.to_raw()?;
                 // SAFETY: FFI call, no invariants
                 let ret = unsafe {
                     br_ecdsa_i31_vrfy_raw(
@@ -912,11 +971,37 @@ macro_rules! ecdsa_impl {
         }
 
         #[doc = concat!($doc, " ECDSA signature.")]
-        pub type $sig = Sig<$curve, { max_sig_len::<{ $curve::SCALAR_SIZE * 8 }>() }>;
+        #[derive(Clone, Debug)]
+        pub struct $sig(Sig<$curve, { max_sig_len::<{ $curve::SCALAR_SIZE * 8 }>() }>);
+
+        impl Signature<$curve> for $sig {
+            type Data = Self;
+
+            #[inline]
+            fn export(&self) -> Self::Data {
+                self.clone()
+            }
+        }
+
+        impl Borrow<[u8]> for $sig {
+            #[inline]
+            fn borrow(&self) -> &[u8] {
+                self.0.as_bytes()
+            }
+        }
+
+        impl Import<&[u8]> for $sig {
+            #[inline]
+            fn import(data: &[u8]) -> Result<Self, ImportError> {
+                Ok(Self(Import::import(data)?))
+            }
+        }
+
+        impl Identified for $sig {
+            const OID: Oid = $sig_oid;
+        }
 
         impl Signer for $curve {
-            const ID: SignerId = SignerId::$id;
-
             type SigningKey = $sk;
             type VerifyingKey = $pk;
             type Signature = $sig;
@@ -930,7 +1015,7 @@ ecdsa_impl!(
     P256SigningKey,
     P256VerifyingKey,
     P256Signature,
-    Secp256r1Sha2_256,
+    ECDSA_WITH_SHA2_256,
 );
 ecdsa_impl!(
     P384,
@@ -939,7 +1024,7 @@ ecdsa_impl!(
     P384SigningKey,
     P384VerifyingKey,
     P384Signature,
-    Secp384r1Sha2_384,
+    ECDSA_WITH_SHA2_384,
 );
 ecdsa_impl!(
     P521,
@@ -948,7 +1033,7 @@ ecdsa_impl!(
     P521SigningKey,
     P521VerifyingKey,
     P521Signature,
-    Secp521r1Sha2_512,
+    ECDSA_WITH_SHA2_512,
 );
 
 macro_rules! hash_impl {
@@ -961,7 +1046,8 @@ macro_rules! hash_impl {
         $block_size:expr,
         $init:ident,
         $update:ident,
-        $digest:ident $(,)?
+        $digest:ident,
+        $oid:expr $(,)?
     ) => {
         #[doc = concat!($doc, ".")]
         #[derive(Copy, Clone, Debug, Default)]
@@ -979,8 +1065,6 @@ macro_rules! hash_impl {
         }
 
         impl Hash for $name {
-            const ID: HashId = HashId::$name;
-
             type DigestSize = U<{ $digest_size as usize }>;
             const DIGEST_SIZE: usize = $digest_size as usize;
 
@@ -1016,6 +1100,10 @@ macro_rules! hash_impl {
         impl BlockSize for $name {
             type BlockSize = U<{ $block_size }>;
         }
+
+        impl Identified for $name {
+            const OID: Oid = $oid;
+        }
     };
 }
 hash_impl!(
@@ -1028,6 +1116,7 @@ hash_impl!(
     br_sha256_init,
     br_sha256_update,
     br_sha256_out,
+    SHA2_256,
 );
 hash_impl!(
     Sha384,
@@ -1039,6 +1128,7 @@ hash_impl!(
     br_sha384_init,
     br_sha384_update,
     br_sha384_out,
+    SHA2_384,
 );
 hash_impl!(
     Sha512,
@@ -1050,15 +1140,16 @@ hash_impl!(
     br_sha512_init,
     br_sha512_update,
     br_sha512_out,
+    SHA2_512,
 );
 
-hkdf_impl!(HkdfSha256, "HKDF-SHA256", Sha256);
-hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384);
-hkdf_impl!(HkdfSha512, "HKDF-SHA512", Sha512);
+hkdf_impl!(HkdfSha256, "HKDF-SHA256", Sha256, KdfId::HkdfSha256);
+hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384, KdfId::HkdfSha384);
+hkdf_impl!(HkdfSha512, "HKDF-SHA512", Sha512, KdfId::HkdfSha512);
 
-hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256, HmacSha2_256);
-hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384, HmacSha2_384);
-hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512, HmacSha2_512);
+hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256, HMAC_WITH_SHA2_256);
+hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384, HMAC_WITH_SHA2_384);
+hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512, HMAC_WITH_SHA2_512);
 
 /// A `HMAC_DRBG`-based CSPRNG.
 pub struct HmacDrbg(br_hmac_drbg_context);

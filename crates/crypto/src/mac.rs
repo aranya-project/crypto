@@ -10,10 +10,7 @@ use generic_array::{ArrayLength, GenericArray};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{IsGreaterOrEqual, IsLess, U32, U48, U64, U65536};
 
-use crate::{
-    keys::{raw_key, InvalidKey, SecretKey},
-    oid::Oid,
-};
+use crate::keys::{raw_key, InvalidKey, SecretKey};
 
 /// An error from a [`Mac`].
 #[derive(Debug, Eq, PartialEq)]
@@ -51,9 +48,6 @@ impl core::error::Error for MacError {}
 /// requirements include HMAC-SHA-512 (for |K| >= 256) and
 /// KMAC256 (for |K| >= 256).
 pub trait Mac: Clone + Sized {
-    /// Uniquely identifies the MAC algorithm.
-    const OID: Oid;
-
     /// An authentication tag.
     type Tag: ConstantTimeEq;
     /// The size in octets of a tag used by this [`Mac`].

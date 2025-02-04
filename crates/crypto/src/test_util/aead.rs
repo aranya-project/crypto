@@ -10,7 +10,8 @@ use more_asserts::assert_ge;
 use crate::{
     aead::{Aead, Nonce, OpenError},
     csprng::{Csprng, Random},
-    test_util::{assert_all_zero, assert_ct_ne, wycheproof},
+    oid::Identified,
+    test_util::{assert_all_zero, assert_ct_ne},
 };
 
 /// Invokes `callback` for each AEAD test.
@@ -88,9 +89,19 @@ const GOLDEN: &[u8] = b"hello, world!";
 const AD: &[u8] = b"some additional data";
 
 /// Tests against AEAD-specific vectors.
-pub fn test_vectors<A: Aead, R: Csprng>(_rng: &mut R) {
-    if let Ok(name) = wycheproof::AeadTest::try_from(A::ID) {
-        wycheproof::test_aead::<A>(name);
+pub fn test_vectors<A, R>(_rng: &mut R)
+where
+    A: Aead + Identified,
+    R: Csprng,
+{
+    use crate::{
+        oid::consts::{AES_128_GCM, AES_192_GCM, AES_256_GCM},
+        test_util::wycheproof::{test_aead, AeadTest},
+    };
+
+    match A::OID {
+        AES_128_GCM | AES_192_GCM | AES_256_GCM => test_aead::<A>(AeadTest::AesGcm),
+        _ => {}
     }
 }
 

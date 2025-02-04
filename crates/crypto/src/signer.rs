@@ -5,7 +5,6 @@
 use core::{
     borrow::Borrow,
     fmt::{self, Debug},
-    num::NonZeroU16,
     result::Result,
 };
 
@@ -16,8 +15,6 @@ use crate::{
     csprng::Random,
     import::Import,
     keys::{PublicKey, SecretKey},
-    oid::Oid,
-    AlgId,
 };
 
 /// An error from a [`Signer`].
@@ -92,9 +89,6 @@ impl From<Bug> for SignerError {
 /// P-384, and P521), albeit with minor modifications (like
 /// rejecting s >= N/2).
 pub trait Signer {
-    /// Uniquely identifies the signature algorithm.
-    const OID: Oid;
-
     /// A private key used to create signatures.
     type SigningKey: SigningKey<Self>;
     /// A public key used verify signatures.

@@ -17,6 +17,12 @@ macro_rules! const_try {
     };
 }
 
+/// Associates an OID with a cryptographic algorithm.
+pub trait Identified {
+    /// The algorithm's OID.
+    const OID: Oid;
+}
+
 /// Creates a constant [`Oid`] at compile time.
 ///
 /// # Examples

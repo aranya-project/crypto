@@ -33,7 +33,6 @@ use crate::{
     kdf::{Context, Expand, Kdf, KdfError, Prk},
     kem::{Kem, KemError},
     keys::RawSecretBytes,
-    AlgId,
 };
 
 /// Converts `v` to a big-endian byte array.
@@ -163,16 +162,16 @@ impl ConstantTimeEq for Psk<'_> {
     }
 }
 
-/// TODO
-pub trait HpkeKem: Kem {
-    /// Uniquely identifies the KEM.
-    const ID: KemId;
+/// Associates a 16-bit HPKE identifier with the algorithm.
+pub trait AlgId<T> {
+    /// Uniquely identifies the algorithm.
+    const ID: T;
 }
 
 /// KEM algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, crate::AlgId)]
 pub enum KemId {
     /// DHKEM(P-256, HKDF-SHA256).
     #[alg_id(0x0010)]
@@ -204,6 +203,18 @@ pub enum KemId {
     /// X25519Kyber768Draft00
     #[alg_id(0x0030)]
     X25519Kyber768Draft00,
+    /// ML-KEM-512.
+    #[alg_id(0x040)]
+    MlKem512,
+    /// ML-KEM-768.
+    #[alg_id(0x041)]
+    MlKem768,
+    /// ML-KEM-1024.
+    #[alg_id(0x042)]
+    MlKem1024,
+    /// X-Wing.
+    #[alg_id(0x647a)]
+    XWing,
     /// Some other KEM.
     ///
     /// Non-zero since 0x0000 is marked as 'reserved'.
@@ -224,21 +235,19 @@ impl Display for KemId {
             Self::DhKemX25519HkdfSha256 => write!(f, "DHKEM(X25519, HKDF-SHA256)"),
             Self::DhKemX448HkdfSha512 => write!(f, "DHKEM(X448, HKDF-SHA512)"),
             Self::X25519Kyber768Draft00 => write!(f, "X25519Kyber768Draft00"),
+            Self::MlKem512 => write!(f, "ML-KEM-512"),
+            Self::MlKem768 => write!(f, "ML-KEM-768"),
+            Self::MlKem1024 => write!(f, "ML-KEM-1024"),
+            Self::XWing => write!(f, "X-Wing"),
             Self::Other(id) => write!(f, "Kem({:#02x})", id),
         }
     }
 }
 
-/// TODO
-pub trait HpkeKdf: Kdf {
-    /// Uniquely identifies the KEM.
-    const ID: KdfId;
-}
-
 /// KDF algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, crate::AlgId)]
 pub enum KdfId {
     /// HKDF-SHA256.
     #[alg_id(0x0001)]
@@ -267,16 +276,10 @@ impl Display for KdfId {
     }
 }
 
-/// TODO
-pub trait HpkeAead: Aead {
-    /// Uniquely identifies the AEAD algorithm.
-    const ID: AeadId;
-}
-
 /// AEAD algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, crate::AlgId)]
 pub enum AeadId {
     /// AES-128-GCM.
     #[alg_id(0x0001)]
@@ -287,16 +290,6 @@ pub enum AeadId {
     /// ChaCha20Poly1305.
     #[alg_id(0x0003)]
     ChaCha20Poly1305,
-    /// CMT-1 AES-256-GCM.
-    ///
-    /// Not an official RFC ID.
-    #[alg_id(0xfffd)]
-    Cmt1Aes256Gcm,
-    /// CMT-4 AES-256-GCM.
-    ///
-    /// Not an official RFC ID.
-    #[alg_id(0xfffe)]
-    Cmt4Aes256Gcm,
     /// Some other AEAD.
     ///
     /// Non-zero since 0x0000 is marked as 'reserved'.
@@ -313,8 +306,6 @@ impl Display for AeadId {
             Self::Aes128Gcm => write!(f, "Aes128Gcm"),
             Self::Aes256Gcm => write!(f, "Aes256Gcm"),
             Self::ChaCha20Poly1305 => write!(f, "ChaCha20Poly1305"),
-            Self::Cmt1Aes256Gcm => write!(f, "Cmt1Aes256Gcm"),
-            Self::Cmt4Aes256Gcm => write!(f, "Cmt4Aes256Gcm"),
             Self::Other(id) => write!(f, "Aead({:#02x})", id),
             Self::ExportOnly => write!(f, "ExportOnly"),
         }
@@ -430,7 +421,12 @@ pub struct Hpke<K, F, A> {
     _aead: PhantomData<A>,
 }
 
-impl<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2> Hpke<K, F, A> {
+impl<K, F, A> Hpke<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     /// Creates a randomized encryption context for encrypting
     /// messages for the receiver, `pkR`.
     ///
@@ -608,14 +604,24 @@ impl<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2> Hpke<K, F, A> {
     }
 }
 
-struct Schedule<K: Kem, F: Kdf, A: Aead + IndCca2> {
+struct Schedule<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     key: KeyData<A>,
     base_nonce: Nonce<A::NonceSize>,
     exporter_secret: Prk<F::PrkSize>,
     _kem: PhantomData<K>,
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> Schedule<K, F, A> {
+impl<K, F, A> Schedule<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     fn into_send_ctx(self) -> SendCtx<K, F, A> {
         SendCtx {
             seal: Either::Right((self.key, self.base_nonce)),
@@ -660,12 +666,22 @@ type RawKey<A> = (KeyData<A>, Nonce<<A as Aead>::NonceSize>);
 
 /// An encryption context that encrypts messages for a particular
 /// recipient.
-pub struct SendCtx<K: Kem, F: Kdf, A: Aead + IndCca2> {
+pub struct SendCtx<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     seal: Either<SealCtx<A>, RawKey<A>>,
     export: ExportCtx<K, F, A>,
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> SendCtx<K, F, A> {
+impl<K, F, A> SendCtx<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = SealCtx::<A>::OVERHEAD;
 
@@ -728,14 +744,14 @@ impl<K: Kem, F: Kdf, A: Aead + IndCca2> SendCtx<K, F, A> {
 /// a particular recipient.
 ///
 /// Unlike [`SendCtx`], it cannot export secrets.
-pub struct SealCtx<A: Aead + IndCca2> {
+pub struct SealCtx<A: Aead + IndCca2 + AlgId<AeadId>> {
     aead: A,
     base_nonce: Nonce<A::NonceSize>,
     /// Incremented after each call to `seal`.
     seq: Seq,
 }
 
-impl<A: Aead + IndCca2> SealCtx<A> {
+impl<A: Aead + IndCca2 + AlgId<AeadId>> SealCtx<A> {
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = A::OVERHEAD;
 
@@ -803,12 +819,22 @@ impl<A: Aead + IndCca2> SealCtx<A> {
 
 /// An encryption context that decrypts messages from
 /// a particular sender.
-pub struct RecvCtx<K: Kem, F: Kdf, A: Aead + IndCca2> {
+pub struct RecvCtx<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     open: Either<OpenCtx<A>, RawKey<A>>,
     export: ExportCtx<K, F, A>,
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> RecvCtx<K, F, A> {
+impl<K, F, A> RecvCtx<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = OpenCtx::<A>::OVERHEAD;
 
@@ -1091,12 +1117,22 @@ impl Display for Seq {
     }
 }
 
-struct ExportCtx<K: Kem, F: Kdf, A: Aead + IndCca2> {
+struct ExportCtx<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     exporter_secret: Prk<F::PrkSize>,
     _etc: PhantomData<(K, A)>,
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> ExportCtx<K, F, A> {
+impl<K, F, A> ExportCtx<K, F, A>
+where
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
+{
     fn new(exporter_secret: Prk<F::PrkSize>) -> Self {
         Self {
             exporter_secret,
@@ -1196,8 +1232,7 @@ mod tests {
     /// Tests that [`AeadId`] is assigned correctly.
     #[test]
     fn test_aead_id() {
-        // NB: we include two unofficial IDs.
-        let unassigned = 0x0004..=0xFFFE - 2;
+        let unassigned = 0x0004..=0xFFFE;
         for id in unassigned {
             let want = AeadId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
             let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)
@@ -1209,11 +1244,11 @@ mod tests {
         }
     }
 
-    /// Tests that [`AeadId`] can be serialized and deserialized via [`serde_json`].
+    /// Tests that [`AeadId`] can be serialized and deserialized
+    /// via [`serde_json`].
     #[test]
     fn test_aead_id_json() {
-        // NB: we include two unofficial IDs.
-        let unassigned = 0x0004..=0xFFFE - 2;
+        let unassigned = 0x0004..=0xFFFE;
         for id in unassigned {
             let want = AeadId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
             let encoded = serde_json::to_string(&id).expect("should be able to encode `u16`");
@@ -1242,8 +1277,14 @@ mod tests {
     /// Tests that [`KemId`] is assigned correctly.
     #[test]
     fn test_kem_id() {
-        let unassigned: [RangeInclusive<u16>; 3] =
-            [0x0001..=0x000F, 0x0022..=0x002F, 0x0031..=0xFFFF];
+        let unassigned: [RangeInclusive<u16>; 6] = [
+            0x0001..=0x000F,
+            0x0017..=0x001F,
+            0x0022..=0x002F,
+            0x0031..=0x0039,
+            0x0043..=0x6479,
+            0x647b..=0xFFFF,
+        ];
         for id in unassigned.into_iter().flatten() {
             let want = KemId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
             let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)

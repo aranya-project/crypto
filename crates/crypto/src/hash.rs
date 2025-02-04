@@ -15,8 +15,6 @@ use typenum::{
     Unsigned, U32, U65536,
 };
 
-use crate::oid::Oid;
-
 /// A cryptographic hash function.
 ///
 /// # Requirements
@@ -33,9 +31,6 @@ use crate::oid::Oid;
 /// Examples of cryptographic hash functions that fulfill
 /// these requirements include SHA-256, SHA-512, and SHA3-512.
 pub trait Hash: Clone {
-    /// Uniquely identifies the hash algorithm.
-    const OID: Oid;
-
     /// The size in octets of a digest used by this [`Hash`].
     ///
     /// Must be at least 32 octets and less than 2¹⁶ octets.

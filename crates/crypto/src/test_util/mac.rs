@@ -1,9 +1,10 @@
 //! [`Mac`] tests.
 
-use super::{assert_ct_eq, assert_ct_ne};
 use crate::{
     csprng::{Csprng, Random},
     mac::Mac,
+    oid::Identified,
+    test_util::{assert_ct_eq, assert_ct_ne},
 };
 
 /// Invokes `callback` for each MAC test.
@@ -85,18 +86,31 @@ const DATA: &[u8] = b"hello, world!";
 /// Unknown hash algorithms are ignored.
 pub fn test_vectors<T, R>(_rng: &mut R)
 where
-    T: Mac,
+    T: Mac + Identified,
     T::Tag: AsRef<[u8]>,
     R: Csprng,
 {
-    use acvp::vectors::hmac;
+    use acvp::vectors::hmac::{self, Algorithm};
 
-    use crate::test_util::acvp::test_hmac;
+    use crate::{
+        oid::consts::{
+            HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512, HMAC_WITH_SHA3_256,
+            HMAC_WITH_SHA3_384, HMAC_WITH_SHA3_512,
+        },
+        test_util::acvp::test_hmac,
+    };
 
-    if let Ok(alg) = T::OID.try_into() {
-        let vectors = hmac::load(alg).expect("should be able to load HMAC test vectors");
-        test_hmac::<T>(&vectors);
-    }
+    let alg = match T::OID {
+        HMAC_WITH_SHA2_256 => Algorithm::HmacSha2_256,
+        HMAC_WITH_SHA2_384 => Algorithm::HmacSha2_384,
+        HMAC_WITH_SHA2_512 => Algorithm::HmacSha2_512,
+        HMAC_WITH_SHA3_256 => Algorithm::HmacSha3_256,
+        HMAC_WITH_SHA3_384 => Algorithm::HmacSha3_384,
+        HMAC_WITH_SHA3_512 => Algorithm::HmacSha3_512,
+        _ => return,
+    };
+    let vectors = hmac::load(alg).expect("should be able to load HMAC test vectors");
+    test_hmac::<T>(&vectors);
 }
 
 /// Basic positive test.

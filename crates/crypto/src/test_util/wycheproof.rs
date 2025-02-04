@@ -5,7 +5,6 @@
 use alloc::{string::ToString, vec};
 use core::borrow::Borrow;
 
-use hpke::HpkeId;
 pub use hpke::TestName as HpkeTest;
 use subtle::ConstantTimeEq;
 pub use wycheproof::{
@@ -16,18 +15,13 @@ pub use wycheproof::{
 use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac, xdh};
 
 use crate::{
-    aead::{Aead, AeadId, IndCca2, Nonce},
-    hpke::{Hpke, HpkeAead, HpkeKdf, HpkeKem, SealCtx},
+    aead::{Aead, IndCca2, Nonce},
+    hpke::{AeadId, AlgId, Hpke, KdfId, KemId, SealCtx},
     import::Import,
-    kdf::{Kdf, KdfId},
-    kem::{Ecdh, EcdhId, Kem},
+    kdf::Kdf,
+    kem::{Ecdh, Kem},
     mac::Mac,
-    oid::{
-        consts::{AES_128_GCM, AES_192_GCM, AES_256_GCM},
-        Oid,
-    },
-    signer::{Signer, SignerId, VerifyingKey},
-    test_util::UnknownAlgId,
+    signer::{Signer, VerifyingKey},
 };
 
 macro_rules! msg {
@@ -37,97 +31,6 @@ macro_rules! msg {
     ($($arg:tt)*) => {
         &format!($($arg)*)
     };
-}
-
-macro_rules! map_ids {
-    (
-        $from:ident => $to:ident;
-        $($pat:pat => $test:ident),+ $(,)?
-    ) => {
-        impl TryFrom<$from> for $to {
-            type Error = UnknownAlgId;
-
-            fn try_from(id: Oid) -> Result<Self, Self::Error> {
-                #[allow(unused_imports)]
-                use $from::*;
-
-                match id {
-                    $(
-                        $pat => Ok($to::$test),
-                    )+
-                    #[allow(unreachable_patterns)]
-                    id => Err(UnknownAlgId(id)),
-                }
-            }
-        }
-    }
-}
-
-map_ids! {
-    AeadId => AeadTest;
-    AES_128_GCM | AES_192_GCM | AES_256_GCM => AesGcm,
-}
-
-map_ids! {
-    EcdhId => EcdhTest;
-    Secp256r1 => EcdhSecp256r1,
-    Secp384r1 => EcdhSecp384r1,
-    Secp521r1 => EcdhSecp521r1,
-}
-
-map_ids! {
-    SignerId => EcdsaTest;
-    Secp256r1Sha2_256 => EcdsaSecp256r1Sha256,
-    Secp256r1Sha2_512 => EcdsaSecp256r1Sha512,
-    Secp384r1Sha2_384 => EcdsaSecp384r1Sha384,
-    Secp521r1Sha2_512 => EcdsaSecp521r1Sha512,
-}
-
-map_ids! {
-    SignerId => EddsaTest;
-    Ed25519 => Ed25519,
-    Ed448 => Ed448,
-}
-
-map_ids! {
-    KdfId => HkdfTest;
-    HkdfSha256 => HkdfSha256,
-    HkdfSha384 => HkdfSha384,
-    HkdfSha512 => HkdfSha512,
-}
-
-map_ids! {
-    EcdhId => XdhTest;
-    X25519 => X25519,
-    X448 => X448,
-}
-
-map_ids! {
-    HpkeId => HpkeTest;
-    HpkeDhKemP256HkdfSha256HkdfSha256Aes128Gcm => HpkeDhKemP256HkdfSha256HkdfSha256Aes128Gcm,
-    HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm => HpkeDhKemP256HkdfSha256HkdfSha256Aes256Gcm,
-    HpkeDhKemP256HkdfSha256HkdfSha256ChaCha20Poly1305 => HpkeDhKemP256HkdfSha256HkdfSha256ChaCha20Poly1305,
-    HpkeDhKemP256HkdfSha256HkdfSha512Aes128Gcm => HpkeDhKemP256HkdfSha256HkdfSha512Aes128Gcm,
-    HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm => HpkeDhKemP256HkdfSha256HkdfSha512Aes256Gcm,
-    HpkeDhKemP256HkdfSha256HkdfSha512ChaCha20Poly1305 => HpkeDhKemP256HkdfSha256HkdfSha512ChaCha20Poly1305,
-    HpkeDhKemP521HkdfSha512HkdfSha256Aes128Gcm => HpkeDhKemP521HkdfSha512HkdfSha256Aes128Gcm,
-    HpkeDhKemP521HkdfSha512HkdfSha256Aes256Gcm => HpkeDhKemP521HkdfSha512HkdfSha256Aes256Gcm,
-    HpkeDhKemP521HkdfSha512HkdfSha256ChaCha20Poly1305 => HpkeDhKemP521HkdfSha512HkdfSha256ChaCha20Poly1305,
-    HpkeDhKemP521HkdfSha512HkdfSha512Aes128Gcm => HpkeDhKemP521HkdfSha512HkdfSha512Aes128Gcm,
-    HpkeDhKemP521HkdfSha512HkdfSha512Aes256Gcm => HpkeDhKemP521HkdfSha512HkdfSha512Aes256Gcm,
-    HpkeDhKemP521HkdfSha512HkdfSha512ChaCha20Poly1305 => HpkeDhKemP521HkdfSha512HkdfSha512ChaCha20Poly1305,
-    HpkeDhKemX25519HkdfSha256HkdfSha256Aes128Gcm => HpkeDhKemX25519HkdfSha256HkdfSha256Aes128Gcm,
-    HpkeDhKemX25519HkdfSha256HkdfSha256Aes256Gcm => HpkeDhKemX25519HkdfSha256HkdfSha256Aes256Gcm,
-    HpkeDhKemX25519HkdfSha256HkdfSha256ChaCha20Poly1305 => HpkeDhKemX25519HkdfSha256HkdfSha256ChaCha20Poly1305,
-    HpkeDhKemX25519HkdfSha256HkdfSha512Aes128Gcm => HpkeDhKemX25519HkdfSha256HkdfSha512Aes128Gcm,
-    HpkeDhKemX25519HkdfSha256HkdfSha512Aes256Gcm => HpkeDhKemX25519HkdfSha256HkdfSha512Aes256Gcm,
-    HpkeDhKemX25519HkdfSha256HkdfSha512ChaCha20Poly1305 => HpkeDhKemX25519HkdfSha256HkdfSha512ChaCha20Poly1305,
-    HpkeDhKemX448HkdfSha512HkdfSha256Aes128Gcm => HpkeDhKemX448HkdfSha512HkdfSha256Aes128Gcm,
-    HpkeDhKemX448HkdfSha512HkdfSha256Aes256Gcm => HpkeDhKemX448HkdfSha512HkdfSha256Aes256Gcm,
-    HpkeDhKemX448HkdfSha512HkdfSha256ChaCha20Poly1305 => HpkeDhKemX448HkdfSha512HkdfSha256ChaCha20Poly1305,
-    HpkeDhKemX448HkdfSha512HkdfSha512Aes128Gcm => HpkeDhKemX448HkdfSha512HkdfSha512Aes128Gcm,
-    HpkeDhKemX448HkdfSha512HkdfSha512Aes256Gcm => HpkeDhKemX448HkdfSha512HkdfSha512Aes256Gcm,
-    HpkeDhKemX448HkdfSha512HkdfSha512ChaCha20Poly1305 => HpkeDhKemX448HkdfSha512HkdfSha512ChaCha20Poly1305,
 }
 
 /// Tests an [`Aead`] against Project Wycheproof test vectors.
@@ -339,9 +242,9 @@ pub fn test_hkdf<T: Kdf>(name: HkdfTest) {
 #[allow(non_snake_case)]
 pub fn test_hpke<K, F, A>(name: HpkeTest)
 where
-    K: HpkeKem,
-    F: HpkeKdf,
-    A: HpkeAead + IndCca2,
+    K: Kem + AlgId<KemId>,
+    F: Kdf + AlgId<KdfId>,
+    A: Aead + IndCca2 + AlgId<AeadId>,
 {
     let set = hpke::TestSet::load(name).expect("should be able to load tests");
     for (i, g) in set.test_groups.iter().enumerate() {
@@ -500,11 +403,8 @@ pub mod hpke {
     use wycheproof::{ByteString, WycheproofError};
 
     use crate::{
-        aead::AeadId,
-        hpke::{Mode, Psk},
+        hpke::{AeadId, KdfId, KemId, Mode, Psk},
         import::Import,
-        kdf::KdfId,
-        kem::KemId,
     };
 
     macro_rules! test_names {
