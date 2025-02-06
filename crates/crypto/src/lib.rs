@@ -14,6 +14,7 @@
 #![warn(missing_docs)]
 
 #[cfg(feature = "alloc")]
+#[allow(unused_extern_crates, reason = "Depends on the full feature set")]
 extern crate alloc;
 
 pub(crate) use spideroak_crypto_derive::AlgId;

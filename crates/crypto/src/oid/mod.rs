@@ -342,17 +342,7 @@ impl fmt::Display for Oid {
 /// It is large enough to encode [UUID] OIDs.
 ///
 /// [UUID]: https://itu.int/ITU-T/X.667
-// NB: 23 + len (u8) pads `OidBuf` to 24 bytes, a multiple of 8.
 pub const DEFAULT_MAX_ENCODED_SIZE: usize = 23;
-
-/// TODO
-pub struct OidBuf42(OidBuf<42>);
-impl OidBuf42 {
-    /// TODO
-    pub const fn encode(self, arc: Arc) -> Result<Self, InvalidOid> {
-        Ok(Self(const_try!(self.0.push(arc))))
-    }
-}
 
 /// An owned OID.
 #[derive(Copy, Clone, Hash, Eq, Ord, PartialOrd)]
@@ -566,46 +556,6 @@ where
         PartialEq::eq(self.as_oid(), other)
     }
 }
-
-// impl<const N: usize> PartialEq<[u8]> for OidBuf<N> {
-//     #[inline]
-//     fn eq(&self, other: &[u8]) -> bool {
-//         PartialEq::eq(self.as_oid(), other)
-//     }
-// }
-
-// impl<const N: usize> PartialEq<OidBuf<N>> for [u8] {
-//     #[inline]
-//     fn eq(&self, other: &OidBuf<N>) -> bool {
-//         PartialEq::eq(other, self)
-//     }
-// }
-
-// impl<const N: usize> PartialEq<&str> for OidBuf<N> {
-//     fn eq(&self, other: &&str) -> bool {
-//         PartialEq::eq(self.as_oid(), other)
-//     }
-// }
-
-// impl<const N: usize> PartialEq<OidBuf<N>> for &str {
-//     fn eq(&self, other: &OidBuf<N>) -> bool {
-//         PartialEq::eq(other, self)
-//     }
-// }
-
-// impl<const N: usize> PartialEq<Oid> for OidBuf<N> {
-//     #[inline]
-//     fn eq(&self, other: &Oid) -> bool {
-//         PartialEq::eq(other, self)
-//     }
-// }
-
-// impl<const N: usize, const M: usize> PartialEq<OidBuf<M>> for OidBuf<N> {
-//     #[inline]
-//     fn eq(&self, other: &OidBuf<M>) -> bool {
-//         PartialEq::eq(self.as_oid(), other.as_oid())
-//     }
-// }
 
 impl<T, const N: usize> AsRef<T> for OidBuf<N>
 where
