@@ -342,7 +342,7 @@ impl fmt::Display for Oid {
 /// It is large enough to encode [UUID] OIDs.
 ///
 /// [UUID]: https://itu.int/ITU-T/X.667
-pub const DEFAULT_MAX_ENCODED_SIZE: usize = 23;
+const DEFAULT_MAX_ENCODED_SIZE: usize = 23;
 
 /// An owned OID.
 #[derive(Copy, Clone, Hash, Eq, Ord, PartialOrd)]
