@@ -1,0 +1,72 @@
+[package]
+name = "spideroak-s2n-quic-tls"
+description = "s2n-tls bindings for spideroak-crypto"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license = "BSD-3-Clause"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
+categories = ["cryptography", "no-std", "no-std::no-alloc"]
+keywords = ["crypto", "cryptography", "spideroak"]
+
+[lints]
+workspace = true
+
+[lib]
+
+[features]
+default = []
+
+# Enable allocations.
+alloc = [
+	"spideroak-crypto/alloc",
+]
+
+
+# Use std.
+std = [
+	"spideroak-crypto/std",
+]
+
+[dependencies]
+##
+# This workspace
+##
+
+spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false }
+
+##
+# Other SpiderOak crates
+##
+
+##
+# Third party
+##
+
+s2n-quic = { version = "1" }
+s2n-quic-core = { version = "0.53" }
+s2n-quic-crypto = { version = "0.53" }
+s2n-quic-tls = { version = "0.53" }
+s2n-tls = { version = "0.3" }
+s2n-tls-sys = { version = "0.3" }
+
+[dev-dependencies]
+# A little bit of a hack: always certain features for tests and
+# examples.
+spideroak-s2n-quic-tls = { path = "." }
+
+
+[package.metadata.docs.rs]
+features = []
+
+[package.metadata.cargo-all-features]
+always_include_features = []
+
+skip_feature_sets = []
+
+denylist = []
+
+[package.metadata.cargo-machete]
+ignored = ["old-generic-array"]
