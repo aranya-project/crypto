@@ -46,7 +46,7 @@ macro_rules! impl_sha3 {
         }
 
         impl Identified for $name {
-            const OID: Oid = $oid;
+            const OID: &Oid = $oid;
         }
     };
 }

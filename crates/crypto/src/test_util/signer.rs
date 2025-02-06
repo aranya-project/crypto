@@ -7,13 +7,7 @@ use crate::{
     csprng::{Csprng, Random},
     import::Import,
     keys::RawSecretBytes,
-    oid::{
-        consts::{
-            ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512, ED25519, ED448,
-            SECP256R1, SECP384R1, SECP521R1,
-        },
-        Identified,
-    },
+    oid::Identified,
     signer::{Signer, SigningKey, VerifyingKey},
     test_util::{assert_ct_eq, assert_ct_ne},
 };
@@ -93,19 +87,37 @@ where
     T::Signature: Identified,
     R: Csprng,
 {
-    use crate::test_util::wycheproof::{test_ecdsa, test_eddsa, EcdsaTest, EddsaTest};
+    use crate::{
+        oid::consts::{
+            ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512, ED25519, ED448,
+            SECP256R1, SECP384R1, SECP521R1,
+        },
+        test_util::wycheproof::{
+            test_ecdsa, test_eddsa,
+            EcdsaTest::{
+                EcdsaSecp256r1Sha256, EcdsaSecp256r1Sha512, EcdsaSecp384r1Sha384,
+                EcdsaSecp521r1Sha512,
+            },
+            EddsaTest::{Ed25519, Ed448},
+        },
+    };
 
-    match (T::OID, <T::Signature as Identified>::OID) {
-        (SECP256R1, ECDSA_WITH_SHA2_256) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp256r1Sha256),
-        (SECP256R1, ECDSA_WITH_SHA2_512) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp256r1Sha512),
-        (SECP384R1, ECDSA_WITH_SHA2_384) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp384r1Sha384),
-        (SECP521R1, ECDSA_WITH_SHA2_512) => test_ecdsa::<T>(EcdsaTest::EcdsaSecp521r1Sha512),
-        _ => {}
+    if let Some(name) = super::try_map! {
+        (T::OID, <T::Signature as Identified>::OID);
+
+        (SECP256R1, ECDSA_WITH_SHA2_256) => EcdsaSecp256r1Sha256,
+        (SECP256R1, ECDSA_WITH_SHA2_512) => EcdsaSecp256r1Sha512,
+        (SECP384R1, ECDSA_WITH_SHA2_384) => EcdsaSecp384r1Sha384,
+        (SECP521R1, ECDSA_WITH_SHA2_512) => EcdsaSecp521r1Sha512,
+    } {
+        test_ecdsa::<T>(name);
     }
-    match T::OID {
-        ED25519 => test_eddsa::<T>(EddsaTest::Ed25519),
-        ED448 => test_eddsa::<T>(EddsaTest::Ed448),
-        _ => {}
+
+    if let Some(name) = super::try_map! { T::OID;
+        ED25519 => Ed25519,
+        ED448 => Ed448,
+    } {
+        test_eddsa::<T>(name);
     }
 }
 

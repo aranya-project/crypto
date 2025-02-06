@@ -72,15 +72,25 @@ where
 {
     use crate::{
         oid::consts::{SECP256R1, SECP384R1, SECP521R1, X25519, X448},
-        test_util::wycheproof::{test_ecdh, test_xdh, EcdhTest, XdhTest},
+        test_util::wycheproof::{
+            test_ecdh, test_xdh,
+            EcdhTest::{EcdhSecp256r1, EcdhSecp384r1, EcdhSecp521r1},
+            XdhTest,
+        },
     };
 
-    match E::OID {
-        SECP256R1 => test_ecdh::<E>(EcdhTest::EcdhSecp256r1),
-        SECP384R1 => test_ecdh::<E>(EcdhTest::EcdhSecp384r1),
-        SECP521R1 => test_ecdh::<E>(EcdhTest::EcdhSecp521r1),
-        X25519 => test_xdh::<E>(XdhTest::X25519),
-        X448 => test_xdh::<E>(XdhTest::X448),
-        _ => {}
+    if let Some(name) = super::try_map! { E::OID;
+        SECP256R1 => EcdhSecp256r1,
+        SECP384R1 => EcdhSecp384r1,
+        SECP521R1 => EcdhSecp521r1,
+    } {
+        test_ecdh::<E>(name);
+    }
+
+    if let Some(name) = super::try_map! { E::OID;
+        X25519 => XdhTest::X25519,
+        X448 => XdhTest::X448,
+    } {
+        test_xdh::<E>(name);
     }
 }

@@ -96,12 +96,15 @@ where
 {
     use crate::{
         oid::consts::{AES_128_GCM, AES_192_GCM, AES_256_GCM},
-        test_util::wycheproof::{test_aead, AeadTest},
+        test_util::wycheproof::{test_aead, AeadTest::AesGcm},
     };
 
-    match A::OID {
-        AES_128_GCM | AES_192_GCM | AES_256_GCM => test_aead::<A>(AeadTest::AesGcm),
-        _ => {}
+    if let Some(name) = super::try_map! { A::OID;
+        AES_128_GCM => AesGcm,
+        AES_192_GCM => AesGcm,
+        AES_256_GCM => AesGcm,
+    } {
+        test_aead::<A>(name);
     }
 }
 

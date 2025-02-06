@@ -4,7 +4,7 @@
 
 pub mod consts;
 
-use core::{fmt, hash::Hash, iter::FusedIterator, slice};
+use core::{fmt, hash::Hash, iter::FusedIterator, ops::Deref, slice};
 
 macro_rules! const_try {
     ($expr:expr $(,)?) => {
@@ -20,7 +20,7 @@ macro_rules! const_try {
 /// Associates an OID with a cryptographic algorithm.
 pub trait Identified {
     /// The algorithm's OID.
-    const OID: Oid;
+    const OID: &'static Oid;
 }
 
 /// Creates a constant [`Oid`] at compile time.
@@ -40,10 +40,11 @@ pub trait Identified {
 #[macro_export]
 macro_rules! oid {
     ($oid:expr) => {{
-        const OUTPUT: $crate::oid::Oid = match $crate::oid::Oid::try_parse($oid) {
-            ::core::result::Result::Ok(oid) => oid,
-            ::core::result::Result::Err(_) => ::core::panic!("invalid OID"),
-        };
+        const OUTPUT: &'static $crate::oid::Oid =
+            match $crate::oid::Oid::try_from_bytes($crate::spideroak_crypto_derive::oid!($oid)) {
+                ::core::result::Result::Ok(oid) => oid,
+                ::core::result::Result::Err(_) => ::core::panic!("invalid OID"),
+            };
         OUTPUT
     }};
 }
@@ -67,29 +68,178 @@ macro_rules! oid {
 #[macro_export]
 macro_rules! extend_oid {
     ($oid:expr, $($arcs:expr),+) => {{
-        const OUTPUT: $crate::oid::Oid = match $oid {
-            oid => match oid.try_extend(&[$($arcs),+]) {
+        const LEN: usize = {
+            let mut n = $oid.len();
+            $( n += $crate::oid::base128_len($arcs); )+
+            n
+        };
+        const OUTPUT: $crate::oid::OidBuf<{ LEN }> = match $oid {
+            oid => match oid.try_extend::<{ LEN }>(&[$($arcs),+]) {
                 ::core::result::Result::Ok(oid) => oid,
                 ::core::result::Result::Err(_) => ::core::panic!("invalid OID"),
             }
         };
-        OUTPUT
+        OUTPUT.as_oid()
     }};
 }
 
-/// The maximum size in octets of a DER-encoded OID.
-pub const MAX_ENCODED_SIZE: usize = 39;
+/// An OID.
+#[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[repr(transparent)]
+pub struct Oid([u8]);
+
+impl Oid {
+    /// Converts the DER-encoded OID into an `Oid`.
+    #[inline]
+    pub const fn try_from_bytes(der: &[u8]) -> Result<&Self, InvalidOid> {
+        // TODO: validate
+        let oid = Self::from_bytes_unchecked(der);
+        Ok(oid)
+    }
+
+    /// Converts the DER-encoded OID into an `Oid`.
+    const fn from_bytes_unchecked(der: &[u8]) -> &Self {
+        // SAFETY: `Oid` and `[u8]` have the same layout in
+        // memory since `Oid` is a `#[repr(transparent)]` wrapper
+        // around `[u8]`.
+        unsafe { &*(der as *const [u8] as *const Self) }
+    }
+
+    /// Returns the size in bytes of the DER encoded object
+    /// identifier.
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns the DER encoded object identifier.
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    /// Extends the OID with additional arcs.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use spideroak_crypto::{extend_oid, oid, oid::Oid};
+    ///
+    /// const NIST: Oid = oid!("2.16.840.1.101.3.4");
+    /// const NIST_AES: Oid = oid!("2.16.840.1.101.3.4.1");
+    ///
+    /// let nist_aes = NIST.try_extend(&[1]);
+    /// assert_eq!(nist_aes, Ok(NIST_AES));
+    /// ```
+    pub const fn try_extend<const N: usize>(&self, arcs: &[Arc]) -> Result<OidBuf<N>, InvalidOid> {
+        self.to_owned().try_extend(arcs)
+    }
+
+    /// Converts the OID into an `OidBuf`.
+    pub const fn to_owned<const N: usize>(&self) -> OidBuf<N> {
+        assert!(N >= self.len());
+
+        let der = self.as_bytes();
+
+        let mut out = [0; N];
+        let mut i = 0;
+        while i < der.len() {
+            out[i] = der[i];
+            i += 1;
+        }
+        OidBuf {
+            len: i as u8,
+            der: out,
+        }
+    }
+
+    /// Reports whether `self` starts with `other`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use spideroak_crypto::{extend_oid, oid, oid::Oid};
+    ///
+    /// const NIST: Oid = oid!("2.16.840.1.101.3.4");
+    /// const NIST_AES: Oid = oid!("2.16.840.1.101.3.4.1");
+    ///
+    /// assert!(NIST_AES.starts_with(&NIST));
+    /// ```
+    pub const fn starts_with(&self, other: &Self) -> bool {
+        let lhs = self.as_bytes();
+        let rhs = other.as_bytes();
+        if lhs.len() < rhs.len() {
+            // `a` cannot start with `b` if `a` is shorter than
+            // `b`.
+            return false;
+        }
+        let mut i = 0;
+        while i < rhs.len() {
+            if lhs[i] != rhs[i] {
+                return false;
+            }
+            // Cannot overflow, but avoids a lint.
+            i = i.wrapping_add(1)
+        }
+        true
+    }
+
+    /// Returns an iterator over the arcs in an [`Oid`].
+    pub const fn arcs(&self) -> Arcs<'_> {
+        Arcs {
+            der: self.as_bytes(),
+            idx: 0,
+        }
+    }
+}
+
+impl PartialEq<Oid> for [u8] {
+    fn eq(&self, other: &Oid) -> bool {
+        PartialEq::eq(other.as_bytes(), self)
+    }
+}
+
+impl PartialEq<[u8]> for Oid {
+    fn eq(&self, other: &[u8]) -> bool {
+        PartialEq::eq(self.as_bytes(), other)
+    }
+}
+
+impl fmt::Display for Oid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, arc) in self.arcs().enumerate() {
+            if i > 0 {
+                write!(f, ".")?;
+            }
+            write!(f, "{arc}")?;
+        }
+        Ok(())
+    }
+}
+
+/// The default maximum size in octets of a DER-encoded OID.
+///
+/// It is large enough to encode [UUID] OIDs.
+///
+/// [UUID]: https://itu.int/ITU-T/X.667
+// NB: 23 + len (u8) pads `OidBuf` to 24 bytes, a multiple of 8.
+pub const DEFAULT_MAX_ENCODED_SIZE: usize = 23;
 
 /// An OID.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct Oid {
+pub struct OidBuf<const N: usize = DEFAULT_MAX_ENCODED_SIZE> {
     /// Invariant: `len` is a valid index into `der`.
     len: u8,
     /// Invariant: `der[..len]` is always valid DER.
-    der: [u8; MAX_ENCODED_SIZE],
+    der: [u8; N],
 }
 
-impl Oid {
+impl OidBuf {}
+
+impl<const N: usize> OidBuf<N> {
+    /// The maximum size of the buffer.
+    pub const MAX_ENCODED_SIZE: usize = N;
+
     /// Parses an OID from its text representation.
     ///
     /// ```rust
@@ -146,6 +296,11 @@ impl Oid {
         const_try!(EncBuf::new(arc1, arc2)).build().try_extend(arcs)
     }
 
+    /// Returns a reference to the owned OID.
+    pub const fn as_oid(&self) -> &Oid {
+        Oid::from_bytes_unchecked(self.as_bytes())
+    }
+
     /// Extends the OID with more arcs.
     ///
     /// # Examples
@@ -198,42 +353,36 @@ impl Oid {
     /// assert!(NIST_AES.starts_with(&NIST));
     /// ```
     pub const fn starts_with(&self, other: &Self) -> bool {
-        let lhs = self.as_bytes();
-        let rhs = other.as_bytes();
-        if lhs.len() > rhs.len() {
-            // `a` cannot start with `b` if `a` is longer than
-            // `b`.
-            return false;
-        }
-        let mut i = 0;
-        while i < lhs.len() {
-            if lhs[i] != rhs[i] {
-                return false;
-            }
-            // Cannot overflow, but avoids a lint.
-            i = i.wrapping_add(1)
-        }
-        true
+        self.as_oid().starts_with(other.as_oid())
     }
 
-    /// Returns an iterator over the arcs in an [`Oid`].
+    /// Returns an iterator over the arcs in the OID.
     pub const fn arcs(&self) -> Arcs<'_> {
-        Arcs {
-            der: self.as_bytes(),
-            idx: 0,
-        }
+        self.as_oid().arcs()
     }
 }
 
-impl fmt::Display for Oid {
+impl<T, const N: usize> AsRef<T> for OidBuf<N>
+where
+    T: ?Sized,
+    <OidBuf<N> as Deref>::Target: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl<const N: usize> Deref for OidBuf<N> {
+    type Target = Oid;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_oid()
+    }
+}
+
+impl<const N: usize> fmt::Display for OidBuf<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, arc) in self.arcs().enumerate() {
-            if i > 0 {
-                write!(f, ".")?;
-            }
-            write!(f, "{arc}")?;
-        }
-        Ok(())
+        self.as_oid().fmt(f)
     }
 }
 
@@ -346,7 +495,7 @@ impl ExactSizeIterator for Arcs<'_> {
 impl FusedIterator for Arcs<'_> {}
 
 /// An OID arc (segment, component, etc.).
-pub type Arc = u64;
+pub type Arc = u128;
 
 /// Parse a base-128 arc.
 const fn parse_arc(mut der: &[u8]) -> Option<(Arc, &[u8])> {
@@ -378,21 +527,21 @@ const fn parse_arc(mut der: &[u8]) -> Option<(Arc, &[u8])> {
 
 /// Encodes [`Arc`]s.
 #[derive(Clone, Debug)]
-struct EncBuf {
+struct EncBuf<const N: usize> {
     /// Invariant: `len` is a valid index into `der`.
     idx: usize,
     /// Invariant: `buf[..len]` is always valid DER.
-    buf: [u8; MAX_ENCODED_SIZE],
+    buf: [u8; N],
 }
 
-impl EncBuf {
+impl<const N: usize> EncBuf<N> {
     const fn new(arc1: Arc, arc2: Arc) -> Result<Self, InvalidOid> {
         // There are three possible top-level arcs (ITU-T, ISO,
         // and joint-iso-itu-t), so `arc1` is in [0, 2].
         //
         // If `arc1` is in [0, 1] (ITU-T or ISO), `arc2` must be
         // in [0, 39]. Otherwise, `arc2` can be any value.
-        if arc1 > 2 || arc1 < 2 && arc2 >= 40 {
+        if arc1 > 2 || (arc1 < 2 && arc2 >= 40) {
             return if arc1 > 2 {
                 Err(invalid_oid("first arc out of range"))
             } else {
@@ -414,7 +563,7 @@ impl EncBuf {
 
         let mut buf = Self {
             idx: 0,
-            buf: [0; MAX_ENCODED_SIZE],
+            buf: [0; N],
         };
         buf = const_try!(buf.encode(arc));
 
@@ -475,8 +624,8 @@ impl EncBuf {
         Ok(self)
     }
 
-    const fn build(self) -> Oid {
-        Oid {
+    const fn build(self) -> OidBuf<N> {
+        OidBuf {
             len: self.idx as u8,
             der: self.buf,
         }
@@ -486,7 +635,8 @@ impl EncBuf {
 /// Returns the number of bytes needed to represent `arc` encoded
 /// as a base-128 integer.
 #[allow(clippy::arithmetic_side_effects, reason = "Cannot wrap")]
-const fn base128_len(arc: Arc) -> usize {
+#[doc(hidden)]
+pub const fn base128_len(arc: Arc) -> usize {
     if arc == 0 {
         1
     } else {
@@ -623,20 +773,29 @@ mod tests {
             "2.139134289",
             &[2, 139134289],
         ),
+        (
+            &[
+                105, 131, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 127,
+            ],
+            true,
+            "2.25.340282366920938463463374607431768211455",
+            &[2, 25, 340282366920938463463374607431768211455],
+        ),
     ];
 
     #[test]
     fn test_parse() {
         for (i, (data, valid, str, arcs)) in TESTS.iter().enumerate() {
-            let result = Oid::try_parse(str);
+            let result = OidBuf::try_parse(str);
             if !valid {
                 assert!(result.is_err(), "#{i}");
                 continue;
             }
-            let want = Oid {
+            let want = OidBuf {
                 len: data.len() as u8,
                 der: {
-                    let mut b = [0u8; MAX_ENCODED_SIZE];
+                    let mut b = [0u8; DEFAULT_MAX_ENCODED_SIZE];
                     b[..data.len()].copy_from_slice(data);
                     b
                 },
@@ -645,7 +804,7 @@ mod tests {
             let got = result.unwrap();
             assert_eq!(got, want, "#{i}: `{str}` (got = `{got}`)");
 
-            let got = Oid::try_from_arcs(arcs).unwrap();
+            let got = OidBuf::try_from_arcs(arcs).unwrap();
             assert_eq!(got, want, "#{i}: `{arcs:?}` (got = `{got}`)");
         }
     }
@@ -657,12 +816,10 @@ mod tests {
                 continue;
             }
 
-            let oid = Oid::try_parse(str).unwrap();
+            let oid: OidBuf = OidBuf::try_parse(str).unwrap();
 
             let got = oid.arcs().collect::<Vec<_>>();
             assert_eq!(&got, arcs, "#{i} `{str}`");
-
-            println!("arcs = {got:?}");
 
             let mut want = got.len();
             let mut arcs = oid.arcs();
@@ -674,6 +831,29 @@ mod tests {
                 }
                 want -= 1;
             }
+        }
+    }
+
+    #[test]
+    fn test_starts_with() {
+        const A: &Oid = oid!("2.16.840.1.101.3.4");
+        const B: &Oid = extend_oid!(A, 1);
+        const C: &Oid = A;
+
+        const TESTS: &[(&Oid, &Oid, bool)] = &[
+            (A, A, true),
+            (A, B, false),
+            (A, C, true),
+            (B, A, true),
+            (B, B, true),
+            (B, C, true),
+            (C, A, true),
+            (C, B, false),
+            (C, C, true),
+        ];
+        for (i, (a, b, want)) in TESTS.iter().enumerate() {
+            let got = a.starts_with(b);
+            assert_eq!(got, *want, "#{i}");
         }
     }
 }

@@ -235,7 +235,7 @@ impl Aead for Aes256Gcm {
 }
 
 impl Identified for Aes256Gcm {
-    const OID: Oid = AES_256_GCM;
+    const OID: &'static Oid = AES_256_GCM;
 }
 
 impl AlgId<AeadId> for Aes256Gcm {
@@ -282,7 +282,7 @@ macro_rules! curve_impl {
         }
 
         impl Identified for $name {
-            const OID: Oid = $oid;
+            const OID: &'static Oid = $oid;
         }
 
         impl $name {
@@ -998,7 +998,7 @@ macro_rules! ecdsa_impl {
         }
 
         impl Identified for $sig {
-            const OID: Oid = $sig_oid;
+            const OID: &'static Oid = $sig_oid;
         }
 
         impl Signer for $curve {
@@ -1102,7 +1102,7 @@ macro_rules! hash_impl {
         }
 
         impl Identified for $name {
-            const OID: Oid = $oid;
+            const OID: &'static Oid = $oid;
         }
     };
 }

@@ -310,7 +310,7 @@ macro_rules! hmac_impl {
 
         $(
             impl $crate::oid::Identified for $name {
-                const OID: $crate::oid::Oid = $oid;
+                const OID: &'static $crate::oid::Oid = $oid;
             }
         )?
     };

@@ -145,7 +145,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
 /// ```rust
 /// use spideroak_crypto::{
 ///     block::BlockSize,
-///     hash::{Digest, Hash, HashId},
+///     hash::{Digest, Hash},
 ///     hkdf_impl,
 ///     typenum::{U32, U64},
 /// };
@@ -210,6 +210,8 @@ macro_rules! hkdf_impl {
                 const ID: $crate::hpke::KdfId = $kdf_id;
             }
         )?
+
+        // TODO(eric): OID
     };
 }
 pub(crate) use hkdf_impl;

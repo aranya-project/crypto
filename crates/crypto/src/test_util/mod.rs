@@ -109,9 +109,36 @@ macro_rules! __doctest_os_hardware_rand {
     };
 }
 
+/// Used to "match" `&Oid`, which can't be used in a match
+/// pattern because (as of 1.81), `rustc` does not allow
+/// non-slice unsized constants in match patterns. See [issue
+/// 87046] and [THIR].
+///
+/// [issue 87046]: https://github.com/rust-lang/rust/issues/87046
+/// [THIR]: https://github.com/rust-lang/rust/blob/d4bdd1ed551fed0c951eb47b4be2c79d7a02d181/compiler/rustc_mir_build/src/thir/pattern/const_to_pat.rs#L304-L308
+macro_rules! try_map {
+    (
+        $value:expr;
+        $($lhs:expr => $rhs:expr),+ $(,)?
+    ) => {
+        match &$value {
+            value => {
+                if false { None }
+                $(
+                    else if $lhs == *value {
+                        Some($rhs)
+                    }
+                )+
+                else { None }
+            }
+        }
+    }
+}
+pub(crate) use try_map;
+
 /// The algorithm ID is unknown.
 #[derive(Debug)]
-pub struct UnknownAlgId(pub(crate) Oid);
+pub struct UnknownAlgId(pub(crate) &'static Oid);
 
 impl error::Error for UnknownAlgId {}
 
@@ -168,7 +195,7 @@ impl<T: Aead> Aead for AeadWithDefaults<T> {
 }
 
 impl<T: Identified> Identified for AeadWithDefaults<T> {
-    const OID: Oid = T::OID;
+    const OID: &'static Oid = T::OID;
 }
 
 impl<T: AlgId<AeadId>> AlgId<AeadId> for AeadWithDefaults<T> {
@@ -197,7 +224,7 @@ impl<T: Hash> Hash for HashWithDefaults<T> {
 }
 
 impl<T: Identified> Identified for HashWithDefaults<T> {
-    const OID: Oid = T::OID;
+    const OID: &'static Oid = T::OID;
 }
 
 /// A [`Kdf`] that that uses the default trait methods.
@@ -227,7 +254,7 @@ impl<T: Kdf> Kdf for KdfWithDefaults<T> {
 }
 
 impl<T: Identified> Identified for KdfWithDefaults<T> {
-    const OID: Oid = T::OID;
+    const OID: &'static Oid = T::OID;
 }
 
 impl<T: AlgId<KdfId>> AlgId<KdfId> for KdfWithDefaults<T> {
@@ -263,7 +290,7 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
 }
 
 impl<T: Identified> Identified for MacWithDefaults<T> {
-    const OID: Oid = T::OID;
+    const OID: &'static Oid = T::OID;
 }
 
 /// A [`Signer`] that that uses the default trait methods.
@@ -276,7 +303,7 @@ impl<T: Signer + ?Sized> Signer for SignerWithDefaults<T> {
 }
 
 impl<T: Identified> Identified for SignerWithDefaults<T> {
-    const OID: Oid = T::OID;
+    const OID: &'static Oid = T::OID;
 }
 
 /// A [`SigningKey`] that uses the default trait methods.
@@ -405,5 +432,5 @@ impl<'a, T: Signer + ?Sized> Import<&'a [u8]> for SignatureWithDefaults<T> {
 }
 
 impl<T: Signer + Identified + ?Sized> Identified for SignatureWithDefaults<T> {
-    const OID: Oid = T::OID;
+    const OID: &'static Oid = T::OID;
 }

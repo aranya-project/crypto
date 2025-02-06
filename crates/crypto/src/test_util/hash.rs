@@ -78,22 +78,20 @@ pub fn test_vectors<T: Hash + Identified>() {
         test_util::acvp::{test_sha2, test_sha3},
     };
 
-    fn load_and_test_sha2<T: Hash>(alg: sha2::Algorithm) {
+    if let Some(alg) = super::try_map! { T::OID;
+        SHA2_256 => sha2::Algorithm::Sha2_256,
+        SHA2_512 => sha2::Algorithm::Sha2_512,
+        SHA2_512_256 => sha2::Algorithm::Sha2_512_256,
+    } {
         let vectors = sha2::load(alg).expect("should be able to load SHA-2 test vectors");
         test_sha2::<T>(&vectors);
     }
 
-    fn load_and_test_sha3<T: Hash>(alg: sha3::Algorithm) {
+    if let Some(alg) = super::try_map! { T::OID;
+        SHA3_256 => sha3::Algorithm::Sha3_256,
+    } {
         let vectors = sha3::load(alg).expect("should be able to load SHA-3 test vectors");
         test_sha3::<T>(&vectors);
-    }
-
-    match T::OID {
-        SHA2_256 => load_and_test_sha2::<T>(sha2::Algorithm::Sha2_256),
-        SHA2_512 => load_and_test_sha2::<T>(sha2::Algorithm::Sha2_512),
-        SHA2_512_256 => load_and_test_sha2::<T>(sha2::Algorithm::Sha2_512_256),
-        SHA3_256 => load_and_test_sha3::<T>(sha3::Algorithm::Sha3_256),
-        _ => {}
     }
 }
 

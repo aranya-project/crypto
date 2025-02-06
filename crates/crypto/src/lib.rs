@@ -16,7 +16,7 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-pub(crate) use spideroak_crypto_derive::AlgId;
+pub(crate) use spideroak_crypto_derive::{self, AlgId};
 pub mod aead;
 pub mod asn1;
 pub mod bearssl;

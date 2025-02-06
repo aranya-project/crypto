@@ -90,7 +90,12 @@ where
     T::Tag: AsRef<[u8]>,
     R: Csprng,
 {
-    use acvp::vectors::hmac::{self, Algorithm};
+    use acvp::vectors::hmac::{
+        self,
+        Algorithm::{
+            HmacSha2_256, HmacSha2_384, HmacSha2_512, HmacSha3_256, HmacSha3_384, HmacSha3_512,
+        },
+    };
 
     use crate::{
         oid::consts::{
@@ -100,17 +105,17 @@ where
         test_util::acvp::test_hmac,
     };
 
-    let alg = match T::OID {
-        HMAC_WITH_SHA2_256 => Algorithm::HmacSha2_256,
-        HMAC_WITH_SHA2_384 => Algorithm::HmacSha2_384,
-        HMAC_WITH_SHA2_512 => Algorithm::HmacSha2_512,
-        HMAC_WITH_SHA3_256 => Algorithm::HmacSha3_256,
-        HMAC_WITH_SHA3_384 => Algorithm::HmacSha3_384,
-        HMAC_WITH_SHA3_512 => Algorithm::HmacSha3_512,
-        _ => return,
-    };
-    let vectors = hmac::load(alg).expect("should be able to load HMAC test vectors");
-    test_hmac::<T>(&vectors);
+    if let Some(alg) = super::try_map! { T::OID;
+        HMAC_WITH_SHA2_256 => HmacSha2_256,
+        HMAC_WITH_SHA2_384 => HmacSha2_384,
+        HMAC_WITH_SHA2_512 => HmacSha2_512,
+        HMAC_WITH_SHA3_256 => HmacSha3_256,
+        HMAC_WITH_SHA3_384 => HmacSha3_384,
+        HMAC_WITH_SHA3_512 => HmacSha3_512,
+    } {
+        let vectors = hmac::load(alg).expect("should be able to load HMAC test vectors");
+        test_hmac::<T>(&vectors);
+    }
 }
 
 /// Basic positive test.

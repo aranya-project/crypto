@@ -52,7 +52,7 @@ impl Signer for Ed25519 {
 }
 
 impl Identified for Ed25519 {
-    const OID: Oid = ED25519;
+    const OID: &Oid = ED25519;
 }
 
 /// An Ed25519 signing key.
@@ -189,7 +189,7 @@ impl Import<&[u8]> for Signature {
 }
 
 impl Identified for Signature {
-    const OID: Oid = ED25519;
+    const OID: &Oid = ED25519;
 }
 
 impl SigningKey {
