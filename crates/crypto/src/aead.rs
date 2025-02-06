@@ -1236,7 +1236,7 @@ mod committing {
 
             $(
                 impl $crate::oid::Identified for $name {
-                    const OID: $crate::oid::Oid = $oid;
+                    const OID: &$crate::oid::Oid = $oid;
                 }
             )?
         };
@@ -1496,7 +1496,7 @@ mod committing {
 
             $(
                 impl $crate::oid::Identified for $name {
-                    const OID: $crate::oid::Oid = $oid;
+                    const OID: &$crate::oid::Oid = $oid;
                 }
             )?
         };

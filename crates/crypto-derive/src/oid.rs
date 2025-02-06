@@ -1,3 +1,5 @@
+#![allow(clippy::arithmetic_side_effects)]
+
 use std::{fs::File, io::Write, ops::RangeBounds, str::FromStr};
 
 use proc_macro2::{Literal, Span, TokenStream};
