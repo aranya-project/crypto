@@ -3,7 +3,6 @@
 use core::{
     array::TryFromSliceError,
     fmt::{self, Debug},
-    num::NonZeroU16,
     result::Result,
 };
 
@@ -11,10 +10,7 @@ use generic_array::{ArrayLength, GenericArray};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{IsGreaterOrEqual, IsLess, U32, U48, U64, U65536};
 
-use crate::{
-    keys::{raw_key, InvalidKey, SecretKey},
-    AlgId,
-};
+use crate::keys::{raw_key, InvalidKey, SecretKey};
 
 /// An error from a [`Mac`].
 #[derive(Debug, Eq, PartialEq)]
@@ -36,23 +32,6 @@ impl fmt::Display for MacError {
 
 impl core::error::Error for MacError {}
 
-/// MAC algorithm identifiers.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
-pub enum MacId {
-    /// HMAC-SHA256.
-    #[alg_id(0x0001)]
-    HmacSha256,
-    /// HMAC-SHA384.
-    #[alg_id(0x0002)]
-    HmacSha384,
-    /// HMAC-SHA512.
-    #[alg_id(0x0003)]
-    HmacSha512,
-    /// Some other digital signature algorithm.
-    #[alg_id(Other)]
-    Other(NonZeroU16),
-}
-
 /// A keyed Message Authentication Code Function (MAC).
 ///
 /// # Requirements
@@ -69,9 +48,6 @@ pub enum MacId {
 /// requirements include HMAC-SHA-512 (for |K| >= 256) and
 /// KMAC256 (for |K| >= 256).
 pub trait Mac: Clone + Sized {
-    /// Uniquely identifies the MAC algorithm.
-    const ID: MacId;
-
     /// An authentication tag.
     type Tag: ConstantTimeEq;
     /// The size in octets of a tag used by this [`Mac`].
@@ -133,7 +109,7 @@ pub trait Mac: Clone + Sized {
         }
     }
 
-    /// Returns the tag for `data` using `key`.
+    /// Computes the tag for `data` using `key`.
     ///
     /// While this function is provided by default,
     /// implementations of [`Mac`] are encouraged to provide
@@ -142,6 +118,17 @@ pub trait Mac: Clone + Sized {
         let mut h = Self::new(key);
         h.update(data);
         h.tag()
+    }
+
+    /// Attempts to compute tag for `data` using `key`.
+    ///
+    /// While this function is provided by default,
+    /// implementations of [`Mac`] are encouraged to provide
+    /// optimized "single-shot" implementations.
+    fn try_mac(key: &[u8], data: &[u8]) -> Result<Self::Tag, InvalidKey> {
+        let mut h = Self::try_new(key)?;
+        h.update(data);
+        Ok(h.tag())
     }
 }
 

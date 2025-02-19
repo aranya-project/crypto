@@ -19,7 +19,7 @@ default = []
 
 [dependencies]
 prettyplease = { workspace = true }
-proc-macro2 = { workspace = true }
+proc-macro2 = { workspace = true, features = ["span-locations"] }
 quote = { workspace = true }
 syn = { workspace = true }
 

@@ -1,0 +1,56 @@
+[package]
+name = "acvp"
+description = "ACVP test vectors"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license = "BSD-3-Clause"
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["all", "vectors"]
+
+# Enable all algorithms.
+all = [
+	"sha2",
+	"sha3",
+]
+
+# Selectively enable algorithms.
+sha2 = []
+sha3 = [
+	"dep:either",
+]
+
+# Enable `std`.
+std = [
+	"anyhow/std",
+	"either?/use_std",
+	"hex/std",
+	"serde/std",
+	"serde_json/std",
+]
+
+# Enable vectors.
+vectors = [
+	"dep:hex",
+	"dep:serde",
+	"dep:serde_json",
+]
+
+[dependencies]
+anyhow = { workspace = true, default-features = false }
+either = { version = "1.13", default-features = false, optional = true }
+hex = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
+serde = { workspace = true, features = ["alloc", "derive"], optional = true }
+serde_json = { version = "1", default-features = false, features = ["alloc"], optional = true }
+
+[build-dependencies]
+prettyplease = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }

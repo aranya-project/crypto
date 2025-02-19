@@ -13,6 +13,10 @@
 #![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
 #![warn(missing_docs)]
 
+#[cfg(feature = "alloc")]
+#[allow(unused_extern_crates, reason = "Depends on the full feature set")]
+extern crate alloc;
+
 pub(crate) use spideroak_crypto_derive::AlgId;
 pub mod aead;
 pub mod asn1;
@@ -32,7 +36,9 @@ pub mod kdf;
 pub mod kem;
 pub mod keys;
 pub mod mac;
+pub mod oid;
 pub mod rust;
+pub(crate) mod sha3;
 pub mod signer;
 pub mod test_util;
 mod util;
@@ -40,5 +46,8 @@ pub mod zeroize;
 
 pub use buggy;
 pub use generic_array;
+pub use hybrid_array;
+#[doc(hidden)]
+pub use spideroak_crypto_derive;
 pub use subtle;
 pub use typenum;

@@ -5,7 +5,6 @@
 use core::{
     borrow::Borrow,
     fmt::{self, Debug},
-    num::NonZeroU16,
     result::Result,
 };
 
@@ -16,7 +15,6 @@ use crate::{
     csprng::Random,
     import::Import,
     keys::{PublicKey, SecretKey},
-    AlgId,
 };
 
 /// An error from a [`Signer`].
@@ -71,29 +69,6 @@ impl From<Bug> for SignerError {
     }
 }
 
-/// Digital signature algorithm identifiers.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
-pub enum SignerId {
-    /// ECDSA using NIST Curve P-256.
-    #[alg_id(0x0001)]
-    P256,
-    /// ECDSA using NIST Curve P-384.
-    #[alg_id(0x0002)]
-    P384,
-    /// ECDSA using NIST Curve P-521.
-    #[alg_id(0x0003)]
-    P521,
-    /// EdDSA using Ed25519.
-    #[alg_id(0x0004)]
-    Ed25519,
-    /// EdDSA using Ed448.
-    #[alg_id(0x0005)]
-    Ed448,
-    /// Some other digital signature algorithm.
-    #[alg_id(Other)]
-    Other(NonZeroU16),
-}
-
 /// Signer is a digital signature algorithm.
 ///
 /// # Requirements
@@ -114,9 +89,6 @@ pub enum SignerId {
 /// P-384, and P521), albeit with minor modifications (like
 /// rejecting s >= N/2).
 pub trait Signer {
-    /// Uniquely identifies the signature algorithm.
-    const ID: SignerId;
-
     /// A private key used to create signatures.
     type SigningKey: SigningKey<Self>;
     /// A public key used verify signatures.
