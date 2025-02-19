@@ -39,14 +39,12 @@ cfg-if = { version = "1", default-features = false }
 serde = { version = ">= 1.0.184", default-features = false }
 thiserror = { version = "2", default-features = false }
 
-# [workspace.build-dependencies]
 prettyplease = { version = "0.2" }
-proc-macro2 = { version = "1.0.80" }
-quote = { version = "1.0" }
-syn = { version = "2.0.59" }
+proc-macro2 = { version = "1" }
+quote = { version = "1" }
+syn = { version = "2" }
 
 [profile.dev]
-panic = "abort"
 # Required for some of the tests to run in a reasonable amount of
 # time.
 opt-level = 2

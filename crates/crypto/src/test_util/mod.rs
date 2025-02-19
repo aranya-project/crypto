@@ -31,14 +31,16 @@ use subtle::{Choice, ConstantTimeEq};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    aead::{Aead, AeadId, Lifetime, OpenError, SealError},
+    aead::{Aead, Lifetime, OpenError, SealError},
     csprng::{Csprng, Random},
-    hash::{Digest, Hash, HashId},
+    hash::{Digest, Hash},
+    hpke::{AeadId, AlgId, KdfId},
     import::{ExportError, Import, ImportError},
-    kdf::{Kdf, KdfError, KdfId, Prk},
+    kdf::{Kdf, KdfError, Prk},
     keys::{InvalidKey, PublicKey, SecretKey, SecretKeyBytes},
-    mac::{Mac, MacId},
-    signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    mac::Mac,
+    oid::{Identified, Oid},
+    signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
 };
 
 #[macro_export]
@@ -107,13 +109,40 @@ macro_rules! __doctest_os_hardware_rand {
     };
 }
 
+/// Used to "match" `&Oid`, which can't be used in a match
+/// pattern because (as of 1.81), `rustc` does not allow
+/// non-slice unsized constants in match patterns. See [issue
+/// 87046] and [THIR].
+///
+/// [issue 87046]: https://github.com/rust-lang/rust/issues/87046
+/// [THIR]: https://github.com/rust-lang/rust/blob/d4bdd1ed551fed0c951eb47b4be2c79d7a02d181/compiler/rustc_mir_build/src/thir/pattern/const_to_pat.rs#L304-L308
+macro_rules! try_map {
+    (
+        $value:expr;
+        $($lhs:expr => $rhs:expr),+ $(,)?
+    ) => {
+        match &$value {
+            value => {
+                if false { None }
+                $(
+                    else if $lhs == *value {
+                        Some($rhs)
+                    }
+                )+
+                else { None }
+            }
+        }
+    }
+}
+pub(crate) use try_map;
+
 /// The algorithm ID is unknown.
 #[derive(Debug)]
-pub struct UnknownAlgId<T>(pub(crate) T);
+pub struct UnknownAlgId(pub(crate) &'static Oid);
 
-impl<T: fmt::Debug + fmt::Display> error::Error for UnknownAlgId<T> {}
+impl error::Error for UnknownAlgId {}
 
-impl<T: fmt::Display> fmt::Display for UnknownAlgId<T> {
+impl fmt::Display for UnknownAlgId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "unknown algorithm ID: {}", self.0)
     }
@@ -123,8 +152,6 @@ impl<T: fmt::Display> fmt::Display for UnknownAlgId<T> {
 pub struct AeadWithDefaults<T>(T);
 
 impl<T: Aead> Aead for AeadWithDefaults<T> {
-    const ID: AeadId = T::ID;
-
     const LIFETIME: Lifetime = T::LIFETIME;
 
     type KeySize = T::KeySize;
@@ -167,13 +194,19 @@ impl<T: Aead> Aead for AeadWithDefaults<T> {
     }
 }
 
+impl<T: Identified> Identified for AeadWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
+}
+
+impl<T: AlgId<AeadId>> AlgId<AeadId> for AeadWithDefaults<T> {
+    const ID: AeadId = T::ID;
+}
+
 /// A [`Hash`] that that uses the default trait methods.
 #[derive(Clone)]
 pub struct HashWithDefaults<T>(T);
 
 impl<T: Hash> Hash for HashWithDefaults<T> {
-    const ID: HashId = <T as Hash>::ID;
-
     type DigestSize = <T as Hash>::DigestSize;
     const DIGEST_SIZE: usize = <T as Hash>::DIGEST_SIZE;
 
@@ -190,12 +223,14 @@ impl<T: Hash> Hash for HashWithDefaults<T> {
     }
 }
 
+impl<T: Identified> Identified for HashWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
+}
+
 /// A [`Kdf`] that that uses the default trait methods.
 pub struct KdfWithDefaults<T>(PhantomData<T>);
 
 impl<T: Kdf> Kdf for KdfWithDefaults<T> {
-    const ID: KdfId = T::ID;
-
     type MaxOutput = T::MaxOutput;
 
     type PrkSize = T::PrkSize;
@@ -218,13 +253,19 @@ impl<T: Kdf> Kdf for KdfWithDefaults<T> {
     }
 }
 
+impl<T: Identified> Identified for KdfWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
+}
+
+impl<T: AlgId<KdfId>> AlgId<KdfId> for KdfWithDefaults<T> {
+    const ID: KdfId = T::ID;
+}
+
 /// A [`Mac`] that that uses the default trait methods.
 #[derive(Clone)]
 pub struct MacWithDefaults<T>(T);
 
 impl<T: Mac> Mac for MacWithDefaults<T> {
-    const ID: MacId = T::ID;
-
     type Tag = T::Tag;
     type TagSize = T::TagSize;
 
@@ -248,15 +289,21 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
     }
 }
 
+impl<T: Identified> Identified for MacWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
+}
+
 /// A [`Signer`] that that uses the default trait methods.
 pub struct SignerWithDefaults<T: ?Sized>(T);
 
 impl<T: Signer + ?Sized> Signer for SignerWithDefaults<T> {
-    const ID: SignerId = T::ID;
-
     type SigningKey = SigningKeyWithDefaults<T>;
     type VerifyingKey = VerifyingKeyWithDefaults<T>;
     type Signature = SignatureWithDefaults<T>;
+}
+
+impl<T: Identified> Identified for SignerWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
 }
 
 /// A [`SigningKey`] that uses the default trait methods.
@@ -382,4 +429,8 @@ impl<'a, T: Signer + ?Sized> Import<&'a [u8]> for SignatureWithDefaults<T> {
     fn import(data: &'a [u8]) -> Result<Self, ImportError> {
         Ok(Self(T::Signature::import(data)?))
     }
+}
+
+impl<T: Signer + Identified + ?Sized> Identified for SignatureWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
 }

@@ -7,20 +7,17 @@ use core::{
     borrow::Borrow,
     fmt::{self, Debug, Display},
     marker::PhantomData,
-    num::NonZeroU16,
     result::Result,
 };
 
-#[doc(inline)]
-pub use crate::hpke::KemId;
 use crate::{
     csprng::{Csprng, Random},
+    hpke::KemId,
     import::{Import, ImportError},
     kdf::{Kdf, KdfError, Prk},
     keys::{PublicKey, RawSecretBytes, SecretKey},
     signer::PkError,
     zeroize::ZeroizeOnDrop,
-    AlgId,
 };
 
 /// An error from a [`Kem`].
@@ -93,9 +90,6 @@ impl From<PkError> for KemError {
 /// * Have at least a 128-bit security level.
 #[allow(non_snake_case)]
 pub trait Kem {
-    /// Uniquely identifies the encapsulation algorithm.
-    const ID: KemId;
-
     /// A local secret (private) key used to decapsulate secrets.
     type DecapKey: DecapKey<EncapKey = Self::EncapKey>;
     /// A remote public key used to encapsulate secrets.
@@ -221,44 +215,6 @@ impl Display for EcdhError {
 
 impl core::error::Error for EcdhError {}
 
-/// ECDH algorithm identifiers.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
-pub enum EcdhId {
-    /// ECDH using NIST Curve P-256.
-    #[alg_id(1)]
-    Secp256r1,
-    /// ECDH using NIST Curve P-384.
-    #[alg_id(2)]
-    Secp384r1,
-    /// ECDH using NIST Curve P-521.
-    #[alg_id(3)]
-    Secp521r1,
-    /// X25519.
-    #[alg_id(4)]
-    X25519,
-    /// X25519.
-    #[alg_id(5)]
-    X448,
-    /// Some other KDF.
-    ///
-    /// Non-zero since 0x0000 is marked as 'reserved'.
-    #[alg_id(Other)]
-    Other(NonZeroU16),
-}
-
-impl Display for EcdhId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Secp256r1 => write!(f, "Secp256r1"),
-            Self::Secp384r1 => write!(f, "Secp384r1"),
-            Self::Secp521r1 => write!(f, "Secp521r1"),
-            Self::X25519 => write!(f, "X25519"),
-            Self::X448 => write!(f, "X448"),
-            Self::Other(id) => write!(f, "EcdhId({:#02x})", id),
-        }
-    }
-}
-
 /// Elliptic Curve Diffie Hellman key exchange.
 ///
 /// # Requirements
@@ -267,9 +223,6 @@ impl Display for EcdhId {
 ///
 /// * Have at least a 128-bit security level
 pub trait Ecdh {
-    /// Uniquely identifies the ECDH algorithm.
-    const ID: EcdhId;
-
     /// The size in bytes of a scalar.
     const SCALAR_SIZE: usize;
 
@@ -596,15 +549,17 @@ type PubKeyData<T> = <<T as Ecdh>::PublicKey as PublicKey>::Data;
 /// ```
 #[macro_export]
 macro_rules! dhkem_impl {
-    ($name:ident, $doc:expr, $ecdh:ty, $kdf:ty, $sk:ident, $pk:ident $(,)?) => {
+    ($name:ident, $doc:expr, $kem_id:expr, $ecdh:ty, $kdf:ty, $sk:ident, $pk:ident $(,)?) => {
         #[doc = concat!($doc, ".")]
         #[derive(Debug)]
         pub struct $name;
 
+        impl $name {
+            const KEM_ID: $crate::hpke::KemId = $kem_id;
+        }
+
         #[allow(non_snake_case)]
         impl $crate::kem::Kem for $name {
-            const ID: $crate::kem::KemId = $crate::kem::KemId::$name;
-
             type DecapKey = $sk;
             type EncapKey = $pk;
             type Secret = $crate::kdf::Prk<<$kdf as $crate::kdf::Kdf>::PrkSize>;
@@ -614,21 +569,22 @@ macro_rules! dhkem_impl {
                 rng: &mut R,
                 pkR: &Self::EncapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).encap(rng, pkR)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).encap(rng, pkR)
             }
 
             fn encap_deterministically(
                 pkR: &Self::EncapKey,
                 skE: Self::DecapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).encap_deterministically(pkR, skE)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID)
+                    .encap_deterministically(pkR, skE)
             }
 
             fn decap(
                 enc: &Self::Encap,
                 skR: &Self::DecapKey,
             ) -> ::core::result::Result<Self::Secret, $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).decap(enc, skR)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).decap(enc, skR)
             }
 
             fn auth_encap<R: $crate::csprng::Csprng>(
@@ -636,7 +592,7 @@ macro_rules! dhkem_impl {
                 pkR: &Self::EncapKey,
                 skS: &Self::DecapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).auth_encap(rng, pkR, skS)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).auth_encap(rng, pkR, skS)
             }
 
             fn auth_encap_deterministically(
@@ -644,7 +600,7 @@ macro_rules! dhkem_impl {
                 skS: &Self::DecapKey,
                 skE: Self::DecapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID)
                     .auth_encap_deterministically(pkR, skS, skE)
             }
 
@@ -653,8 +609,12 @@ macro_rules! dhkem_impl {
                 skR: &Self::DecapKey,
                 pkS: &Self::EncapKey,
             ) -> ::core::result::Result<Self::Secret, $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).auth_decap(enc, skR, pkS)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).auth_decap(enc, skR, pkS)
             }
+        }
+
+        impl $crate::hpke::AlgId<$crate::hpke::KemId> for $name {
+            const ID: $crate::hpke::KemId = Self::KEM_ID;
         }
     };
 }

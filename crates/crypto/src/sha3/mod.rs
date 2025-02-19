@@ -5,17 +5,21 @@
 use crypto_common::OutputSizeUser;
 use typenum::Unsigned;
 
-use crate::hash::{Digest, Hash, HashId};
+use crate::{
+    hash::{Digest, Hash},
+    oid::{
+        consts::{SHA3_256, SHA3_384, SHA3_512},
+        Identified, Oid,
+    },
+};
 
 macro_rules! impl_sha3 {
-    ($name:ident, $doc:expr) => {
+    ($name:ident, $doc:expr, $oid:expr) => {
         #[doc = concat!($doc, ".")]
         #[derive(Clone, Debug, Default)]
         pub(crate) struct $name(sha3::$name);
 
         impl Hash for $name {
-            const ID: HashId = HashId::$name;
-
             type DigestSize = <sha3::$name as OutputSizeUser>::OutputSize;
             const DIGEST_SIZE: usize =
                 <<sha3::$name as OutputSizeUser>::OutputSize as Unsigned>::USIZE;
@@ -40,11 +44,15 @@ macro_rules! impl_sha3 {
                 Digest::from_array(<sha3::$name as sha3::Digest>::digest(data).into())
             }
         }
+
+        impl Identified for $name {
+            const OID: &Oid = $oid;
+        }
     };
 }
-impl_sha3!(Sha3_256, "SHA3-256");
-impl_sha3!(Sha3_384, "SHA3-384");
-impl_sha3!(Sha3_512, "SHA3-512");
+impl_sha3!(Sha3_256, "SHA3-256", SHA3_256);
+impl_sha3!(Sha3_384, "SHA3-384", SHA3_384);
+impl_sha3!(Sha3_512, "SHA3-512", SHA3_512);
 
 #[cfg(test)]
 mod tests {

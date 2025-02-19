@@ -1,6 +1,6 @@
 //! [`Hash`] tests.
 
-use crate::hash::Hash;
+use crate::{hash::Hash, oid::Identified};
 
 /// Invokes `callback` for each hash test.
 ///
@@ -70,15 +70,26 @@ pub use test_hash;
 /// Tests against hash-specific vectors.
 ///
 /// Unknown hash algorithms are ignored.
-pub fn test_vectors<T: Hash>() {
+pub fn test_vectors<T: Hash + Identified>() {
     use acvp::vectors::{sha2, sha3};
 
-    use crate::test_util::acvp::{test_sha2, test_sha3};
+    use crate::{
+        oid::consts::{SHA2_256, SHA2_512, SHA2_512_256, SHA3_256},
+        test_util::acvp::{test_sha2, test_sha3},
+    };
 
-    if let Ok(alg) = T::ID.try_into() {
+    if let Some(alg) = super::try_map! { T::OID;
+        SHA2_256 => sha2::Algorithm::Sha2_256,
+        SHA2_512 => sha2::Algorithm::Sha2_512,
+        SHA2_512_256 => sha2::Algorithm::Sha2_512_256,
+    } {
         let vectors = sha2::load(alg).expect("should be able to load SHA-2 test vectors");
         test_sha2::<T>(&vectors);
-    } else if let Ok(alg) = T::ID.try_into() {
+    }
+
+    if let Some(alg) = super::try_map! { T::OID;
+        SHA3_256 => sha3::Algorithm::Sha3_256,
+    } {
         let vectors = sha3::load(alg).expect("should be able to load SHA-3 test vectors");
         test_sha3::<T>(&vectors);
     }
