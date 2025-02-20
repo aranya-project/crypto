@@ -34,10 +34,11 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-anyhow = { version = "1.0", default-features = false }
+anyhow = { version = "1", default-features = false }
 cfg-if = { version = "1", default-features = false }
 serde = { version = ">= 1.0.184", default-features = false }
 thiserror = { version = "2", default-features = false }
+tracing = { version = "0.1", default-features = false }
 
 prettyplease = { version = "0.2" }
 proc-macro2 = { version = "1" }

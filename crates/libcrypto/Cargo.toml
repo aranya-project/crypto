@@ -1,0 +1,85 @@
+[package]
+name = "spideroak-libcrypto"
+description = "A libcrypto implementation over `spideroak-crypto`"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license = "BSD-3-Clause"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
+categories = ["cryptography", "no-std", "no-std::no-alloc"]
+keywords = ["crypto", "cryptography", "spideroak"]
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[features]
+default = []
+
+# Set when `cbindgen` is running.
+#
+# TODO(eric): Remove?
+cbindgen = []
+
+# Use executable-based constructors to initialize
+# implementations.
+ctor = []
+
+# Use unstable linkage feature for true weak linkage.
+#
+# Requires +nightly.
+linkage = []
+
+# Use std.
+std = [
+	"spideroak-crypto/std",
+]
+
+# Enable test utilities.
+testing = [
+	"spideroak-crypto/test_util",
+]
+
+[dependencies]
+##
+# This workspace
+##
+
+spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false, features = ["alloc"]}
+
+##
+# Other SpiderOak crates
+##
+
+aranya-capi-core = { version = "0.1", default-features = false }
+aranya-capi-macro = { version = "0.1", default-features = false }
+
+##
+# Third party
+##
+
+cfg-if = { workspace = true, default-features = false }
+libc = { version = "0.2", default-features = false }
+linkme = { version = "0.3", default-features = false }
+
+[dev-dependencies]
+# A little bit of a hack: always certain features for tests and
+# examples.
+spideroak-libcrypto = { path = ".", features = ["testing"] }
+
+[package.metadata.docs.rs]
+features = []
+
+[package.metadata.cargo-all-features]
+always_include_features = []
+
+skip_feature_sets = []
+
+denylist = []
+
+[package.metadata.cargo-machete]
+ignored = ["old-generic-array"]

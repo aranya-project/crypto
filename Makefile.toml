@@ -18,15 +18,46 @@ description = "List tasks"
 script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 
 
+##
 # Build
+##
+
 [tasks.build-code]
 category = "build"
 description = "Build Code"
 command = "cargo"
 args = ["build", "--verbose", "--release", "${@}"]
 
+[tasks.build-libcrypto-rust]
+category = "build"
+description = "Build `libcrypto-rust`"
+run_task = { name = [
+    "build-libcrypto-rust-header",
+    "build-libcrypto-rust-lib",
+] }
 
+[tasks.build-libcrypto-rust-header]
+category = "build"
+description = "Build `libcrypto-rust` header"
+toolchain = "${NIGHTLY}"
+cwd = "crates/libcrypto-rust"
+command = "cbindgen"
+args = ["--config=cbindgen.toml", "--output=output/spideroak-crypto.h"]
+dependencies = ["install-cbindgen", "install-nightly"]
+
+[tasks.build-libcrypto-rust-lib]
+category = "build"
+description = "Build `libcrypto-rust` shared library"
+cwd = "crates/libcrypto-rust"
+command = "cargo"
+args = ["build", "--release"]
+dependencies = ["install-nightly"]
+
+
+##
 # Test
+##
+
 [tasks.unit-tests]
 category = "test"
 description = "Run Unit Tests"
@@ -36,7 +67,10 @@ args = ["--verbose", "test-all-features", "${@}"]
 dependencies = ["install-cargo-all-features"]
 
 
+##
 # Security
+##
+
 [tasks.security]
 category = "security"
 description = "Run security checks"
@@ -65,7 +99,10 @@ command = "cargo"
 args = ["vet", "check"]
 
 
+##
 # Correctness
+##
+
 [tasks.correctness]
 category = "correctness"
 description = "Run correctness checks"
@@ -182,7 +219,10 @@ description = "Zip docs"
 script = "zip -qr docs.zip target/doc"
 
 
+##
 # Misc
+##
+
 [tasks.install-nightly]
 description = "Install nightly rust"
 # First check if the toolchain is installed, because that is much faster.
@@ -203,3 +243,7 @@ fi
 [tasks.install-cargo-all-features]
 private = true
 install_crate = { crate_name = "cargo-all-features", version = "1.10.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
+
+[tasks.install-cbindgen]
+private = true
+install_crate = { crate_name = "cbindgen", version = "0.27.0", binary = "cbindgen", test_arg = "-V" }

@@ -8,12 +8,23 @@ use spideroak_crypto::{
     typenum::{Prod, U12, U16, U255, U32, U48},
 };
 
-#[derive(Debug)]
-pub enum CipherSuite<A> {
-    TlsAes256GcmSha384(TlsAes256GcmSha384<A>),
+pub trait Crypto {
+    type Aes128GcmSha256;
+    type Aes256GcmSha384;
+    type ChaCha20Poly1305Sha256;
 }
 
-impl<A> CryptoSuite for CipherSuite<A> {
+#[derive(Debug)]
+pub enum CipherSuite<C: Crypto> {
+    /// TLS_AES_128_GCM_SHA256
+    Aes128GcmSha256(C::Aes128GcmSha256),
+    /// TLS_AES_256_GCM_SHA384
+    Aes256GcmSha384(C::Aes256GcmSha384),
+    /// TLS_CHACHA20_POLY1305_SHA256
+    ChaCha20Poly1305Sha256(C::ChaCha20Poly1305Sha256),
+}
+
+impl<C: Crypto> CryptoSuite for CipherSuite<C> {
     type HandshakeKey = HandshakeKey;
     type HandshakeHeaderKey = HandshakeHeaderKey;
     type InitialKey = InitialKey;

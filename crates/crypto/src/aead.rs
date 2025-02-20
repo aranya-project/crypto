@@ -4,6 +4,7 @@
 //! [RFC 5116]: https://www.rfc-editor.org/rfc/rfc5116
 
 use core::{
+    cell::UnsafeCell,
     cmp::{Eq, PartialEq},
     fmt::{self, Debug},
     iter::IntoIterator,
@@ -17,9 +18,8 @@ use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use serde::{Deserialize, Serialize};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
-    generic_const_mappings::Const,
-    type_operators::{IsGreaterOrEqual, IsLess},
-    Unsigned, U16, U65536,
+    generic_const_mappings::Const, GrEq, IsGreaterOrEqual, IsLess, NonZero, Unsigned, U16, U65536,
+    U8,
 };
 
 use crate::{
@@ -801,6 +801,172 @@ impl<N: ArrayLength> TryFrom<&[u8]> for Nonce<N> {
     }
 }
 
+/// An [`Aead`] that requires the TLS v1.3 nonce construction.
+pub struct Tls13Aead<A> {
+    aead: A,
+    checker: UnsafeCell<Tls13NonceChecker>,
+}
+
+unsafe impl<A: Send> Send for Tls13Aead<A> {}
+
+impl<A> Tls13Aead<A>
+where
+    A: Aead,
+    A::NonceSize: IsGreaterOrEqual<U8>,
+    GrEq<A::NonceSize, U8>: NonZero,
+{
+    #[inline(always)]
+    fn check_nonce(&self, nonce: &[u8]) -> Result<(), SealError> {
+        // SAFETY:
+        // - `UnsafeCell` makes `Tls13Aead` `!Sync`, so it can
+        //   only be used by one thread at a time.
+        // - The only place we create an exclusive reference to
+        //   `self.checker` is inside this method.
+        // - The reference to `self.checker` does not escape this
+        //   method.
+        let checker = unsafe { &mut *(self.checker.get()) };
+        if !checker.is_valid(nonce) {
+            Err(SealError::Encryption)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<A> Aead for Tls13Aead<A>
+where
+    A: Aead,
+    A::NonceSize: IsGreaterOrEqual<U8>,
+    GrEq<A::NonceSize, U8>: NonZero,
+{
+    const LIFETIME: Lifetime = A::LIFETIME;
+
+    type KeySize = A::KeySize;
+    const KEY_SIZE: usize = A::KEY_SIZE;
+
+    type NonceSize = A::NonceSize;
+    const NONCE_SIZE: usize = A::NONCE_SIZE;
+
+    type Overhead = A::Overhead;
+    const OVERHEAD: usize = A::OVERHEAD;
+
+    const MAX_PLAINTEXT_SIZE: u64 = A::MAX_PLAINTEXT_SIZE;
+    const MAX_ADDITIONAL_DATA_SIZE: u64 = A::MAX_ADDITIONAL_DATA_SIZE;
+    const MAX_CIPHERTEXT_SIZE: u64 = A::MAX_CIPHERTEXT_SIZE;
+
+    type Key = A::Key;
+
+    fn new(key: &Self::Key) -> Self {
+        Self {
+            aead: A::new(key),
+            checker: UnsafeCell::new(Tls13NonceChecker::default()),
+        }
+    }
+
+    fn seal(
+        &self,
+        mut dst: &mut [u8],
+        nonce: &[u8],
+        plaintext: &[u8],
+        additional_data: &[u8],
+    ) -> Result<(), SealError> {
+        check_seal_params::<Self>(&mut dst, nonce, plaintext, additional_data)?;
+
+        self.check_nonce(nonce)?;
+        self.aead.seal(dst, nonce, plaintext, additional_data)
+    }
+
+    fn seal_in_place(
+        &self,
+        nonce: &[u8],
+        data: &mut [u8],
+        tag: &mut [u8],
+        additional_data: &[u8],
+    ) -> Result<(), SealError> {
+        check_seal_in_place_params::<Self>(nonce, data, tag, additional_data)?;
+
+        self.check_nonce(nonce)?;
+        self.aead.seal_in_place(nonce, data, tag, additional_data)
+    }
+
+    fn open(
+        &self,
+        dst: &mut [u8],
+        nonce: &[u8],
+        ciphertext: &[u8],
+        additional_data: &[u8],
+    ) -> Result<(), OpenError> {
+        check_open_params::<Self>(dst, nonce, ciphertext, additional_data)?;
+
+        self.aead.open(dst, nonce, ciphertext, additional_data)
+    }
+
+    fn open_in_place(
+        &self,
+        nonce: &[u8],
+        data: &mut [u8],
+        tag: &[u8],
+        additional_data: &[u8],
+    ) -> Result<(), OpenError> {
+        check_open_in_place_params::<Self>(nonce, data, tag, additional_data)?;
+
+        self.aead.open_in_place(nonce, data, tag, additional_data)
+    }
+}
+
+impl<A> IndCca2 for Tls13Aead<A>
+where
+    A: Aead + IndCca2,
+    A::NonceSize: IsGreaterOrEqual<U8>,
+    GrEq<A::NonceSize, U8>: NonZero,
+{
+}
+
+/// Checks nonces per [RFC 8446] section 5.3
+///
+/// [RFC 8446]: https://datatracker.ietf.org/doc/html/rfc8446#section-5.3
+#[derive(Clone, Default, Debug)]
+struct Tls13NonceChecker {
+    min_next_nonce: u64,
+    mask: Option<u64>,
+}
+
+impl Tls13NonceChecker {
+    #[inline(always)]
+    #[must_use]
+    fn is_valid(&mut self, nonce: &[u8]) -> bool {
+        // TLS v1.3 per-record nonces are derived from a 64-bit
+        // sequence number and a static nonce derived from the
+        // key schedule.
+        //
+        // The per-record nonce is derived by converting the
+        // sequence number to a big-endian byte array, prepending
+        // zeros until it has the same length as the static
+        // nonce, and then XORing it with the static nonce.
+        //
+        // After being used to derive a per-record nonce, the
+        // sequence number is incremented by one. It should never
+        // wrap.
+        let Some((_, seq_buf)) = nonce.split_last_chunk() else {
+            return false;
+        };
+        let mut seq = u64::from_be_bytes(*seq_buf);
+        // The first sequence number is zero, meaning `seq`
+        // is just the last 64 bits of the nonce.
+        seq ^= *self.mask.get_or_insert(seq);
+        if seq < self.min_next_nonce {
+            // Refuse to go backward.
+            return false;
+        };
+        let Some(next) = seq.checked_add(1) else {
+            // Refuse to overflow.
+            return false;
+        };
+        self.min_next_nonce = next;
+        true
+    }
+}
+
 /// A marker trait signifying that the [`Aead`] is IND-CCA2
 /// secure.
 pub trait IndCca2: Aead {}
@@ -1506,3 +1672,46 @@ mod committing {
 #[cfg(feature = "committing-aead")]
 #[cfg_attr(docsrs, doc(cfg(feature = "committing-aead")))]
 pub use committing::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tls13_nonce() {
+        let mut checker = Tls13NonceChecker::default();
+
+        let tests: &[(&[u8], bool)] = &[
+            // Too small.
+            (&[0; 0], false),
+            (&[0; 1], false),
+            (&[0; 2], false),
+            (&[0; 3], false),
+            (&[0; 4], false),
+            (&[0; 5], false),
+            (&[0; 6], false),
+            (&[0; 7], false),
+            // Correct.
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], true),
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], true),
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2], true),
+            // Going backward.
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], false),
+            // Correct
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10], true),
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255], true),
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0], true),
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 254], true),
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255], true),
+            // Going backward.
+            (&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 254], false),
+            (&[0; 12], false),
+            // Overflow.
+            (&[0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255], false),
+        ];
+        for (i, &(nonce, want)) in tests.iter().enumerate() {
+            let got = checker.is_valid(nonce);
+            assert_eq!(got, want, "#{i}");
+        }
+    }
+}

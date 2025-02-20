@@ -20,8 +20,6 @@ use crate::crypto::Suite;
 #[derive(Debug)]
 pub struct Server {}
 
-impl Server {}
-
 impl Provider for Server {
     type Server = Self;
     type Client = Client;
@@ -32,7 +30,7 @@ impl Provider for Server {
     }
 
     fn start_client(self) -> Result<Self::Client, Self::Error> {
-        panic!("cannot create a client from a server");
+        unreachable!("cannot create a client from a server");
     }
 }
 
@@ -51,7 +49,7 @@ impl Endpoint for Server {
         _transport_parameters: &Params,
         _server_name: ServerName,
     ) -> Self::Session {
-        panic!("cannot create a client session from a server config")
+        unreachable!("cannot create a client session from a server config")
     }
 
     fn max_tag_length(&self) -> usize {
@@ -69,7 +67,7 @@ impl Provider for Client {
     type Error = core::convert::Infallible;
 
     fn start_server(self) -> Result<Self::Server, Self::Error> {
-        panic!("cannot create a server from a client");
+        unreachable!("cannot create a server from a client");
     }
 
     fn start_client(self) -> Result<Self::Client, Self::Error> {
@@ -84,7 +82,7 @@ impl Endpoint for Client {
         &mut self,
         _transport_parameters: &Params,
     ) -> Self::Session {
-        panic!("cannot create a server session from a client config")
+        unreachable!("cannot create a server session from a client config")
     }
 
     fn new_client_session<Params: EncoderValue>(
@@ -102,6 +100,8 @@ impl Endpoint for Client {
 
 #[derive(Debug)]
 struct TlsSession {}
+
+impl TlsSession {}
 
 impl Session for TlsSession {
     fn poll<C: Context<Self>>(&mut self, _context: &mut C) -> Poll<Result<(), Error>> {

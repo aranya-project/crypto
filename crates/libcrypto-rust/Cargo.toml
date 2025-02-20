@@ -1,0 +1,67 @@
+[package]
+name = "spideroak-libcrypto-rust"
+description = "A libcrypto implementation using `spideroak-crypto`"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license = "BSD-3-Clause"
+readme = "README.md"
+repository.workspace = true
+rust-version.workspace = true
+categories = ["cryptography", "no-std", "no-std::no-alloc"]
+keywords = ["crypto", "cryptography", "spideroak"]
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[features]
+default = []
+
+# Set when `cbindgen` is running.
+#
+# TODO(eric): Remove?
+cbindgen = [
+	"spideroak-libcrypto/cbindgen",
+]
+
+# Use executable-based constructors to initialize
+# implementations.
+ctor = [
+	"spideroak-libcrypto/ctor",
+]
+
+# Use unstable linkage feature for true weak linkage.
+#
+# Requires +nightly.
+linkage = [
+	"spideroak-libcrypto/linkage",
+]
+
+# Use std.
+std = [
+	"spideroak-crypto/std",
+	"spideroak-libcrypto/std",
+]
+
+[dependencies]
+spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false }
+spideroak-libcrypto = { version = "0.1", path = "../libcrypto", default-features = false }
+
+[dev-dependencies]
+spideroak-libcrypto = { version = "0.1", path = "../libcrypto", features = ["testing"] }
+
+[package.metadata.docs.rs]
+features = []
+
+[package.metadata.cargo-all-features]
+always_include_features = []
+
+skip_feature_sets = []
+
+denylist = []
+
+[package.metadata.cargo-machete]
+ignored = ["old-generic-array"]
