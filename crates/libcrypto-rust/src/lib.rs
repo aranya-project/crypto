@@ -1,7 +1,9 @@
-//! TODO
+//! `libcrypto` bindings for [`spideroak-crypto`].
+//!
+//! [`spideroak-crypto`]: https://crates.io/crates/spideroak-crypto
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
-//#![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
+#![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
 
 use spideroak_crypto::{aead::Tls13Aead, rust::Aes256Gcm};
 use spideroak_libcrypto::impl_aead;

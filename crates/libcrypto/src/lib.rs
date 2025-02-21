@@ -6,12 +6,14 @@
 
 extern crate alloc;
 
-pub(crate) use aranya_capi_macro::opaque;
-pub mod aead;
+mod aead;
+pub mod testing;
 mod util;
-pub(crate) mod weak;
+mod weak;
+
+pub use aead::*;
+// pub(crate) use aranya_capi_macro::opaque;
 #[doc(hidden)]
 pub use linkme;
-pub mod testing;
 #[doc(hidden)]
 pub use spideroak_crypto;

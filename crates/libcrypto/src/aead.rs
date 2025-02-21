@@ -13,12 +13,9 @@ use spideroak_crypto::{
     zeroize::Zeroize,
 };
 
-use crate::{
-    opaque,
-    util::{
-        any_overlap, inexact_overlap, less_or_eq, pedantic_slice_checks, try_from_raw_parts,
-        try_from_raw_parts_mut, try_ptr_as_mut, try_ptr_as_ref, ISIZE_MAX,
-    },
+use crate::util::{
+    any_overlap, inexact_overlap, less_or_eq, pedantic_slice_checks, try_from_raw_parts,
+    try_from_raw_parts_mut, try_ptr_as_mut, try_ptr_as_ref, ISIZE_MAX,
 };
 
 /// Adds support for a particular AEAD.
@@ -41,12 +38,57 @@ macro_rules! impl_aead {
     };
     (@imp $name:ident, $aead:ty) => {
         const _: () = {
-            use $crate::aead::$name;
-            $crate::set_sym!($name, || -> $crate::aead::EVP_AEAD {
-                $crate::aead::EVP_AEAD::new::<$aead>()
+            use $crate::$name;
+            $crate::set_sym!($name, || -> $crate::EVP_AEAD {
+                $crate::EVP_AEAD::new::<$aead>()
             });
         };
     };
+}
+
+macro_rules! opaque2 {
+    (
+        size = $size:literal, align = $align:literal;
+
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident {
+            $($t:tt)+
+        }
+    ) => {
+        $(#[$meta])*
+        #[cfg(not(cbindgenx))]
+        $vis struct $name {
+            $($t)+
+        }
+
+        $(#[$meta])*
+        #[cfg(cbindgenx)]
+        #[repr(C, align($align))]
+        $vis struct $name {
+            /// This field only exists for size purposes. It is
+            /// UNDEFINED BEHAVIOR to read from or write to it.
+            /// @private
+            __for_size_only: [u8; $size],
+        }
+
+        // $crate::util::const_assert_gr_eq!("invalid size: ", $size as usize, ::core::mem::size_of::<$name>());
+        // $crate::util::const_assert_gr_eq!("invalid alignment: ", $size as usize, ::core::mem::align_of::<$name>());
+    }
+}
+
+opaque2! {
+    //size = 7, align = 8;
+    size = 16, align = 8;
+    /// TODO
+    #[repr(C)]
+    #[non_exhaustive]
+    #[derive(Clone, Debug)]
+    pub struct EVP_TEST {
+        /// See [`Aead::KEY_SIZE`].
+        key_len: usize,
+        /// See [`Aead::NONCE_SIZE`].
+        nonce_len: usize,
+    }
 }
 
 /// A specific AEAD algorithm.
@@ -231,7 +273,7 @@ pub struct ENGINE {}
 #[repr(C)]
 #[non_exhaustive]
 #[derive(Debug)]
-#[opaque(size = 24, align = 8)]
+//#[opaque(size = 24, align = 8)]
 pub struct EVP_AEAD_CTX {
     /// The AEAD algorithm.
     ///

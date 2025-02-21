@@ -5,7 +5,7 @@
 
 use core::ptr;
 
-use crate::aead::{
+use crate::{
     EVP_AEAD_CTX_cleanup, EVP_AEAD_CTX_init, EVP_AEAD_CTX_open, EVP_AEAD_CTX_seal,
     EVP_AEAD_key_length, EVP_AEAD_max_overhead, EVP_AEAD_nonce_length, EVP_AEAD, EVP_AEAD_CTX,
 };
@@ -23,9 +23,9 @@ macro_rules! test_aead {
     ($aead:ident, $test:ident) => {
         #[test]
         pub fn $test() {
-            assert_eq!($crate::aead::$aead(), $crate::aead::$aead());
+            assert_eq!($crate::$aead(), $crate::$aead());
 
-            let ptr = $crate::aead::$aead();
+            let ptr = $crate::$aead();
             if ptr.is_null() {
                 return;
             }

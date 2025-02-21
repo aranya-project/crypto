@@ -20,25 +20,14 @@ crate-type = ["lib", "cdylib", "staticlib"]
 [features]
 default = []
 
-# Set when `cbindgen` is running.
-#
-# TODO(eric): Remove?
-cbindgen = [
-	"spideroak-libcrypto/cbindgen",
-]
-
 # Use executable-based constructors to initialize
 # implementations.
-ctor = [
-	"spideroak-libcrypto/ctor",
-]
+ctor = ["spideroak-libcrypto/ctor"]
 
 # Use unstable linkage feature for true weak linkage.
 #
 # Requires +nightly.
-linkage = [
-	"spideroak-libcrypto/linkage",
-]
+linkage = ["spideroak-libcrypto/linkage"]
 
 # Use std.
 std = [
@@ -52,6 +41,11 @@ spideroak-libcrypto = { version = "0.1", path = "../libcrypto", default-features
 
 [dev-dependencies]
 spideroak-libcrypto = { version = "0.1", path = "../libcrypto", features = ["testing"] }
+
+[build-dependencies]
+spideroak-libcrypto-codegen = { version = "0.1", path = "../libcrypto-codegen" }
+
+anyhow = { workspace = true, features = ["std"] }
 
 [package.metadata.docs.rs]
 features = []

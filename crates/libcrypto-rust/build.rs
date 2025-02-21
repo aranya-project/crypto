@@ -2,9 +2,11 @@
 
 use std::env;
 
-fn main() {
-    println!("cargo::rustc-check-cfg=cfg(cbindgen)");
-    if env::var("_CBINDGEN_IS_RUNNING").is_ok() {
-        println!("cargo::rustc-cfg=cbindgen");
-    }
+use anyhow::Context;
+use spideroak_libcrypto_codegen::write_headers;
+
+fn main() -> anyhow::Result<()> {
+    let out_dir = env::var("OUT_DIR")?;
+    write_headers(out_dir).with_context(|| "unable to write headers")?;
+    Ok(())
 }

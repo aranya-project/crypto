@@ -28,29 +28,21 @@ description = "Build Code"
 command = "cargo"
 args = ["build", "--verbose", "--release", "${@}"]
 
+[tasks.build-libcrypto-header]
+category = "build"
+description = "Build `spideroak-libcrypto` header"
+toolchain = "${NIGHTLY}"
+cwd = "crates/libcrypto"
+command = "cbindgen"
+args = ["--config=cbindgen.toml", "--output=output/__all.h", "${@}"]
+dependencies = ["install-cbindgen", "install-nightly"]
+
 [tasks.build-libcrypto-rust]
 category = "build"
 description = "Build `libcrypto-rust`"
-run_task = { name = [
-    "build-libcrypto-rust-header",
-    "build-libcrypto-rust-lib",
-] }
-
-[tasks.build-libcrypto-rust-header]
-category = "build"
-description = "Build `libcrypto-rust` header"
-toolchain = "${NIGHTLY}"
-cwd = "crates/libcrypto-rust"
-command = "cbindgen"
-args = ["--config=cbindgen.toml", "--output=output/spideroak-crypto.h"]
-dependencies = ["install-cbindgen", "install-nightly"]
-
-[tasks.build-libcrypto-rust-lib]
-category = "build"
-description = "Build `libcrypto-rust` shared library"
 cwd = "crates/libcrypto-rust"
 command = "cargo"
-args = ["build", "--release"]
+args = ["build", "--release", "${@}"]
 dependencies = ["install-nightly"]
 
 
