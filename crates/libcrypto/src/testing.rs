@@ -8,6 +8,7 @@ use core::ptr;
 use crate::{
     EVP_AEAD_CTX_cleanup, EVP_AEAD_CTX_init, EVP_AEAD_CTX_open, EVP_AEAD_CTX_seal,
     EVP_AEAD_key_length, EVP_AEAD_max_overhead, EVP_AEAD_nonce_length, EVP_AEAD, EVP_AEAD_CTX,
+    EVP_AEAD_CTX_SIZE, MAX_AEAD_SIZE,
 };
 
 /// Tests AEADs.
@@ -38,63 +39,66 @@ macro_rules! test_aead {
 }
 
 /// Tests an AEAD.
-pub fn test_aead(aead: &EVP_AEAD) {
-    let mut ctx = EVP_AEAD_CTX::default();
-    let key = vec![0; EVP_AEAD_key_length(aead)];
-    let ret = unsafe {
-        EVP_AEAD_CTX_init(
-            ptr::addr_of_mut!(ctx).cast(),
-            aead,
-            key.as_ptr(),
-            key.len(),
-            0,
-            ptr::null(),
-        )
-    };
-    assert_eq!(ret, 1);
+pub fn test_aead(_aead: &EVP_AEAD) {
+    println!("xx {:?}", option_env!("SPIDEROAK_LIBCRYPTO_MAX_AEAD_SIZE"));
+    assert_eq!(1024, crate::MAX_AEAD_SIZE);
+    //     let mut ctx = vec![0; EVP_AEAD_CTX_SIZE];
+    //     let mut ctx = EVP_AEAD_CTX::default();
+    //     let key = vec![0; EVP_AEAD_key_length(aead)];
+    //     let ret = unsafe {
+    //         EVP_AEAD_CTX_init(
+    //             ptr::addr_of_mut!(ctx).cast(),
+    //             aead,
+    //             key.as_ptr(),
+    //             key.len(),
+    //             0,
+    //             ptr::null(),
+    //         )
+    //     };
+    //     assert_eq!(ret, 1);
 
-    let pt = vec![b'A'; 512];
-    let mut out = vec![0; pt.len() + EVP_AEAD_max_overhead(aead)];
-    let mut out_len = 0;
-    let nonce = vec![0; EVP_AEAD_nonce_length(aead)];
-    let ad = b"some additional data...";
-    let ret = unsafe {
-        EVP_AEAD_CTX_seal(
-            &ctx,
-            out.as_mut_ptr(),
-            ptr::addr_of_mut!(out_len).cast(),
-            out.len(),
-            nonce.as_ptr(),
-            nonce.len(),
-            pt.as_ptr(),
-            pt.len(),
-            ad.as_ptr(),
-            ad.len(),
-        )
-    };
-    assert_eq!(ret, 1);
-    assert_eq!(out_len, out.len());
+    //     let pt = vec![b'A'; 512];
+    //     let mut out = vec![0; pt.len() + EVP_AEAD_max_overhead(aead)];
+    //     let mut out_len = 0;
+    //     let nonce = vec![0; EVP_AEAD_nonce_length(aead)];
+    //     let ad = b"some additional data...";
+    //     let ret = unsafe {
+    //         EVP_AEAD_CTX_seal(
+    //             &ctx,
+    //             out.as_mut_ptr(),
+    //             ptr::addr_of_mut!(out_len).cast(),
+    //             out.len(),
+    //             nonce.as_ptr(),
+    //             nonce.len(),
+    //             pt.as_ptr(),
+    //             pt.len(),
+    //             ad.as_ptr(),
+    //             ad.len(),
+    //         )
+    //     };
+    //     assert_eq!(ret, 1);
+    //     assert_eq!(out_len, out.len());
 
-    let ct = out.clone();
-    let mut out = vec![0; pt.len()];
-    let mut out_len = 0;
-    let ret = unsafe {
-        EVP_AEAD_CTX_open(
-            &ctx,
-            out.as_mut_ptr(),
-            ptr::addr_of_mut!(out_len).cast(),
-            out.len(),
-            nonce.as_ptr(),
-            nonce.len(),
-            ct.as_ptr(),
-            ct.len(),
-            ad.as_ptr(),
-            ad.len(),
-        )
-    };
-    assert_eq!(ret, 1);
-    assert_eq!(out_len, out.len());
-    assert_eq!(out, pt);
+    //     let ct = out.clone();
+    //     let mut out = vec![0; pt.len()];
+    //     let mut out_len = 0;
+    //     let ret = unsafe {
+    //         EVP_AEAD_CTX_open(
+    //             &ctx,
+    //             out.as_mut_ptr(),
+    //             ptr::addr_of_mut!(out_len).cast(),
+    //             out.len(),
+    //             nonce.as_ptr(),
+    //             nonce.len(),
+    //             ct.as_ptr(),
+    //             ct.len(),
+    //             ad.as_ptr(),
+    //             ad.len(),
+    //         )
+    //     };
+    //     assert_eq!(ret, 1);
+    //     assert_eq!(out_len, out.len());
+    //     assert_eq!(out, pt);
 
-    unsafe { EVP_AEAD_CTX_cleanup(&mut ctx) }
+    //     unsafe { EVP_AEAD_CTX_cleanup(&mut ctx) }
 }

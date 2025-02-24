@@ -81,7 +81,7 @@ impl fmt::Display for InvalidNonceSize {
 impl core::error::Error for InvalidNonceSize {}
 
 /// An error from an [`Aead`] seal.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SealError {
     /// An internal bug was discovered.
     Bug(Bug),
@@ -161,7 +161,7 @@ impl From<InvalidNonceSize> for SealError {
 }
 
 /// An error from an [`Aead`] open.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OpenError {
     /// An internal bug was discovered.
     Bug(Bug),

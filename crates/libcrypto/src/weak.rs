@@ -26,7 +26,7 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         #[macro_export]
         macro_rules! set_sym {
-            ($name:ident, || -> $ty:ty { $block:expr }) => {
+            ($name:ident, || -> $ty:ty $block:block) => {
                 #[no_mangle]
                 unsafe extern "C" fn $name() -> $ty {
                     $block
@@ -53,7 +53,7 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         #[macro_export]
         macro_rules! set_sym {
-            ($name:ident, || -> $ty:ty { $block:expr }) => {
+            ($name:ident, || -> $ty:ty $block:block) => {
                 $crate::ctor!(|| {
                     #[used]
                     static __TMP: $ty = { $block };
@@ -116,17 +116,32 @@ cfg_if::cfg_if! {
                 #[doc(hidden)]
                 #[linkme::distributed_slice]
                 #[used]
-                pub static $sym: [$ty] = [..];
+                pub static $sym: [Option<&$ty>] = [..];
+
+                // Make sure that we always have one element
+                // because of <https://github.com/dtolnay/linkme/issues/98#issuecomment-2296078911>
+                const _: () = {
+                    #[linkme::distributed_slice($sym)]
+                    #[allow(unused_attributes)]
+                    #[used]
+                    static __TMP: Option<&$ty> = None;
+                };
             };
         }
         pub(crate) use new_sym;
 
         macro_rules! get_sym {
             ($sym:ident) => {{
-                debug_assert!($sym.len() <= 1);
+                debug_assert!(!$sym.is_empty());
+                debug_assert!($sym.len() <= 2);
+
                 match $sym.get(0) {
-                    ::core::option::Option::Some(v) => ::core::ptr::from_ref(v),
-                    ::core::option::Option::None => ::core::ptr::null(),
+                    Some(None) => match $sym.get(1) {
+                        Some(Some(v)) => ::core::ptr::from_ref(v),
+                        _ => ::core::ptr::null(),
+                    },
+                    Some(Some(v)) => ::core::ptr::from_ref(v),
+                    None => ::core::ptr::null(),
                 }
             }};
         }
@@ -135,12 +150,14 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         #[macro_export]
         macro_rules! set_sym {
-            ($name:ident, || -> $ty:ty { $block:expr }) => {
+            ($name:ident, || -> $ty:ty $block:block) => {
                 const _: () = {
                     #[$crate::linkme::distributed_slice($name)]
                     #[linkme(crate = $crate::linkme)]
+                    #[allow(unused_attributes)]
                     #[used]
-                    static __TMP: $ty = { $block };
+                    static __TMP: ::core::option::Option<&$ty> =
+                        ::core::option::Option::Some(&{ $block });
                 };
             };
         }

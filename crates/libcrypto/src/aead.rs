@@ -4,18 +4,28 @@
 
 #![allow(non_camel_case_types)]
 
-use alloc::boxed::Box;
-use core::{ffi::c_int, mem::MaybeUninit, ptr};
+use core::{
+    alloc::Layout,
+    ffi::c_int,
+    marker::PhantomData,
+    mem::{ManuallyDrop, MaybeUninit},
+    ptr,
+};
 
+use buggy::{bug, Bug};
 use spideroak_crypto::{
     aead::{Aead, BufferTooSmallError, InvalidNonceSize, OpenError, SealError},
     import::{Import, ImportError},
     zeroize::Zeroize,
 };
 
-use crate::util::{
-    any_overlap, inexact_overlap, less_or_eq, pedantic_slice_checks, try_from_raw_parts,
-    try_from_raw_parts_mut, try_ptr_as_mut, try_ptr_as_ref, ISIZE_MAX,
+use crate::{
+    error::{invalid_arg, Error},
+    util::{
+        any_overlap, inexact_overlap, less_or_eq, opaque, pedantic_slice_checks,
+        try_from_raw_parts, try_from_raw_parts_mut, try_ptr_as_mut, try_ptr_as_ref,
+    },
+    MAX_AEAD_SIZE,
 };
 
 /// Adds support for a particular AEAD.
@@ -40,62 +50,38 @@ macro_rules! impl_aead {
         const _: () = {
             use $crate::$name;
             $crate::set_sym!($name, || -> $crate::EVP_AEAD {
+                const _: () = {
+                    $crate::const_assert!(
+                        $crate::MAX_AEAD_SIZE >= ::core::mem::size_of::<$aead>(),
+                        "`", ::core::stringify!($aead), "` is too large; ",
+                        "set `SPIDEROAK_LIBCRYPTO_MAX_AEAD_SIZE` to at least ",
+                        ::core::mem::size_of::<$aead>(), " bytes"
+                    );
+                };
+                const _: () = {
+                    const GOT: usize =::core::mem::align_of::<$crate::EVP_AEAD_CTX>();
+                    const WANT: usize = ::core::mem::align_of::<$crate::EvpAeadCtx<$aead>>();
+                    $crate::const_assert!(
+                        GOT >= WANT,
+                        "`", ::core::stringify!($aead), "` is over-aligned; ",
+                        "set `SPIDEROAK_LIBCRYPTO_MAX_AEAD_ALIGN` to at least ",
+                        ::core::mem::align_of::<$aead>(), " bytes"
+                    );
+                };
+
                 $crate::EVP_AEAD::new::<$aead>()
             });
         };
     };
 }
 
-macro_rules! opaque2 {
-    (
-        size = $size:literal, align = $align:literal;
-
-        $(#[$meta:meta])*
-        $vis:vis struct $name:ident {
-            $($t:tt)+
-        }
-    ) => {
-        $(#[$meta])*
-        #[cfg(not(cbindgenx))]
-        $vis struct $name {
-            $($t)+
-        }
-
-        $(#[$meta])*
-        #[cfg(cbindgenx)]
-        #[repr(C, align($align))]
-        $vis struct $name {
-            /// This field only exists for size purposes. It is
-            /// UNDEFINED BEHAVIOR to read from or write to it.
-            /// @private
-            __for_size_only: [u8; $size],
-        }
-
-        // $crate::util::const_assert_gr_eq!("invalid size: ", $size as usize, ::core::mem::size_of::<$name>());
-        // $crate::util::const_assert_gr_eq!("invalid alignment: ", $size as usize, ::core::mem::align_of::<$name>());
-    }
-}
-
-opaque2! {
-    //size = 7, align = 8;
-    size = 16, align = 8;
-    /// TODO
-    #[repr(C)]
-    #[non_exhaustive]
-    #[derive(Clone, Debug)]
-    pub struct EVP_TEST {
-        /// See [`Aead::KEY_SIZE`].
-        key_len: usize,
-        /// See [`Aead::NONCE_SIZE`].
-        nonce_len: usize,
-    }
-}
-
+opaque! { size = 112, align = 16;
 /// A specific AEAD algorithm.
+///
+/// It is safe for concurrent use.
 #[repr(C)]
 #[non_exhaustive]
 #[derive(Clone, Debug)]
-//#[opaque(size = 96, align = 8)]
 pub struct EVP_AEAD {
     /// See [`Aead::KEY_SIZE`].
     key_len: usize,
@@ -110,15 +96,26 @@ pub struct EVP_AEAD {
     /// See [`Aead::MAX_ADDITIONAL_DATA_SIZE`].
     a_max: u64,
 
-    /// [`Aead::new`].
-    init: fn(key: &[u8]) -> Result<*const u8, ImportError>,
+    /// The memory layout of the `Aead`.
+    layout: Layout,
+
+    /// Initializes `ctx.inner` with [`Aead::new`].
+    init: fn(ctx: &mut EVP_AEAD_CTX, key: &[u8]) -> Result<(), ImportError>,
 
     /// Frees the allocated data.
-    drop: fn(ctx: &mut EVP_AEAD_CTX),
+    ///
+    /// # Safety
+    ///
+    /// - `ctx` must be initialized.
+    cleanup: unsafe fn(ctx: &mut EVP_AEAD_CTX),
 
     /// [`Aead::seal`].
+    ///
+    /// # Safety
+    ///
+    /// - `ctx` must be initialized.
     #[allow(clippy::type_complexity)]
-    seal: fn(
+    seal: unsafe fn(
         ctx: &EVP_AEAD_CTX,
         dst: &mut [u8],
         nonce: &[u8],
@@ -127,8 +124,12 @@ pub struct EVP_AEAD {
     ) -> Result<(), SealError>,
 
     /// [`Aead::seal_in_place`].
+    ///
+    /// # Safety
+    ///
+    /// - `ctx` must be initialized.
     #[allow(clippy::type_complexity)]
-    seal_in_place: fn(
+    seal_in_place: unsafe fn(
         ctx: &EVP_AEAD_CTX,
         nonce: &[u8],
         data: &mut [u8],
@@ -137,8 +138,12 @@ pub struct EVP_AEAD {
     ) -> Result<(), SealError>,
 
     /// [`Aead::open`].
+    ///
+    /// # Safety
+    ///
+    /// - `ctx` must be initialized.
     #[allow(clippy::type_complexity)]
-    open: fn(
+    open: unsafe fn(
         ctx: &EVP_AEAD_CTX,
         dst: &mut [u8],
         nonce: &[u8],
@@ -147,8 +152,12 @@ pub struct EVP_AEAD {
     ) -> Result<(), OpenError>,
 
     /// [`Aead::open_in_place`].
+    ///
+    /// # Safety
+    ///
+    /// - `ctx` must be initialized.
     #[allow(clippy::type_complexity)]
-    open_in_place: fn(
+    open_in_place: unsafe fn(
         ctx: &EVP_AEAD_CTX,
         nonce: &[u8],
         data: &mut [u8],
@@ -156,10 +165,23 @@ pub struct EVP_AEAD {
         additional_data: &[u8],
     ) -> Result<(), OpenError>,
 }
+}
 
 impl EVP_AEAD {
     #[doc(hidden)]
     pub const fn new<A: Aead>() -> Self {
+        // TODO
+        // const {
+        //     assert!(
+        //         size_of::<EVP_AEAD_CTX>() >= size_of::<EvpAeadCtx<A>>(),
+        //         "bug: invalid size"
+        //     );
+        //     assert!(
+        //         align_of::<EVP_AEAD_CTX>() >= align_of::<EvpAeadCtx<A>>(),
+        //         "bug: invalid alignment"
+        //     );
+        // }
+
         Self {
             key_len: A::KEY_SIZE,
             nonce_len: A::NONCE_SIZE,
@@ -167,41 +189,65 @@ impl EVP_AEAD {
             p_max: A::MAX_PLAINTEXT_SIZE,
             c_max: A::MAX_CIPHERTEXT_SIZE,
             a_max: A::MAX_ADDITIONAL_DATA_SIZE,
-            init: |key| {
+            layout: Layout::new::<A>(),
+            init: |ctx, key| {
                 let key = <A::Key as Import<_>>::import(key)?;
                 let aead = A::new(&key);
-                let ptr = Box::into_raw(Box::new(aead)).cast::<u8>();
-                Ok(ptr)
-            },
-            drop: |ctx| {
+
                 // SAFETY:
-                // - We have to trust that the caller initialized
-                //   it with `EVP_AEAD_CTX_init`.
-                let boxed = unsafe { Box::from_raw(ctx.ptr.cast::<A>().cast_mut()) };
-                drop(boxed);
+                // - We checked at compile time that
+                //   `EvpAeadCtx<A>` has at least the same size
+                //   and alignment as `EVP_AEAD_CTX`.
+                let ctx = unsafe { &mut *(ctx as *mut EVP_AEAD_CTX).cast::<EvpAeadCtx<A>>() };
+                ctx.inner.write(InnerAead {
+                    aead: ManuallyDrop::new(aead),
+                });
+
+                Ok(())
+            },
+            cleanup: |ctx| {
+                // SAFETY:
+                // - We checked at compile time that
+                //   `EvpAeadCtx<A>` has at least the same size
+                //   and alignment as `EVP_AEAD_CTX`.
+                let ctx = unsafe { &mut *(ctx as *mut EVP_AEAD_CTX).cast::<EvpAeadCtx<A>>() };
+                // SAFETY: See the function pointer's safety
+                // docs.
+                let inner = unsafe { ctx.inner.assume_init_mut() };
+                // SAFETY: We have to trust that the caller does
+                // not assume that `self.inner` is initialized
+                // after this point.
+                unsafe { ManuallyDrop::drop(&mut inner.aead) }
+
+                // Clobber `self.inner` in case `A` isn't
+                // `ZeroizeOnDrop`.
+                //
+                // NB: This is safe because we are not assuming
+                // that `self.inner` is initialized.
+                ctx.inner.zeroize();
             },
             seal: |ctx, dst, nonce, plaintext, additional_data| {
-                // SAFETY: We have to trust that `ptr` is
-                // non-null and suitably aligned.
-                let aead = unsafe { ctx.aead::<A>() };
+                // SAFETY: See the function pointer's safety
+                // docs.
+                let aead = unsafe { ctx.get_inner::<A>()? };
                 aead.seal(dst, nonce, plaintext, additional_data)
             },
             seal_in_place: |ctx, nonce, data, overhead, additional_data| {
-                // SAFETY: We have to trust that `ptr` is
-                // non-null and suitably aligned.
-                let aead = unsafe { ctx.aead::<A>() };
+                // SAFETY: See the function pointer's safety
+                // docs.
+                let aead = unsafe { ctx.get_inner::<A>()? };
                 aead.seal_in_place(nonce, data, overhead, additional_data)
             },
             open: |ctx, dst, nonce, plaintext, additional_data| {
-                // SAFETY: We have to trust that `ptr` is
-                // non-null and suitably aligned.
-                let aead = unsafe { ctx.aead::<A>() };
+                // SAFETY: See the function pointer's safety
+                // docs.
+                let aead = unsafe { ctx.get_inner::<A>()? };
                 aead.open(dst, nonce, plaintext, additional_data)
             },
             open_in_place: |ctx, nonce, data, overhead, additional_data| {
-                // SAFETY: We have to trust that `ptr` is
-                // non-null and suitably aligned.
-                let aead = unsafe { ctx.aead::<A>() };
+                // SAFETY: See the function pointer's safety
+                // docs.
+                let aead = unsafe { ctx.get_inner::<A>()? };
                 aead.open_in_place(nonce, data, overhead, additional_data)
             },
         }
@@ -262,6 +308,16 @@ add_evp_aead!(
     "ChaCha20Poly1305",
 );
 
+/// Is this a known [`EVP_AEAD`]?
+#[inline]
+fn is_known_aead(aead: *const EVP_AEAD) -> bool {
+    aead == EVP_aead_aes_128_gcm()
+        || aead == EVP_aead_aes_256_gcm()
+        || aead == EVP_aead_aes_128_gcm_tls13()
+        || aead == EVP_aead_aes_256_gcm_tls13()
+        || aead == EVP_aead_chacha20_poly1305()
+}
+
 /// Unused.
 /// cbindgen:no-export
 #[repr(C)]
@@ -269,57 +325,206 @@ add_evp_aead!(
 #[derive(Debug)]
 pub struct ENGINE {}
 
+/// TODO
+pub const EVP_AEAD_CTX_SIZE: usize = 8 + MAX_AEAD_SIZE;
+
+opaque! { size = EVP_AEAD_CTX_SIZE, align = 16;
 /// An AEAD instance.
+///
+/// It must be initialized with [`EVP_AEAD_CTX_init`] before it
+/// can be used.
 #[repr(C)]
 #[non_exhaustive]
 #[derive(Debug)]
-//#[opaque(size = 24, align = 8)]
 pub struct EVP_AEAD_CTX {
     /// The AEAD algorithm.
     ///
-    /// Ideally, this would be `&'static EVP_AEAD`, but we need
-    /// to support C doing this:
+    /// The [NPO] guarantees that this is safe to use with zeroed
+    /// memory.
     ///
-    /// ```C
-    /// EVP_AEAD_CTX ctx;
-    /// memset(&ctx, 0, sizeof(ctx));
-    /// ```
-    aead: *const EVP_AEAD,
+    /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
+    aead: Option<&'static EVP_AEAD>,
 
-    /// Points to the `Aead` instance.
+    /// The `Aead` instance.
     ///
-    /// This is allocated by `Box`.
+    /// This is actually `MaybeUninit<InnerAead<A>>` where `A:
+    /// Aead`. It is a ZST and does not affect the memory layout.
     ///
-    /// It is null if the `EVP_AEAD_CTX` has not yet been
-    /// initialized or if `EVP_AEAD_CTX_cleanup` was called.
-    ptr: *const u8,
+    /// If `self.aead` is `Some`, then this field is initialized.
+    ///
+    /// # Caveats
+    ///
+    /// It is obviously very easy for C code to corrupt memory,
+    /// so this is a best-effort attempt. We can't control what
+    /// other languages do to violate Rust's invariants.
+    inner: PhantomData<()>,
+}
 }
 
 impl EVP_AEAD_CTX {
-    /// Returns `self.ptr` cast to `A`.
+    /// Returns the underlying [`Aead`], or [`Err(Bug)`] if
+    /// `self` is not initialized.
     ///
     /// # Safety
     ///
-    /// - `self.ptr` must be non-null.
-    /// - `self.ptr` must be suitably aligned and initialized for
-    ///   `A`.
-    /// - You must uphold Rust's aliasing rules.
-    unsafe fn aead<A>(&self) -> &A {
+    /// - `self` must be initialized.
+    unsafe fn get_inner<A>(&self) -> Result<&A, Bug> {
+        if self.aead.is_none() {
+            bug!("`EVP_AEAD_CTX` is not initialized");
+        };
+        let inner = {
+            let ptr = ptr::addr_of!(self.inner).cast::<MaybeUninit<InnerAead<A>>>();
+            // SAFETY: The FFI caller is responsible for ensuring
+            // that `*self` is large enough. See also this
+            // method's safety docs.
+            unsafe { (&*ptr).assume_init_ref() }
+        };
         // SAFETY: See the method's safety docs.
-        unsafe { &*(self.ptr.cast::<A>()) }
+        let aead = unsafe { &*inner.aead };
+        Ok(aead)
+    }
+
+    fn init(&mut self, aead: &'static EVP_AEAD, key: &[u8]) -> Result<(), ImportError> {
+        self.aead = Some(aead);
+        (aead.init)(self, key)
+    }
+
+    fn cleanup(&mut self) -> Result<(), Bug> {
+        let Some(aead) = self.aead.take() else {
+            bug!("`EVP_AEAD_CTX` is not initialized");
+        };
+        // SAFETY:
+        // - `self.aead` is (was) `Some`, so `self.inner` is
+        //   initialized (see `self.inner`'s docs for caveats).
+        unsafe { (aead.cleanup)(self) }
+        Ok(())
+    }
+
+    fn seal(
+        &self,
+        dst: &mut [u8],
+        nonce: &[u8],
+        plaintext: &[u8],
+        additional_data: &[u8],
+    ) -> Result<(), SealError> {
+        let Some(aead) = self.aead else {
+            bug!("`EVP_AEAD_CTX` is not initialized");
+        };
+        // SAFETY:
+        // - `self.aead` is `Some`, so `self.inner` is
+        //   initialized (see `self.inner`'s docs for caveats).
+        unsafe { (aead.seal)(self, dst, nonce, plaintext, additional_data) }
+    }
+
+    fn seal_in_place(
+        &self,
+        nonce: &[u8],
+        data: &mut [u8],
+        overhead: &mut [u8],
+        additional_data: &[u8],
+    ) -> Result<(), SealError> {
+        let Some(aead) = self.aead else {
+            bug!("`EVP_AEAD_CTX` is not initialized");
+        };
+        // SAFETY:
+        // - `self.aead` is `Some`, so `self.inner` is
+        //   initialized (see `self.inner`'s docs for caveats).
+        unsafe { (aead.seal_in_place)(self, nonce, data, overhead, additional_data) }
+    }
+
+    fn open(
+        &self,
+        dst: &mut [u8],
+        nonce: &[u8],
+        ciphertext: &[u8],
+        additional_data: &[u8],
+    ) -> Result<(), OpenError> {
+        let Some(aead) = self.aead else {
+            bug!("`EVP_AEAD_CTX` is not initialized");
+        };
+        // SAFETY:
+        // - `self.aead` is `Some`, so `self.inner` is
+        //   initialized (see `self.inner`'s docs for caveats).
+        unsafe { (aead.open)(self, dst, nonce, ciphertext, additional_data) }
+    }
+
+    fn open_in_place(
+        &self,
+        nonce: &[u8],
+        data: &mut [u8],
+        overhead: &mut [u8],
+        additional_data: &[u8],
+    ) -> Result<(), OpenError> {
+        let Some(aead) = self.aead else {
+            bug!("`EVP_AEAD_CTX` is not initialized");
+        };
+        // SAFETY:
+        // - `self.aead` is `Some`, so `self.inner` is
+        //   initialized (see `self.inner`'s docs for caveats).
+        unsafe { (aead.open_in_place)(self, nonce, data, overhead, additional_data) }
     }
 }
 
 impl Default for EVP_AEAD_CTX {
+    #[inline]
     fn default() -> Self {
         Self {
-            aead: ptr::null(),
-            ptr: ptr::null(),
+            aead: None,
+            inner: PhantomData,
         }
     }
 }
 
-/// Sets an uninitialized `ctx` to all zeros.
+/// Used when reading/writing to [`EVP_AEAD_CTX.inner`].
+#[doc(hidden)]
+#[repr(C)]
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct EvpAeadCtx<A> {
+    /// The AEAD algorithm.
+    ///
+    /// The [NPO] guarantees that this is safe to use with zeroed
+    /// memory.
+    ///
+    /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
+    aead: Option<&'static EVP_AEAD>,
+    /// The `Aead` instance.
+    ///
+    /// If `self.aead` is `Some`, then this field is initialized.
+    ///
+    /// # Caveats
+    ///
+    /// It is obviously very easy for C code to corrupt memory,
+    /// so this is a best-effort attempt. We can't control what
+    /// other languages do to violate Rust's invariants.
+    inner: MaybeUninit<InnerAead<A>>,
+}
+
+impl<A> Default for EvpAeadCtx<A> {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            aead: None,
+            inner: MaybeUninit::uninit(),
+        }
+    }
+}
+
+#[repr(C)]
+union InnerAead<A> {
+    aead: ManuallyDrop<A>,
+    _buf: [u8; MAX_AEAD_SIZE],
+}
+
+/// Sets an uninitialized `ctx` to all zeros. This is equivalent
+/// to
+///
+/// ```c
+/// EVP_AEAD_CTX ctx;
+/// memset(&ctx, 0, sizeof(ctx))
+/// ```
+///
+/// but is more explicit.
 ///
 /// `ctx` must still be initialized with [`EVP_AEAD_CTX_init`]
 /// before use.
@@ -356,8 +561,7 @@ pub unsafe extern "C" fn EVP_AEAD_CTX_zero(ctx: *mut MaybeUninit<EVP_AEAD_CTX>) 
 /// - `ctx`, `aead`, and `key` must be non-null and suitably
 ///   aligned.
 /// - `key` must be valid for reads up to `key_len` bytes.
-/// - `key_len` must be less than or equal to than
-///   [`isize::MAX`].
+/// - `key_len` must be less than or equal to [`isize::MAX`].
 #[no_mangle]
 pub unsafe extern "C" fn EVP_AEAD_CTX_init(
     ctx: *mut MaybeUninit<EVP_AEAD_CTX>,
@@ -381,14 +585,17 @@ fn evp_aead_ctx_init(
     key_len: usize,
     tag_len: usize,
     impl_: *const MaybeUninit<ENGINE>,
-) -> Result<(), &'static str> {
+) -> Result<(), Error> {
+    // Ensure that `ctx` is valid even if we return an error.
+    //
     // SAFETY:
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements.
-    let ctx = try_ptr_as_mut!(@unsafe ctx)?;
+    let ctx = try_ptr_as_mut!(@unsafe ctx)?.write(EVP_AEAD_CTX::default());
 
-    // Ensure that `ctx` is valid even if we return an error.
-    ctx.write(EVP_AEAD_CTX::default());
+    if !aead.is_null() && !is_known_aead(aead) {
+        return Err(invalid_arg("aead", "unknown `EVP_AEAD`"));
+    }
 
     // SAFETY:
     // - We have to trust that the caller upholds Rust's aliasing
@@ -398,7 +605,7 @@ fn evp_aead_ctx_init(
 
     let key = {
         if key_len != aead.key_len {
-            return Err("invalid `key_len`");
+            return Err(invalid_arg("key_len", "invalid key length"));
         }
         // SAFETY:
         // - We have to trust that the caller has initialized
@@ -412,15 +619,15 @@ fn evp_aead_ctx_init(
     };
 
     if !impl_.is_null() {
-        return Err("`impl_` must be null");
+        return Err(invalid_arg("impl_", "pointer must be null"));
     }
 
     if tag_len != 0 && tag_len != aead.overhead {
-        return Err("invalid `tag_len`");
+        return Err(invalid_arg("tag_len", "invalid tag length"));
     }
 
-    let ptr = (aead.init)(key).map_err(|_| "unable to initialize `Aead`")?;
-    ctx.write(EVP_AEAD_CTX { aead, ptr });
+    ctx.init(aead, key)
+        .map_err(|_| "unable to initialize `Aead`")?;
 
     Ok(())
 }
@@ -440,17 +647,9 @@ pub unsafe extern "C" fn EVP_AEAD_CTX_cleanup(ctx: *mut EVP_AEAD_CTX) {
     let Ok(ctx) = try_ptr_as_mut!(@unsafe ctx) else {
         return;
     };
-    if ctx.ptr.is_null() {
-        return;
-    }
-    // SAFETY:
-    // - We have to trust that the caller upholds Rust's aliasing
-    //   requirements.
-    // - We have to trust that the caller initialized `ctx`.
-    let Ok(aead) = try_ptr_as_ref!(@unsafe ctx.aead) else {
-        return;
-    };
-    (aead.drop)(ctx);
+    // Not much we can do here. Plus, `buggy` calls
+    // `unreachable!` in debug mode for us.
+    let _ = ctx.cleanup();
 }
 
 /// Encrypts and authenticates `in_len` bytes from `in_`,
@@ -535,34 +734,32 @@ fn evp_aead_ctx_seal(
     in_len: usize,
     ad: *const u8,
     ad_len: usize,
-) -> Result<(), SealError> {
+) -> Result<(), Error> {
     // SAFETY:
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements.
     // - We have to trust that the caller initialized `ctx`.
-    let ctx = try_ptr_as_ref!(@unsafe ctx).map_err(SealError::Other)?;
+    let ctx = try_ptr_as_ref!(@unsafe ctx)?;
 
-    // SAFETY:
-    // - We have to trust that the caller upholds Rust's aliasing
-    //   requirements.
-    // - We have to trust that the caller initialized `ctx`.
-    let aead = try_ptr_as_ref!(@unsafe ctx.aead).map_err(SealError::Other)?;
+    let Some(aead) = ctx.aead else {
+        return Err(invalid_arg("ctx", "not initialized"));
+    };
 
     // Sanity check `out`, but don't convert it to a slice yet
     // because it might alias `in_`.
-    pedantic_slice_checks!(out, max_out_len).map_err(SealError::Other)?;
+    pedantic_slice_checks(out, max_out_len).map_err(|msg| invalid_arg("out, max_out_len", msg))?;
 
     // SAFETY:
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements.
-    let out_len = try_ptr_as_mut!(@unsafe out_len).map_err(SealError::Other)?;
+    let out_len = try_ptr_as_mut!(@unsafe out_len)?;
 
     let nonce = {
         if any_overlap(out, max_out_len, nonce, nonce_len) {
-            return Err(SealError::Other("`out` cannot overlap with `nonce`"));
+            return Err(invalid_arg("nonce", "cannot overlap with `out`"));
         }
         if nonce_len != aead.nonce_len {
-            return Err(SealError::InvalidNonceSize(InvalidNonceSize));
+            return Err(SealError::InvalidNonceSize(InvalidNonceSize).into());
         }
         // SAFETY:
         // - We have to trust that the caller has initialized
@@ -572,22 +769,22 @@ fn evp_aead_ctx_seal(
         // - We checked that `nonce` does not alias `out`, but we
         //   still have to trust that the caller upholds Rust's
         //   aliasing requirements for any other uses of `nonce`.
-        try_from_raw_parts!(@unsafe nonce, nonce_len).map_err(SealError::Other)?
+        try_from_raw_parts!(@unsafe nonce, nonce_len)?
     };
 
     if !less_or_eq(in_len, aead.p_max) {
-        return Err(SealError::PlaintextTooLong);
+        return Err(SealError::PlaintextTooLong.into());
     }
     // Sanity check `in_`, but don't convert it to a slice yet
     // because it might alias `out`.
-    pedantic_slice_checks!(in_, in_len).map_err(SealError::Other)?;
+    pedantic_slice_checks(in_, in_len).map_err(|msg| invalid_arg("in_, in_len", msg))?;
 
     let additional_data = {
         if any_overlap(out, max_out_len, ad, ad_len) {
-            return Err(SealError::Other("`out` cannot overlap with `ad`"));
+            return Err(invalid_arg("ad", "cannot overlap with `out`"));
         }
         if !less_or_eq(ad_len, aead.a_max) {
-            return Err(SealError::AdditionalDataTooLong);
+            return Err(SealError::AdditionalDataTooLong.into());
         }
         // SAFETY:
         // - We have to trust that the caller has initialized
@@ -597,12 +794,13 @@ fn evp_aead_ctx_seal(
         // - We checked that `ad` does not alias `out`, but we
         //   still have to trust that the caller upholds Rust's
         //   aliasing requirements for any other uses of `nonce`.
-        try_from_raw_parts!(@unsafe ad, ad_len).map_err(SealError::Other)?
+        try_from_raw_parts!(@unsafe ad, ad_len)?
     };
 
     if inexact_overlap(in_, in_len, out, max_out_len) {
-        return Err(SealError::Other(
-            "`in_` and `out` must overlap entirely or not at all",
+        return Err(invalid_arg(
+            "in_, out",
+            "must overlap entirely or not at all",
         ));
     }
 
@@ -611,9 +809,7 @@ fn evp_aead_ctx_seal(
     // `in_len` <= `p_max` and `p_max` = `c_max` - `overhead`, so
     // this addition can only overflow if `usize` is tiny.
     let Some(nw) = in_len.checked_add(aead.overhead) else {
-        // If the ciphertext does not have a full tag, etc. it
-        // cannot be authenticated.
-        return Err(SealError::Other("`in_` too large"));
+        return Err(SealError::Other("`in_` too large").into());
     };
 
     // SAFETY:
@@ -621,16 +817,14 @@ fn evp_aead_ctx_seal(
     //   `max_out_len` bytes.
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements for any other uses of `out`.
-    let out = try_from_raw_parts_mut!(@unsafe out, max_out_len).map_err(SealError::Other)?;
+    let out = try_from_raw_parts_mut!(@unsafe out, max_out_len)?;
     if out.len() < nw {
-        return Err(SealError::BufferTooSmall(BufferTooSmallError(Some(
-            aead.overhead,
-        ))));
+        return Err(SealError::BufferTooSmall(BufferTooSmallError(Some(aead.overhead))).into());
     }
 
     if in_ == out.as_ptr() {
         let (data, overhead) = out.split_at_mut(nw);
-        (aead.seal_in_place)(ctx, nonce, data, overhead, additional_data)?;
+        ctx.seal_in_place(nonce, data, overhead, additional_data)?;
     } else {
         // SAFETY:
         // - We have to trust that `in_` is valid for reads up to
@@ -638,8 +832,8 @@ fn evp_aead_ctx_seal(
         // - We checked that `in_` does not alias `out_`, but we
         //   still have to trust that the caller upholds Rust's
         //   aliasing requirements for any other uses of `in_`.
-        let plaintext = try_from_raw_parts!(@unsafe in_, in_len).map_err(SealError::Other)?;
-        (aead.seal)(ctx, out, nonce, plaintext, additional_data)?;
+        let plaintext = try_from_raw_parts!(@unsafe in_, in_len)?;
+        ctx.seal(out, nonce, plaintext, additional_data)?;
     }
 
     out_len.write(nw);
@@ -729,34 +923,32 @@ fn evp_aead_ctx_open(
     in_len: usize,
     ad: *const u8,
     ad_len: usize,
-) -> Result<(), OpenError> {
+) -> Result<(), Error> {
     // SAFETY:
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements.
     // - We have to trust that the caller initialized `ctx`.
-    let ctx = try_ptr_as_ref!(@unsafe ctx).map_err(OpenError::Other)?;
+    let ctx = try_ptr_as_ref!(@unsafe ctx)?;
 
-    // SAFETY:
-    // - We have to trust that the caller upholds Rust's aliasing
-    //   requirements.
-    // - We have to trust that the caller initialized `ctx`.
-    let aead = try_ptr_as_ref!(@unsafe ctx.aead).map_err(OpenError::Other)?;
+    let Some(aead) = ctx.aead else {
+        return Err(invalid_arg("ctx", "not initialized"));
+    };
 
     // Sanity check `out`, but don't convert it to a slice yet
     // because it might alias `in_`.
-    pedantic_slice_checks!(out, max_out_len).map_err(OpenError::Other)?;
+    pedantic_slice_checks(out, max_out_len).map_err(|msg| invalid_arg("out, max_out_len", msg))?;
 
     // SAFETY:
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements.
-    let out_len = try_ptr_as_mut!(@unsafe out_len).map_err(OpenError::Other)?;
+    let out_len = try_ptr_as_mut!(@unsafe out_len)?;
 
     let nonce = {
         if any_overlap(out, max_out_len, nonce, nonce_len) {
-            return Err(OpenError::Other("`out` cannot overlap with `nonce`"));
+            return Err(invalid_arg("nonce", "cannot overlap with `out`"));
         }
         if nonce_len != aead.nonce_len {
-            return Err(OpenError::InvalidNonceSize(InvalidNonceSize));
+            return Err(OpenError::InvalidNonceSize(InvalidNonceSize).into());
         }
         // SAFETY:
         // - We have to trust that the caller has initialized
@@ -766,22 +958,22 @@ fn evp_aead_ctx_open(
         // - We checked that `nonce` does not alias `out`, but we
         //   still have to trust that the caller upholds Rust's
         //   aliasing requirements for any other uses of `nonce`.
-        try_from_raw_parts!(@unsafe nonce, nonce_len).map_err(OpenError::Other)?
+        try_from_raw_parts!(@unsafe nonce, nonce_len)?
     };
 
     if !less_or_eq(in_len, aead.p_max) {
-        return Err(OpenError::PlaintextTooLong);
+        return Err(OpenError::PlaintextTooLong.into());
     }
     // Sanity check `in_`, but don't convert it to a slice yet
     // because it might alias `out`.
-    pedantic_slice_checks!(in_, in_len).map_err(OpenError::Other)?;
+    pedantic_slice_checks(in_, in_len).map_err(|msg| invalid_arg("in_, in_len", msg))?;
 
     let additional_data = {
         if any_overlap(out, max_out_len, ad, ad_len) {
-            return Err(OpenError::Other("`out` cannot overlap with `ad`"));
+            return Err(invalid_arg("ad", "cannot overlap with `out`"));
         }
         if !less_or_eq(ad_len, aead.a_max) {
-            return Err(OpenError::AdditionalDataTooLong);
+            return Err(OpenError::AdditionalDataTooLong.into());
         }
         // SAFETY:
         // - We have to trust that the caller has initialized
@@ -791,12 +983,13 @@ fn evp_aead_ctx_open(
         // - We checked that `ad` does not alias `out`, but we
         //   still have to trust that the caller upholds Rust's
         //   aliasing requirements for any other uses of `nonce`.
-        try_from_raw_parts!(@unsafe ad, ad_len).map_err(OpenError::Other)?
+        try_from_raw_parts!(@unsafe ad, ad_len)?
     };
 
     if inexact_overlap(in_, in_len, out, max_out_len) {
-        return Err(OpenError::Other(
-            "`in_` and `out` must overlap entirely or not at all",
+        return Err(invalid_arg(
+            "in_, out",
+            "must overlap entirely or not at all",
         ));
     }
 
@@ -806,7 +999,7 @@ fn evp_aead_ctx_open(
     let Some(nw) = in_len.checked_sub(aead.overhead) else {
         // If the ciphertext does not have a full tag, etc. it
         // cannot be authenticated.
-        return Err(OpenError::Authentication);
+        return Err(OpenError::Authentication.into());
     };
 
     // SAFETY:
@@ -814,16 +1007,14 @@ fn evp_aead_ctx_open(
     //   `max_out_len` bytes.
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements for any other uses of `out`.
-    let out = try_from_raw_parts_mut!(@unsafe out, max_out_len).map_err(OpenError::Other)?;
+    let out = try_from_raw_parts_mut!(@unsafe out, max_out_len)?;
     if out.len() < nw {
-        return Err(OpenError::BufferTooSmall(BufferTooSmallError(Some(
-            aead.overhead,
-        ))));
+        return Err(OpenError::BufferTooSmall(BufferTooSmallError(Some(aead.overhead))).into());
     }
 
     let result = if in_ == out.as_ptr() {
         let (data, overhead) = out.split_at_mut(nw);
-        (aead.open_in_place)(ctx, nonce, data, overhead, additional_data)
+        ctx.open_in_place(nonce, data, overhead, additional_data)
     } else {
         // SAFETY:
         // - We have to trust that `in_` is valid for reads up to
@@ -831,12 +1022,12 @@ fn evp_aead_ctx_open(
         // - We checked that `in_` does not alias `out_`, but we
         //   still have to trust that the caller upholds Rust's
         //   aliasing requirements for any other uses of `in_`.
-        let plaintext = try_from_raw_parts!(@unsafe in_, in_len).map_err(OpenError::Other)?;
-        (aead.open)(ctx, out, nonce, plaintext, additional_data)
+        let plaintext = try_from_raw_parts!(@unsafe in_, in_len)?;
+        ctx.open(out, nonce, plaintext, additional_data)
     };
     if result.is_err() {
         out.zeroize();
-        return result;
+        return result.map_err(Into::into);
     }
 
     out_len.write(nw);

@@ -20,6 +20,12 @@ crate-type = ["lib", "cdylib", "staticlib"]
 [features]
 default = []
 
+# Use liballoc.
+alloc = [
+	"buggy/alloc",
+	"spideroak-crypto/alloc",
+]
+
 # Set when `cbindgen` is running.
 #
 # TODO(eric): Remove?
@@ -36,7 +42,9 @@ linkage = []
 
 # Use std.
 std = [
+	"buggy/std",
 	"spideroak-crypto/std",
+	"thiserror/std",
 ]
 
 # Enable test utilities.
@@ -45,17 +53,21 @@ testing = []
 [dependencies]
 spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false, features = ["alloc"]}
 
-const_panic = { version = "0.2" }
+buggy = { version = "0.1", default-features = false }
 
 cfg-if = { workspace = true, default-features = false }
 # TODO(eric): We only need this if we're not using the `ctor`
 # feature.
 linkme = { version = "0.3", default-features = false }
+thiserror = { workspace = true, default-features = false }
 
 [dev-dependencies]
 # A little bit of a hack: always certain features for tests and
 # examples.
 spideroak-libcrypto = { path = ".", features = ["testing"] }
+
+[build-dependencies]
+anyhow = { workspace = true }
 
 [package.metadata.docs.rs]
 features = []

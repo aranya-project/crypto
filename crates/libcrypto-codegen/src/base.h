@@ -1,6 +1,8 @@
 #ifndef OPENSSL_HEADER_BASE_H
 #define OPENSSL_HEADER_BASE_H
 
+#include <openssl/__config.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

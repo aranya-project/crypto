@@ -22,12 +22,25 @@ typedef struct ENGINE ENGINE;
 
 
 /**
- * A specific AEAD algorithm.
+ * The maximum size in bytes of an AEAD implementation.
  */
-typedef struct OPENSSL_ALIGNED(8) EVP_AEAD {
+#define MAX_AEAD_SIZE 512
+
+/**
+ * The maximum alignment in bytes of an AEAD implementation.
+ */
+#define MAX_AEAD_ALIGN 16
+
+/**
+ * A specific AEAD algorithm.
+ *
+ * It is safe for concurrent use.
+ */
+typedef struct OPENSSL_ALIGNED(16) EVP_AEAD {
     /**
      * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
+     * UNDEFINED BEHAVIOR to read from or write to it
+     * after the object has been initialized.
      * @private
      */
     uint8_t __for_size_only[96];
@@ -35,14 +48,18 @@ typedef struct OPENSSL_ALIGNED(8) EVP_AEAD {
 
 /**
  * An AEAD instance.
+ *
+ * It must be initialized with [`EVP_AEAD_CTX_init`] before it
+ * can be used.
  */
-typedef struct OPENSSL_ALIGNED(8) EVP_AEAD_CTX {
+typedef struct OPENSSL_ALIGNED(16) EVP_AEAD_CTX {
     /**
      * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
+     * UNDEFINED BEHAVIOR to read from or write to it
+     * after the object has been initialized.
      * @private
      */
-    uint8_t __for_size_only[24];
+    uint8_t __for_size_only[EVP_AEAD_CTX_SIZE];
 } EVP_AEAD_CTX;
 
 #ifdef __cplusplus
@@ -101,7 +118,15 @@ const struct EVP_AEAD *EVP_aead_aes_256_gcm_tls13(void);
 const struct EVP_AEAD *EVP_aead_chacha20_poly1305(void);
 
 /**
- * Sets an uninitialized `ctx` to all zeros.
+ * Sets an uninitialized `ctx` to all zeros. This is equivalent
+ * to
+ *
+ * ```c
+ * EVP_AEAD_CTX ctx;
+ * memset(&ctx, 0, sizeof(ctx))
+ * ```
+ *
+ * but is more explicit.
  *
  * `ctx` must still be initialized with [`EVP_AEAD_CTX_init`]
  * before use.
@@ -131,8 +156,7 @@ void EVP_AEAD_CTX_zero(struct EVP_AEAD_CTX *ctx);
  * - `ctx`, `aead`, and `key` must be non-null and suitably
  *   aligned.
  * - `key` must be valid for reads up to `key_len` bytes.
- * - `key_len` must be less than or equal to than
- *   [`isize::MAX`].
+ * - `key_len` must be less than or equal to [`isize::MAX`].
  */
 int EVP_AEAD_CTX_init(struct EVP_AEAD_CTX *ctx,
                       const struct EVP_AEAD *aead,

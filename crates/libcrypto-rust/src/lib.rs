@@ -9,12 +9,17 @@ use spideroak_crypto::{aead::Tls13Aead, rust::Aes256Gcm};
 use spideroak_libcrypto::impl_aead;
 
 impl_aead!(AES_256_GCM, Aes256Gcm);
-impl_aead!(AES_256_GCM, Aes256Gcm);
 impl_aead!(AES_256_GCM_TLS13, Tls13Aead<Aes256Gcm>);
 
 #[cfg(test)]
 mod tests {
     use spideroak_libcrypto::test_aead;
+
+    #[test]
+    fn test_idk() {
+        println!("yy {}", env!("SPIDEROAK_LIBCRYPTO_MAX_AEAD_SIZE"));
+        assert!(false);
+    }
 
     test_aead!(all);
 }
