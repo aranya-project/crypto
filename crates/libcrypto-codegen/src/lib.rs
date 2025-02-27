@@ -1,42 +1,9 @@
 //! Code generation for `spideroak-libcrypto`.
 
+mod error;
+pub mod gen;
+
 use std::{fs, path::Path};
-
-/// Builds [`Headers`].
-pub struct Builder {
-    max_aead_size: usize,
-    max_aead_align: usize,
-}
-
-impl Builder {
-    /// Creates a builder.
-    pub fn new() -> Self {
-        Self {
-            max_aead_size: 512,
-            max_aead_align: 16,
-        }
-    }
-
-    /// Sets the maximum size in bytes for any `Aead`s.
-    pub fn with_max_aead_size(mut self, size: usize) -> Self {
-        self.max_aead_size = size;
-        self
-    }
-
-    /// Sets the maximum alignment in bytes for any `Aead`s.
-    pub fn with_max_aead_align(mut self, align: usize) -> Self {
-        self.max_aead_align = align;
-        self
-    }
-
-    /// Builds the headers.
-    pub fn build(self) -> anyhow::Result<Headers> {
-        Ok(Headers {
-            max_aead_size: self.max_aead_size,
-            max_aead_align: self.max_aead_align,
-        })
-    }
-}
 
 /// Generated headers.
 pub struct Headers {
@@ -45,6 +12,14 @@ pub struct Headers {
 }
 
 impl Headers {
+    /// TODO
+    pub fn new() -> Self {
+        Self {
+            max_aead_size: 0,
+            max_aead_align: 0,
+        }
+    }
+
     /// Writes the headers to `dir`.
     pub fn generate<P: AsRef<Path>>(self, dir: P) -> anyhow::Result<()> {
         let Self {

@@ -10,6 +10,9 @@ default-members = [
 	"crates/*",
 ]
 
+# TODO
+exclude = ["crates/s2n-tls"]
+
 [workspace.package]
 authors = ["SpiderOak, Inc."]
 edition = "2021"
@@ -49,6 +52,7 @@ syn = { version = "2" }
 # Required for some of the tests to run in a reasonable amount of
 # time.
 opt-level = 2
+panic = "abort"
 
 [profile.dev-std]
 inherits = "dev"

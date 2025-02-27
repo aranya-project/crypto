@@ -15,7 +15,7 @@ use core::{
 };
 
 use generic_array::{ArrayLength, GenericArray};
-pub use zeroize::{Zeroize, ZeroizeOnDrop};
+pub use zeroize::{zeroize_flat_type, Zeroize, ZeroizeOnDrop};
 
 /// Zeroizing is a a wrapper for any `Z: Zeroize` type which
 /// implements a `Drop` handler which zeroizes dropped values.

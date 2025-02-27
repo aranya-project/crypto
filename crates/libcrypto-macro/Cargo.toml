@@ -1,6 +1,6 @@
 [package]
-name = "spideroak-libcrypto-codegen"
-description = "Code generator for `spideroak-libcrypto`"
+name = "spideroak-libcrypto-macro"
+description = "Proc macros for `spideroak-libcrypto`"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -15,11 +15,14 @@ keywords = ["libcrypto", "codegen"]
 workspace = true
 
 [lib]
+proc-macro = true
 
 [features]
 default = []
 
 [dependencies]
+spideroak-libcrypto-codegen = { version = "0.1", path = "../libcrypto-codegen" }
+
 aho-corasick = { version = "1.1.3" }
 anyhow = { workspace = true, features = ["std"] }
 bimap = { version = "0.6.3" }
@@ -28,5 +31,5 @@ prettyplease = { workspace = true }
 proc-macro2 = { workspace = true, features = ["span-locations"] }
 quote = { workspace = true }
 strum = { version = "0.26.3", features = ["derive"] }
-syn = { workspace = true, features = ["extra-traits", "full", "visit-mut"] }
+syn = { workspace = true, features = ["extra-traits", "full"] }
 tracing = { workspace = true, features = ["std"] }

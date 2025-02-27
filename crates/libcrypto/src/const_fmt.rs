@@ -1,3 +1,5 @@
+//! Compile-time formatting.
+
 use core::{marker::PhantomData, slice, str};
 
 /// Asserts that `$cond` is true.
@@ -27,7 +29,6 @@ macro_rules! const_assert {
         };
     };
 }
-pub(crate) use const_assert;
 
 /// Like [`panic`], but with const formatting.
 #[doc(hidden)]
@@ -149,8 +150,11 @@ impl_int_arg_type! { i8 i16 i32 i64 i128 isize => Int(i128) }
 /// A constant argument.
 #[derive(Copy, Clone, Debug)]
 pub enum Arg<'a> {
+    /// An unsigned integer.
     Uint(u128),
+    /// A signer integer.
     Int(i128),
+    /// A string.
     Str(&'a str),
 }
 

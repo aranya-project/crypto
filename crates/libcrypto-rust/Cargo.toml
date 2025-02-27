@@ -20,14 +20,11 @@ crate-type = ["lib", "cdylib", "staticlib"]
 [features]
 default = []
 
-# Use executable-based constructors to initialize
-# implementations.
-ctor = ["spideroak-libcrypto/ctor"]
-
-# Use unstable linkage feature for true weak linkage.
-#
-# Requires +nightly.
-linkage = ["spideroak-libcrypto/linkage"]
+# Use alloc.
+alloc = [
+	"spideroak-crypto/alloc",
+	"spideroak-libcrypto/alloc",
+]
 
 # Use std.
 std = [
@@ -38,6 +35,8 @@ std = [
 [dependencies]
 spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false }
 spideroak-libcrypto = { version = "0.1", path = "../libcrypto", default-features = false }
+
+cfg-if = { workspace = true, default-features = false }
 
 [dev-dependencies]
 spideroak-libcrypto = { version = "0.1", path = "../libcrypto", features = ["testing"] }

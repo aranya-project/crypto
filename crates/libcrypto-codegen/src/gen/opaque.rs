@@ -1,39 +1,35 @@
-/// Makes a type opaque.
-#[macro_export]
-macro_rules! opaque {
-    (
-        size = $size:expr, align = $align:expr;
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{Ident, ItemStruct};
 
-        $(#[$meta:meta])*
-        $vis:vis struct $name:ident {
-            $($t:tt)+
-        }
-    ) => {
-        $(#[$meta])*
-        #[cfg(not(cbindgen))]
-        $vis struct $name {
-            $($t)+
-        }
-
-        $(#[$meta])*
+pub(crate) fn opaque(
+    item: ItemStruct,
+    size: usize,
+    align: usize,
+    libcrypto: &Ident,
+) -> TokenStream {
+    quote! {
         #[cfg(cbindgen)]
-        #[repr(C, align($align))]
+        #[repr(C, align(#align))]
         $vis struct $name {
             /// This field only exists for size purposes. It is
             /// UNDEFINED BEHAVIOR to read from or write to it
             /// after the object has been initialized.
             /// @private
-            __for_size_only: [u8; $size],
+            __for_size_only: [u8; #size],
         }
 
+        #[cfg(not(cbindgen))]
+        #item
+
         const _: () = {
-            $crate::const_assert!(
+            #libcrypto::const_assert!(
                 $size as usize >= ::core::mem::size_of::<$name>(),
                 "bug: invalid size:\n",
                 " got:", $size as usize, "\n",
                 "want: >= ", ::core::mem::size_of::<$name>()
             );
-            $crate::const_assert!(
+            #libcrypto::const_assert!(
                 $size as usize >= ::core::mem::align_of::<$name>(),
                 "bug: invalid alignment:\n",
                 " got:", $size as usize, "\n",

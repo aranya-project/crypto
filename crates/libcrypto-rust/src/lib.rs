@@ -6,20 +6,51 @@
 #![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
 
 use spideroak_crypto::{aead::Tls13Aead, rust::Aes256Gcm};
-use spideroak_libcrypto::impl_aead;
+use spideroak_libcrypto::libcrypto;
 
-impl_aead!(AES_256_GCM, Aes256Gcm);
-impl_aead!(AES_256_GCM_TLS13, Tls13Aead<Aes256Gcm>);
+include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-#[cfg(test)]
-mod tests {
-    use spideroak_libcrypto::test_aead;
-
-    #[test]
-    fn test_idk() {
-        println!("yy {}", env!("SPIDEROAK_LIBCRYPTO_MAX_AEAD_SIZE"));
-        assert!(false);
+libcrypto! {
+    aeads {
+        EVP_aead_aes_256_gcm => Aes256Gcm,
+        EVP_aead_aes_256_gcm_tls13 => Tls13Aead<Aes256Gcm>,
     }
-
-    test_aead!(all);
 }
+
+cfg_if::cfg_if! {
+    if #[cfg(any(test, doctest, feature = "std"))] {
+        // OK
+    } else {
+        #[panic_handler]
+        fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
+            extern "C" {
+                fn abort() -> !;
+            }
+            // SAFETY: FFI call, no invariants.
+            unsafe { abort() }
+        }
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(any(test, doctest, feature = "std"))] {
+        // OK
+    } else {
+        #[cfg(not(cbindgen))]
+        #[no_mangle]
+        extern "C" fn rust_eh_personality() {}
+    }
+}
+
+// #[cfg(test)]
+// mod tests {
+//     use spideroak_libcrypto::test_aead;
+
+//     #[test]
+//     fn test_idk() {
+//         println!("yy {}", env!("SPIDEROAK_LIBCRYPTO_MAX_AEAD_SIZE"));
+//         assert!(false);
+//     }
+
+//     test_aead!(all);
+// }

@@ -1,9 +1,12 @@
+//! Error handling.
+
 use core::fmt;
 
 use spideroak_crypto::aead::{OpenError, SealError};
 
+/// An internal error.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
-pub(crate) enum Error {
+pub enum Error {
     #[error("{0}")]
     InvalidArg(#[from] InvalidArg),
 
@@ -24,13 +27,14 @@ impl From<&'static str> for Error {
     }
 }
 
-pub(crate) fn invalid_arg(arg: &'static str, reason: &'static str) -> Error {
+/// The argument is invalid.
+pub fn invalid_arg(arg: &'static str, reason: &'static str) -> Error {
     InvalidArg::new(arg, reason).into()
 }
 
 /// An argument is invalid.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, thiserror::Error)]
-pub(crate) struct InvalidArg {
+pub struct InvalidArg {
     arg: &'static str,
     reason: &'static str,
 }

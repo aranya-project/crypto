@@ -15,7 +15,6 @@ keywords = ["crypto", "cryptography", "spideroak"]
 workspace = true
 
 [lib]
-crate-type = ["lib", "cdylib", "staticlib"]
 
 [features]
 default = []
@@ -31,15 +30,6 @@ alloc = [
 # TODO(eric): Remove?
 cbindgen = []
 
-# Use executable-based constructors to initialize
-# implementations.
-ctor = []
-
-# Use unstable linkage feature for true weak linkage.
-#
-# Requires +nightly.
-linkage = []
-
 # Use std.
 std = [
 	"buggy/std",
@@ -51,15 +41,13 @@ std = [
 testing = []
 
 [dependencies]
-spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false, features = ["alloc"]}
+spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false }
+spideroak-libcrypto-macro = { version = "0.1.0", path = "../libcrypto-macro", default-features = false }
 
 buggy = { version = "0.1", default-features = false }
 
-cfg-if = { workspace = true, default-features = false }
-# TODO(eric): We only need this if we're not using the `ctor`
-# feature.
-linkme = { version = "0.3", default-features = false }
 thiserror = { workspace = true, default-features = false }
+typeid = { version = "1", default-features = false }
 
 [dev-dependencies]
 # A little bit of a hack: always certain features for tests and

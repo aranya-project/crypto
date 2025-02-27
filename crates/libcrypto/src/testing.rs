@@ -3,13 +3,10 @@
 #![cfg(feature = "testing")]
 #![cfg_attr(docsrs, doc(cfg(feature = "testing")))]
 
+#[allow(unused_imports)]
 use core::ptr;
 
-use crate::{
-    EVP_AEAD_CTX_cleanup, EVP_AEAD_CTX_init, EVP_AEAD_CTX_open, EVP_AEAD_CTX_seal,
-    EVP_AEAD_key_length, EVP_AEAD_max_overhead, EVP_AEAD_nonce_length, EVP_AEAD, EVP_AEAD_CTX,
-    EVP_AEAD_CTX_SIZE, MAX_AEAD_SIZE,
-};
+use crate::EVP_AEAD;
 
 /// Tests AEADs.
 #[macro_export]

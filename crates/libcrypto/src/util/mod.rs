@@ -1,8 +1,6 @@
+//! Utilities.
+
 mod opaque;
-
-pub(crate) use opaque::opaque;
-
-pub(crate) const ISIZE_MAX: usize = isize::MAX as usize;
 
 /// Casts `ptr` to a shared ref.
 ///
@@ -12,6 +10,7 @@ pub(crate) const ISIZE_MAX: usize = isize::MAX as usize;
 ///
 /// - You must uphold Rust's aliasing requirements.
 /// - You must ensure that the referent memory is initialized.
+#[macro_export]
 macro_rules! try_ptr_as_ref {
     (@unsafe $ptr:expr $(,)?) => {
         match $ptr {
@@ -48,6 +47,7 @@ pub(crate) use try_ptr_as_ref;
 ///
 /// - You must uphold Rust's aliasing requirements.
 /// - You must ensure that the referent memory is initialized.
+#[macro_export]
 macro_rules! try_ptr_as_mut {
     (@unsafe $ptr:expr $(,)?) => {
         match $ptr {
@@ -84,13 +84,14 @@ pub(crate) use try_ptr_as_mut;
 /// - `len` is greater than `isize::MAX`.
 /// - `ptr` is null and `len` is non-zero.
 /// - `ptr` is non-null and `len` is zero.
-pub(crate) fn pedantic_slice_checks<T>(
+pub fn pedantic_slice_checks<T>(
     ptr: *const T,
     len: usize,
 ) -> Result<(*const T, usize), &'static str> {
     if !ptr.is_null() && !ptr.is_aligned() {
         return Err("pointer is not suitably aligned");
     }
+    const ISIZE_MAX: usize = isize::MAX as usize;
     if len > ISIZE_MAX {
         return Err("length is greater than `isize::MAX`");
     }
@@ -111,7 +112,7 @@ pub(crate) fn pedantic_slice_checks<T>(
 /// - `len` is greater than `isize::MAX`.
 /// - `ptr` is null and `len` is non-zero.
 /// - `ptr` is non-null and `len` is zero.
-pub(crate) fn pedantic_slice_checks_mut<T>(
+pub fn pedantic_slice_checks_mut<T>(
     ptr: *mut T,
     len: usize,
 ) -> Result<(*mut T, usize), &'static str> {
@@ -133,6 +134,7 @@ pub(crate) fn pedantic_slice_checks_mut<T>(
 /// - `ptr` must be valid (initialized, etc.) for reads up to
 ///   `len` bytes.
 /// - You must uphold Rust's aliasing requirements.
+#[macro_export]
 macro_rules! try_from_raw_parts {
     (@unsafe $ptr:expr, $len:expr $(,)?) => {{
         $crate::util::pedantic_slice_checks($ptr, $len)
@@ -170,6 +172,7 @@ pub(crate) use try_from_raw_parts;
 /// - `ptr` must be valid (initialized, etc.) for reads up to
 ///   `len` bytes.
 /// - You must uphold Rust's aliasing requirements.
+#[macro_export]
 macro_rules! try_from_raw_parts_mut {
     (@unsafe $ptr:expr, $len:expr $(,)?) => {{
         $crate::util::pedantic_slice_checks_mut($ptr, $len)
@@ -194,7 +197,7 @@ pub(crate) use try_from_raw_parts_mut;
 
 /// Reports whether the memory regions `x[..x_len]` and
 /// `y[..y_len]` overlap at non-corresponding addresses.
-pub(crate) fn inexact_overlap<T>(x: *const T, x_len: usize, y: *const T, y_len: usize) -> bool {
+pub fn inexact_overlap<T>(x: *const T, x_len: usize, y: *const T, y_len: usize) -> bool {
     if x == y || x.is_null() || x_len == 0 || y.is_null() || y_len == 0 {
         false
     } else {
@@ -208,7 +211,7 @@ pub(crate) fn inexact_overlap<T>(x: *const T, x_len: usize, y: *const T, y_len: 
     clippy::arithmetic_side_effects,
     reason = "The caller must check the lengths"
 )]
-pub(crate) fn any_overlap<T>(x: *const T, x_len: usize, y: *const T, y_len: usize) -> bool {
+pub fn any_overlap<T>(x: *const T, x_len: usize, y: *const T, y_len: usize) -> bool {
     if x.is_null() || x_len == 0 || y.is_null() || y_len == 0 {
         return false;
     }
@@ -226,7 +229,7 @@ pub(crate) fn any_overlap<T>(x: *const T, x_len: usize, y: *const T, y_len: usiz
 
 /// Reports whether `n <= v`.
 #[inline(always)]
-pub(crate) fn less_or_eq(n: usize, v: u64) -> bool {
+pub fn less_or_eq(n: usize, v: u64) -> bool {
     u64::try_from(n).is_ok_and(|n| n <= v)
 }
 
