@@ -2,12 +2,14 @@ use std::collections::BTreeMap;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use spideroak_libcrypto_codegen::gen::AEADS;
+use spideroak_libcrypto_codegen::AEADS;
 use syn::{
     braced,
     parse::{Parse, ParseStream},
     parse_quote, Error, Expr, Ident, Result, Token, TypePath,
 };
+
+use crate::util::skip_comma;
 
 pub(super) fn build(item: TokenStream) -> Result<TokenStream> {
     let lib = syn::parse2::<Libcrypto>(item)?;
@@ -127,13 +129,4 @@ impl Parse for Libcrypto {
 
         Ok(api)
     }
-}
-
-/// Skips the next token if it's a comma.
-fn skip_comma(input: ParseStream<'_>) -> Result<()> {
-    let lookahead = input.lookahead1();
-    if lookahead.peek(Token![,]) {
-        let _: Token![,] = input.parse()?;
-    }
-    Ok(())
 }

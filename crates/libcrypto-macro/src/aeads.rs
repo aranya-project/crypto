@@ -2,144 +2,139 @@ use std::collections::BTreeMap;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use spideroak_libcrypto_codegen::gen::AEADS;
+use spideroak_libcrypto_codegen::AEADS;
 use syn::{
-    braced,
     parse::{Parse, ParseStream},
-    parse_quote, Attribute, Error, Expr, Ident, ItemUnion, Result, Token, TypePath,
+    parse_quote, Error, Expr, Ident, ItemUnion, Result, Token, Type,
 };
 
+use crate::util::skip_comma;
+
 pub(super) fn aeads(item: TokenStream) -> Result<TokenStream> {
-    let mut item = syn::parse2::<ItemUnion>(item)?;
+    let aeads = syn::parse2::<Aeads>(item)?.aeads;
 
-    if !is_repr_c(&item.attrs) {
-        item.attrs.push(parse_quote! {
-            #[repr(C)]
+    let libcrypto = format_ident!("__spideroak_libcrypto");
+
+    let item: ItemUnion = {
+        let fields = aeads.iter().filter_map(|(ident, ty)| {
+            let Some(ty) = ty else {
+                return None;
+            };
+            let ident = format_ident!("_{}", ident.to_string().to_lowercase());
+            Some(quote! {
+                #ident: ::core::mem::ManuallyDrop<::core::mem::MaybeUninit<#ty>>
+            })
         });
-    }
-
-    let mut algs = BTreeMap::new();
-    for name in [
-        "AES_128_GCM",
-        "AES_256_GCM",
-        "AES_128_GCM_TLS13",
-        "AES_256_GCM_TLS13",
-        "CHACHA20_POLY1305",
-    ] {
-        algs.insert(format_ident!("{}", name), None);
-    }
-
-    for field in item.fields.named.iter_mut() {
-        let ty = &mut field.ty;
-        *ty = parse_quote! {
-            ::core::mem::ManuallyDrop<#ty>
-        };
-        let Some(Helper { alg }) = find_helper(&field.attrs)? else {
-            return Err(Error::new_spanned(
-                field,
-                "missing `#[aead(...)]` attribute",
-            ));
-        };
-        let Some(v) = algs.get_mut(&alg) else {
-            return Err(Error::new_spanned(&alg, "unknown algorithm"));
-        };
-        if v.replace(&field.ty).is_some() {
-            return Err(Error::new_spanned(
-                &alg,
-                "BUG: `ty` should have been `None`",
-            ));
+        parse_quote! {
+            #[repr(C)]
+            /// cbindgen:skip
+            union __AeadsImpl {
+                #(#fields),*
+            }
         }
-    }
-
-    let algs = algs.iter().map(|name, ty| {
-        let val: Expr = match ty {
-            Some(ref path) => parse_quote! {
-                ::core::option::Option::Some(&EVP_AEAD::new::<#path>())
-            },
-            None => parse_quote!(::core::option::Option::None),
-        };
-    });
+    };
 
     let ident = &item.ident;
+
+    let default_impl = {
+        let field = &item.fields.named[0];
+        let Some(name) = &field.ident else {
+            return Err(Error::new_spanned(field, "field must have a name"));
+        };
+        quote! {
+            #[automatically_derived]
+            impl Default for #ident {
+                #[inline]
+                fn default() -> Self {
+                    Self {
+                        // It doesn't really matter which field
+                        // we choose since Rust unions don't have
+                        // an "active field."
+                        #name: ::core::mem::ManuallyDrop::new(
+                            ::core::mem::MaybeUninit::uninit(),
+                        ),
+                    }
+                }
+            }
+        }
+    };
+
+    let aeads_impl = {
+        let map = BTreeMap::from_iter(AEADS.iter().map(|aead| {
+            (
+                format_ident!("{}", aead.constructor),
+                format_ident!("{}", aead.name),
+            )
+        }));
+        let consts = aeads.iter().map(|(name, ty)| {
+            let name = &map[name];
+            let val: Expr = match ty {
+                Some(ref path) => parse_quote! {
+                    ::core::option::Option::Some(
+                        &#libcrypto::aead::EVP_AEAD::new::<#path>())
+                },
+                None => parse_quote!(::core::option::Option::None),
+            };
+            quote! {
+                const #name: ::core::option::Option<&#libcrypto::aead::EVP_AEAD> = #val;
+            }
+        });
+        quote! {
+            // SAFETY: This trait is automatically derived.
+            #[automatically_derived]
+            unsafe impl #libcrypto::aead::Aeads for #ident {
+                #(#consts)*
+            }
+
+            const _: () = {
+                #libcrypto::const_assert!(
+                    <#ident as #libcrypto::aead::Aeads>::MAX_SIZE == ::core::mem::size_of::<#ident>(),
+                    "BUG: invalid size:\n",
+                    " got: ", <#ident as #libcrypto::aead::Aeads>::MAX_SIZE, "\n",
+                    "want: ", ::core::mem::size_of::<#ident>()
+                );
+                #libcrypto::const_assert!(
+                    <#ident as #libcrypto::aead::Aeads>::MAX_ALIGN == ::core::mem::align_of::<#ident>(),
+                    "BUG: invalid alignment:\n",
+                    " got: ", <#ident as #libcrypto::aead::Aeads>::MAX_ALIGN, "\n",
+                    "want: ", ::core::mem::align_of::<#ident>()
+                );
+            };
+        }
+    };
+
     let code = quote! {
         #item
-
-        unsafe impl spideroak_libcrypto::aead::Aeads for #ident {
-        }
+        #default_impl
+        #aeads_impl
     };
     Ok(code)
 }
 
-fn is_repr_c(attrs: &[Attribute]) -> bool {
-    for attr in attrs {
-        if attr.path().is_ident("repr") {
-            return true; // TODO
-        }
-    }
-    false
-}
-
-fn find_helper(attrs: &[Attribute]) -> Result<Option<Helper>> {
-    for attr in attrs {
-        if attr.path().is_ident("aead") {
-            let helper = attr.parse_args::<Helper>()?;
-            return Ok(Some(helper));
-        }
-    }
-    Ok(None)
-}
-
+/// ```ignore
+/// aeads! {
+///     EVP_aead_aes_128_gcm => Aes128Gcm,
+///     ...
+/// }
+/// ```
 #[derive(Clone, Debug)]
-struct Helper {
-    alg: Ident,
+struct Aeads {
+    aeads: BTreeMap<Ident, Option<Type>>,
 }
 
-impl Parse for Helper {
+impl Parse for Aeads {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let span = input.span();
-        let mut alg = None;
-        while !input.is_empty() {
-            let lookahead = input.lookahead1();
-            if lookahead.peek(kw::alg) {
-                let _ = input.parse::<kw::alg>()?;
-                let _ = input.parse::<Token![=]>()?;
-                alg = Some(input.parse::<Ident>()?);
-            } else {
-                return Err(lookahead.error());
-            }
-        }
-        let alg = alg.ok_or_else(|| Error::new(span, "missing `alg`"))?;
-        Ok(Self { alg })
-    }
-}
-
-mod kw {
-    syn::custom_keyword!(alg);
-    syn::custom_keyword!(aeads);
-}
-
-#[derive(Clone, Debug)]
-struct Libcrypto {
-    tokens: TokenStream,
-}
-
-impl Libcrypto {
-    fn parse_aeads(&mut self, input: ParseStream<'_>) -> Result<()> {
-        let _ = input.parse::<kw::aeads>()?;
-        let content;
-        let _ = braced!(content in input);
-        let input = content;
-
-        let mut aeads = BTreeMap::new();
-        for aead in AEADS {
-            aeads.insert(format_ident!("{}", aead.constructor), None);
-        }
+        let mut aeads = BTreeMap::from_iter(
+            AEADS
+                .iter()
+                .map(|aead| (format_ident!("{}", aead.constructor), None)),
+        );
 
         while !input.is_empty() {
             let name = input.parse::<Ident>()?;
             let _ = input.parse::<Token![=>]>()?;
-            let ty = input.parse::<TypePath>()?;
-            skip_comma(&input)?;
+            let ty = input.parse::<Type>()?;
+            skip_comma(input)?;
 
             let Some(opt) = aeads.get_mut(&name) else {
                 return Err(Error::new_spanned(&name, "unknown AEAD"));
@@ -153,87 +148,6 @@ impl Libcrypto {
         }
         assert_eq!(aeads.len(), AEADS.len());
 
-        for (name, ty) in aeads.iter() {
-            let name = format_ident!("__static_{}", name);
-            let ty: Expr = match ty {
-                Some(ref path) => parse_quote! {
-                    ::core::option::Option::Some(&EVP_AEAD::new::<#path>())
-                },
-                None => parse_quote!(::core::option::Option::None),
-            };
-            self.tokens.extend(quote! {
-                #[used]
-                #[allow(missing_docs)]
-                #[allow(non_upper_case_globals)]
-                static #name: ::core::option::Option<&EVP_AEAD> = #ty;
-            });
-        }
-
-        self.tokens.extend({
-            let mut max_aead_size = TokenStream::new();
-            let mut max_aead_align = TokenStream::new();
-
-            for tokens in [&mut max_aead_size, &mut max_aead_align] {
-                tokens.extend(quote! {
-                    let mut max: usize = 0;
-                });
-            }
-
-            for ty in aeads.values().filter_map(Option::as_ref) {
-                max_aead_size.extend(quote! {
-                    if ::core::mem::size_of::<#ty>() > max {
-                        max = ::core::mem::size_of::<#ty>();
-                    }
-                });
-                max_aead_align.extend(quote! {
-                    if ::core::mem::align_of::<#ty>() > max {
-                        max = ::core::mem::align_of::<#ty>();
-                    }
-                });
-            }
-
-            for tokens in [&mut max_aead_size, &mut max_aead_align] {
-                tokens.extend(quote! {
-                    max
-                });
-            }
-
-            quote! {
-                /// The maximum size in bytes of an AEAD.
-                pub const MAX_AEAD_SIZE: usize = { #max_aead_size };
-                /// The maximum alignment in bytes of an AEAD.
-                pub const MAX_AEAD_ALIGN: usize = { #max_aead_align };
-            }
-        });
-
-        Ok(())
+        Ok(Self { aeads })
     }
-}
-
-impl Parse for Libcrypto {
-    fn parse(input: ParseStream<'_>) -> Result<Self> {
-        let mut api = Libcrypto {
-            tokens: TokenStream::new(),
-        };
-
-        while !input.is_empty() {
-            let lookahead = input.lookahead1();
-            if lookahead.peek(kw::aeads) {
-                api.parse_aeads(input)?;
-            } else {
-                return Err(lookahead.error());
-            }
-        }
-
-        Ok(api)
-    }
-}
-
-/// Skips the next token if it's a comma.
-fn skip_comma(input: ParseStream<'_>) -> Result<()> {
-    let lookahead = input.lookahead1();
-    if lookahead.peek(Token![,]) {
-        let _: Token![,] = input.parse()?;
-    }
-    Ok(())
 }

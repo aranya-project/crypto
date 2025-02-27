@@ -1,4 +1,4 @@
-//! AEAD support.
+//! `aead.h`
 //!
 //! NB: `#define S2N_LIBCRYPTO_SUPPORTS_EVP_AEAD_TLS`
 
@@ -17,7 +17,6 @@ use spideroak_crypto::{
     import::{Import, ImportError},
     zeroize::{zeroize_flat_type, Zeroize},
 };
-use typeid::ConstTypeId;
 
 use crate::{
     error::{invalid_arg, Error},
@@ -27,8 +26,13 @@ use crate::{
     },
 };
 
-/// TODO
-pub const MAX_AEAD_SIZE: usize = 1000;
+/// Unused.
+#[repr(C)]
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug)]
+pub struct ENGINE {
+    _words: [usize; 2],
+}
 
 /// A specific AEAD algorithm.
 ///
@@ -52,15 +56,14 @@ pub struct EVP_AEAD {
 
     /// The memory layout of the `Aead`.
     layout: Layout,
-    /// The type of the `Aead`.
-    type_id: ConstTypeId,
 
-    /// Initializes `ctx.inner` with [`Aead::new`].
+    /// Initializes `ptr` with [`Aead::new`].
     ///
     /// # Safety
     ///
     /// - `ptr` must be non-null and suitably aligned for the
     ///   `Aead` it will point to.
+    #[allow(clippy::type_complexity)]
     init: unsafe fn(
         // A pointer to the uninitialized `Aead`.
         ptr: *mut MaybeUninit<ManuallyDrop<()>>,
@@ -71,8 +74,8 @@ pub struct EVP_AEAD {
     ///
     /// # Safety
     ///
-    /// - `ptr` must be non-null and suitably aligned for `Aead`
-    ///   it points to.
+    /// - `ptr` must be non-null and suitably aligned for the
+    ///   `Aead` it points to.
     /// - The memory that `ptr` points to must be an initialized
     ///   `Aead` that matches `type_id`.
     /// - `ptr` must not be used after this function is called.
@@ -82,10 +85,10 @@ pub struct EVP_AEAD {
     ///
     /// # Safety
     ///
-    /// - `ptr` must be non-null and suitably aligned for `Aead`
-    ///   it points to.
+    /// - `ptr` must be non-null and suitably aligned for the
+    ///   `Aead` it points to.
     /// - The memory that `ptr` points to must be an initialized
-    ///   `Aead` that matches `type_id`.
+    ///   `Aead`.
     #[allow(clippy::type_complexity)]
     seal: unsafe fn(
         // A pointer to the `Aead`.
@@ -100,10 +103,10 @@ pub struct EVP_AEAD {
     ///
     /// # Safety
     ///
-    /// - `ptr` must be non-null and suitably aligned for `Aead`
-    ///   it points to.
+    /// - `ptr` must be non-null and suitably aligned for the
+    ///   `Aead` it points to.
     /// - The memory that `ptr` points to must be an initialized
-    ///   `Aead` that matches `type_id`.
+    ///   `Aead`.
     #[allow(clippy::type_complexity)]
     seal_in_place: unsafe fn(
         // A pointer to the `Aead`.
@@ -118,10 +121,10 @@ pub struct EVP_AEAD {
     ///
     /// # Safety
     ///
-    /// - `ptr` must be non-null and suitably aligned for `Aead`
-    ///   it points to.
+    /// - `ptr` must be non-null and suitably aligned for the
+    ///   `Aead` it points to.
     /// - The memory that `ptr` points to must be an initialized
-    ///   `Aead` that matches `type_id`.
+    ///   `Aead`.
     #[allow(clippy::type_complexity)]
     open: unsafe fn(
         // A pointer to the `Aead`.
@@ -136,10 +139,10 @@ pub struct EVP_AEAD {
     ///
     /// # Safety
     ///
-    /// - `ptr` must be non-null and suitably aligned for `Aead`
-    ///   it points to.
+    /// - `ptr` must be non-null and suitably aligned for the
+    ///   `Aead` it points to.
     /// - The memory that `ptr` points to must be an initialized
-    ///   `Aead` that matches `type_id`.
+    ///   `Aead`.
     #[allow(clippy::type_complexity)]
     open_in_place: unsafe fn(
         // A pointer to the `Aead`.
@@ -154,18 +157,6 @@ pub struct EVP_AEAD {
 impl EVP_AEAD {
     #[doc(hidden)]
     pub const fn new<A: Aead>() -> Self {
-        // TODO
-        // const {
-        //     assert!(
-        //         size_of::<EVP_AEAD_CTX>() >= size_of::<EvpAeadCtx<A>>(),
-        //         "bug: invalid size"
-        //     );
-        //     assert!(
-        //         align_of::<EVP_AEAD_CTX>() >= align_of::<EvpAeadCtx<A>>(),
-        //         "bug: invalid alignment"
-        //     );
-        // }
-
         Self {
             key_len: A::KEY_SIZE,
             nonce_len: A::NONCE_SIZE,
@@ -174,7 +165,6 @@ impl EVP_AEAD {
             c_max: A::MAX_CIPHERTEXT_SIZE,
             a_max: A::MAX_ADDITIONAL_DATA_SIZE,
             layout: Layout::new::<A>(),
-            type_id: ConstTypeId::of::<A>(),
             init: |ptr, key| {
                 let key = <A::Key as Import<_>>::import(key)?;
                 let aead = A::new(&key);
@@ -225,74 +215,39 @@ impl EVP_AEAD {
 impl EVP_AEAD {
     /// Returns the size in bytes of the AEAD's key.
     #[doc(alias = "EVP_AEAD_key_length")]
-    pub fn key_length(&self) -> usize {
+    #[inline]
+    pub const fn key_length(&self) -> usize {
         self.key_len
     }
 
     /// Returns the size in bytes of the AEAD's nonce.
     #[doc(alias = "EVP_AEAD_nonce_length")]
-    pub fn nonce_length(&self) -> usize {
+    #[inline]
+    pub const fn nonce_length(&self) -> usize {
         self.nonce_len
     }
 
     /// Returns the size in bytes of the AEAD's authentication
     /// overhead.
     #[doc(alias = "EVP_AEAD_max_overhead")]
-    pub fn max_overhead(&self) -> usize {
+    #[inline]
+    pub const fn max_overhead(&self) -> usize {
         self.overhead
     }
 
     /// Returns the size in bytes of the AEAD's authentication
     /// overhead.
     #[doc(alias = "EVP_AEAD_max_tag_len")]
-    pub fn max_tag_len(&self) -> usize {
+    #[inline]
+    pub const fn max_tag_len(&self) -> usize {
         self.overhead
     }
 }
 
-/// Unused.
-/// cbindgen:no-export
-#[repr(C)]
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct ENGINE {}
-
-/// TODO
-pub const EVP_AEAD_CTX_SIZE: usize = 8 + MAX_AEAD_SIZE;
-
-macro_rules! test {
-    (
-        AES_128_GCM => $aes_128_gcm:ty,
-        AES_256_GCM => $aes_256_gcm:ty,
-        AES_128_GCM_FOR_TLS13 => $aes_128_gcm_tls13:ty,
-        AES_256_GCM_FOR_TLS13 => $aes_256_gcm_tls13:ty,
-        CHACHA20_POLY1305 => $chacha20_poly1305:ty,
-    ) => {
-        #[repr(C)]
-        union MyAeads {
-        }
-
-        impl Aeads for MyAeads {
-            const AES_128_GCM:
-        }
-    };
-}
-
-// /// Supported AEADs.
-// pub trait Aeads {
-//     /// AES-128-GCM.
-//     type Aes128Gcm;
-//     /// AES-256-GCM.
-//     type Aes256Gcm;
-//     /// AES-128-GCM for TLS 1.3.
-//     type Aes128GcmTls13;
-//     /// AES-256-GCM for TLS 1.3.
-//     type Aes256GcmTls13;
-//     /// ChaCha20-Poly1305.
-//     type ChaCha20Poly1305;
-// }
-
 /// Supported AEADs.
+///
+/// Do not implement this trait yourself. Instead use
+/// [`aeads`][crate::aeads].
 ///
 /// # Safety
 ///
@@ -353,41 +308,17 @@ const fn max(a: usize, b: usize) -> usize {
     [a, b][(a < b) as usize]
 }
 
-/// A supported AEAD.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum Alg {
-    Aes128Gcm,
-    Aes256Gcm,
-    Aes128GcmTls13,
-    Aes256GcmTls13,
-    ChaCha20Poly1305,
-}
+/// A number that's at least [`size_of::<EVP_AEAD_CTX<()>>()`].
+#[doc(hidden)]
+pub const EVP_AEAD_CTX_BASE_SIZE: usize = 8;
 
-// /// TODO
-// // `ManuallyDrop<MaybeUninit<T>>` is silly because
-// // `MaybeUninit<T>` contains a `ManuallyDrop<T>`, but oh well.
-// #[repr(C)]
-// pub union EvpAeadCtxAead<T: Aeads> {
-//     aes_128_gcm: ManuallyDrop<MaybeUninit<T::Aes128Gcm>>,
-//     aes_256_gcm: ManuallyDrop<MaybeUninit<T::Aes256Gcm>>,
-//     aes_128_gcm_tls13: ManuallyDrop<MaybeUninit<T::Aes128GcmTls13>>,
-//     aes_256_gcm_tls13: ManuallyDrop<MaybeUninit<T::Aes256GcmTls13>>,
-//     chacha20_poly1305: ManuallyDrop<MaybeUninit<T::ChaCha20Poly1305>>,
-// }
-
-// impl<T: Aeads> EvpAeadCtxAead<T> {
-//     const fn uninit() -> Self {
-//         Self {
-//             // It doesn't really matter which field we choose
-//             // since Rust unions don't have an "active field."
-//             aes_128_gcm: ManuallyDrop::new(MaybeUninit::uninit()),
-//         }
-//     }
-// }
+/// A number that's at least [`align_of::<EVP_AEAD_CTX<()>>()`].
+#[doc(hidden)]
+pub const EVP_AEAD_CTX_BASE_ALIGN: usize = 8;
 
 /// An AEAD instance.
 ///
-/// It must be initialized with [`EVP_AEAD_CTX_init`] before it
+/// It must be initialized with [`evp_aead_ctx_init`] before it
 /// can be used.
 #[repr(C)]
 #[non_exhaustive]
@@ -426,59 +357,22 @@ impl<T: Aeads> EVP_AEAD_CTX<T> {
             bug!("`EVP_AEAD_CTX` is not initialized");
         };
 
-        // // SAFETY:
-        // // - We check the type of `self.aead`.
-        // // - `self.vtable` is `Some`, so `self.aead` is
-        // //   initialized.
-        // let ptr = unsafe {
-        //     // Use `MaybeUninit::as_ptr` to avoid
-        //     // `assume_init_ref` gymnastics.
-        //     match aead.alg::<T>()? {
-        //         Alg::Aes128Gcm => self.aead.aes_128_gcm.as_ptr().cast::<()>(),
-        //         Alg::Aes256Gcm => self.aead.aes_256_gcm.as_ptr().cast::<()>(),
-        //         Alg::Aes128GcmTls13 => self.aead.aes_128_gcm_tls13.as_ptr().cast::<()>(),
-        //         Alg::Aes256GcmTls13 => self.aead.aes_256_gcm_tls13.as_ptr().cast::<()>(),
-        //         Alg::ChaCha20Poly1305 => self.aead.chacha20_poly1305.as_ptr().cast::<()>(),
-        //     }
-        // };
-        let ptr = ptr::addr_of!(self.vtable).cast::<()>();
+        let ptr = ptr::addr_of!(self.aead).cast::<()>();
 
         Ok(f(aead, ptr))
     }
 
-    fn init(&mut self, aead: &'static EVP_AEAD, key: &[u8]) -> Result<(), ImportError> {
-        // // SAFETY: We check the type of `self.aead`.
-        // let ptr = unsafe {
-        //     // Use `MaybeUninit::as_mut_ptr` to avoid
-        //     // `assume_init_ref` gymnastics.
-        //     match aead.alg::<T>()? {
-        //         Alg::Aes128Gcm => {
-        //             ptr::addr_of_mut!(self.aead.aes_128_gcm).cast::<MaybeUninit<()>>()
-        //         }
-        //         Alg::Aes256Gcm => {
-        //             ptr::addr_of_mut!(self.aead.aes_256_gcm).cast::<MaybeUninit<()>>()
-        //         }
-        //         Alg::Aes128GcmTls13 => {
-        //             ptr::addr_of_mut!(self.aead.aes_128_gcm_tls13).cast::<MaybeUninit<()>>()
-        //         }
-        //         Alg::Aes256GcmTls13 => {
-        //             ptr::addr_of_mut!(self.aead.aes_256_gcm_tls13).cast::<MaybeUninit<()>>()
-        //         }
-        //         Alg::ChaCha20Poly1305 => {
-        //             ptr::addr_of_mut!(self.aead.chacha20_poly1305).cast::<MaybeUninit<()>>()
-        //         }
-        //     }
-        // };
-        let ptr = ptr::addr_of_mut!(self.vtable).cast::<MaybeUninit<ManuallyDrop<()>>>();
+    fn init(&mut self, vtable: &'static EVP_AEAD, key: &[u8]) -> Result<(), ImportError> {
+        let ptr = ptr::addr_of_mut!(self.aead).cast::<MaybeUninit<ManuallyDrop<()>>>();
 
         // SAFETY: `ptr` is non-null and suitably aligned for
         // the `Aead`.
-        unsafe { (aead.init)(ptr, key)? }
+        unsafe { (vtable.init)(ptr, key)? }
 
         // Only set `self.vtable` after we've initialized
         // `self.aead` since this field indicates whether
         // `self.aead` is initialized.
-        self.vtable = Some(aead);
+        self.vtable = Some(vtable);
 
         Ok(())
     }
@@ -488,21 +382,7 @@ impl<T: Aeads> EVP_AEAD_CTX<T> {
             bug!("`EVP_AEAD_CTX` is not initialized");
         };
 
-        // // SAFETY:
-        // // - We check the type of `self.aead`.
-        // // - `self.vtable` is (well, was) `Some`, so `self.aead`
-        // //   is initialized (see `self.aead`'s docs for
-        // //   caveats).
-        // unsafe {
-        //     match aead.alg::<T>()? {
-        //         Alg::Aes128Gcm => (&mut self.aead.aes_128_gcm).assume_init_drop(),
-        //         Alg::Aes256Gcm => (&mut self.aead.aes_256_gcm).assume_init_drop(),
-        //         Alg::Aes128GcmTls13 => (&mut self.aead.aes_128_gcm_tls13).assume_init_drop(),
-        //         Alg::Aes256GcmTls13 => (&mut self.aead.aes_256_gcm_tls13).assume_init_drop(),
-        //         Alg::ChaCha20Poly1305 => (&mut self.aead.chacha20_poly1305).assume_init_drop(),
-        //     }
-        // };
-        let ptr = ptr::addr_of_mut!(self.vtable).cast::<ManuallyDrop<()>>();
+        let ptr = ptr::addr_of_mut!(self.aead).cast::<ManuallyDrop<()>>();
 
         unsafe { (aead.cleanup)(ptr) }
 
@@ -512,7 +392,7 @@ impl<T: Aeads> EVP_AEAD_CTX<T> {
         // NB: This is safe because every field in `self.aead`
         // is `MaybeUninit` and `MaybeUninit` is valid for every
         // bit pattern.
-        unsafe { zeroize_flat_type(&mut self.vtable) }
+        unsafe { zeroize_flat_type(&mut self.aead) }
 
         Ok(())
     }
@@ -600,47 +480,6 @@ impl<T> fmt::Debug for EVP_AEAD_CTX<T> {
     }
 }
 
-/// Used when reading/writing to [`EVP_AEAD_CTX.inner`].
-#[doc(hidden)]
-#[repr(C)]
-#[non_exhaustive]
-#[derive(Debug)]
-pub struct EvpAeadCtx<A> {
-    /// The AEAD algorithm.
-    ///
-    /// The [NPO] guarantees that this is safe to use with zeroed
-    /// memory.
-    ///
-    /// [NPO]: https://doc.rust-lang.org/std/option/index.html#representation
-    aead: Option<&'static EVP_AEAD>,
-    /// The `Aead` instance.
-    ///
-    /// If `self.vtable` is `Some`, then this field is initialized.
-    ///
-    /// # Caveats
-    ///
-    /// It is obviously very easy for C code to corrupt memory,
-    /// so this is a best-effort attempt. We can't control what
-    /// other languages do to violate Rust's invariants.
-    inner: MaybeUninit<InnerAead<A>>,
-}
-
-impl<A> Default for EvpAeadCtx<A> {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            aead: None,
-            inner: MaybeUninit::uninit(),
-        }
-    }
-}
-
-#[repr(C)]
-union InnerAead<A> {
-    aead: ManuallyDrop<A>,
-    _buf: [u8; MAX_AEAD_SIZE],
-}
-
 /// Sets an uninitialized `ctx` to all zeros. This is equivalent
 /// to
 ///
@@ -651,10 +490,10 @@ union InnerAead<A> {
 ///
 /// but is more explicit.
 ///
-/// `ctx` must still be initialized with [`EVP_AEAD_CTX_init`]
+/// `ctx` must still be initialized with [`evp_aead_ctx_init`]
 /// before use.
 ///
-/// It is safe to call [`EVP_AEAD_CTX_cleanup`] after calling
+/// It is safe to call [`evp_aead_ctx_cleanup`] after calling
 /// this routine.
 ///
 /// # Safety
@@ -672,20 +511,24 @@ pub unsafe fn evp_aead_ctx_zero<T: Aeads>(ctx: *mut MaybeUninit<EVP_AEAD_CTX<T>>
 
 /// Initializes `ctx` for the given AEAD algorithm.
 ///
-/// - `key_len` must match [`EVP_AEAD_key_len(aead)`].
+/// - `ctx`, `aead`, and `key` must be non-null and suitably
+///   aligned.
+/// - `key_len` must match [`EVP_AEAD::nonce_length`].
 /// - If non-zero, `tag_len` must match
-///   [`EVP_AEAD_tag_len(aead)`].
+///   [`EVP_AEAD::max_tag_len`].
 /// - `impl_` must be null.
 ///
 /// It returns 1 on success and 0 otherwise. It is safe to call
-/// [`EVP_AEAD_CTX_cleanup`] on error.
+/// [`evp_aead_ctx_cleanup`] on error.
 ///
 /// # Safety
 ///
-/// - `ctx`, `aead`, and `key` must be non-null and suitably
-///   aligned.
+/// - `ctx` must be valid for writes up to
+///   `size_of::<EVP_AEAD_CTX<T>>()` bytes.
+/// - `aead` must be initialized.
 /// - `key` must be valid for reads up to `key_len` bytes.
 /// - `key_len` must be less than or equal to [`isize::MAX`].
+/// - You must uphold Rust's aliasing invariants.
 pub unsafe fn evp_aead_ctx_init<T: Aeads>(
     ctx: *mut MaybeUninit<EVP_AEAD_CTX<T>>,
     aead: *const EVP_AEAD,
@@ -705,36 +548,35 @@ pub unsafe fn evp_aead_ctx_init<T: Aeads>(
     // - We have to trust that the caller upholds Rust's aliasing
     //   requirements.
     // - We have to trust that the caller initialized `aead`.
-    let aead = try_ptr_as_ref!(@unsafe aead)?;
+    let vtable = try_ptr_as_ref!(@unsafe aead)?;
 
-    if !is_known_aead::<T>(aead) {
+    if !is_known_aead::<T>(vtable) {
         return Err(invalid_arg("aead", "unknown `EVP_AEAD`"));
     }
 
     let key = {
-        if key_len != aead.key_len {
+        if key_len != vtable.key_len {
             return Err(invalid_arg("key_len", "invalid key length"));
         }
         // SAFETY:
         // - We have to trust that the caller has initialized
-        //   `nonce`.
-        // - We have to trust that `nonce` is valid for reads up to
-        //   `nonce_len` bytes.
-        // - We checked that `nonce` does not alias `out`, but we
-        //   still have to trust that the caller upholds Rust's
-        //   aliasing requirements for any other uses of `nonce`.
-        try_from_raw_parts!(@unsafe key,key_len)?
+        //   `key`.
+        // - We have to trust that `nonce` is valid for reads up
+        //   to `key_len` bytes.
+        // - We have to trust that the caller upholds Rust's
+        //   aliasing requirements for any other uses of `key`.
+        try_from_raw_parts!(@unsafe key, key_len)?
     };
 
     if !impl_.is_null() {
         return Err(invalid_arg("impl_", "pointer must be null"));
     }
 
-    if tag_len != 0 && tag_len != aead.overhead {
+    if tag_len != 0 && tag_len != vtable.overhead {
         return Err(invalid_arg("tag_len", "invalid tag length"));
     }
 
-    ctx.init(aead, key)
+    ctx.init(vtable, key)
         .map_err(|_| "unable to initialize `Aead`")?;
 
     Ok(())
@@ -742,10 +584,27 @@ pub unsafe fn evp_aead_ctx_init<T: Aeads>(
 
 #[inline]
 fn is_known_aead<T: Aeads>(aead: &EVP_AEAD) -> bool {
-    aead.alg::<T>().is_ok()
+    macro_rules! test_aeads {
+        ($($name:ident),* $(,)?) => {
+            $(
+                if T::$name.is_some_and(|v| ptr::eq(v, aead)) {
+                    return true;
+                }
+            )*
+            false
+        };
+    }
+    test_aeads! {
+        AES_128_GCM,
+        AES_256_GCM,
+        AES_128_GCM_TLS13,
+        AES_256_GCM_TLS13,
+        CHACHA20_POLY1305,
+    }
 }
 
-/// Frees all resources used by `ctx`.
+/// Releases all resources used by `ctx`, but does not free `ctx`
+/// itself.
 ///
 /// # Safety
 ///
@@ -775,9 +634,9 @@ pub unsafe fn evp_aead_ctx_cleanup<T: Aeads>(ctx: *mut EVP_AEAD_CTX<T>) {
 /// It returns 1 on success and 0 otherwise.
 ///
 /// - `max_out_len` must be at least `in_len` plus the result of
-///   [`EVP_AEAD_max_overhead`].
+///   [`EVP_AEAD::max_overhead`].
 /// - `nonce_len` must be equal to the result of
-///   [`EVP_AEAD_nonce_length`].
+///   [`EVP_AEAD::nonce_length`].
 /// - If `nonce_len` is zero, `nonce` must be null.
 /// - If `in_` is null, `in_len` must be zero.
 /// - If `in_` is non-null, `in_len` must be non-zero.
@@ -820,7 +679,7 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
     // - We have to trust that the caller initialized `ctx`.
     let ctx = try_ptr_as_ref!(@unsafe ctx)?;
 
-    let Some(aead) = ctx.vtable else {
+    let Some(vtable) = ctx.vtable else {
         return Err(invalid_arg("ctx", "not initialized"));
     };
 
@@ -837,7 +696,7 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
         if any_overlap(out, max_out_len, nonce, nonce_len) {
             return Err(invalid_arg("nonce", "cannot overlap with `out`"));
         }
-        if nonce_len != aead.nonce_len {
+        if nonce_len != vtable.nonce_len {
             return Err(SealError::InvalidNonceSize(InvalidNonceSize).into());
         }
         // SAFETY:
@@ -851,7 +710,7 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
         try_from_raw_parts!(@unsafe nonce, nonce_len)?
     };
 
-    if !less_or_eq(in_len, aead.p_max) {
+    if !less_or_eq(in_len, vtable.p_max) {
         return Err(SealError::PlaintextTooLong.into());
     }
     // Sanity check `in_`, but don't convert it to a slice yet
@@ -862,7 +721,7 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
         if any_overlap(out, max_out_len, ad, ad_len) {
             return Err(invalid_arg("ad", "cannot overlap with `out`"));
         }
-        if !less_or_eq(ad_len, aead.a_max) {
+        if !less_or_eq(ad_len, vtable.a_max) {
             return Err(SealError::AdditionalDataTooLong.into());
         }
         // SAFETY:
@@ -887,7 +746,7 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
     //
     // `in_len` <= `p_max` and `p_max` = `c_max` - `overhead`, so
     // this addition can only overflow if `usize` is tiny.
-    let Some(nw) = in_len.checked_add(aead.overhead) else {
+    let Some(nw) = in_len.checked_add(vtable.overhead) else {
         return Err(SealError::Other("`in_` too large").into());
     };
 
@@ -898,7 +757,7 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
     //   requirements for any other uses of `out`.
     let out = try_from_raw_parts_mut!(@unsafe out, max_out_len)?;
     if out.len() < nw {
-        return Err(SealError::BufferTooSmall(BufferTooSmallError(Some(aead.overhead))).into());
+        return Err(SealError::BufferTooSmall(BufferTooSmallError(Some(vtable.overhead))).into());
     }
 
     if in_ == out.as_ptr() {
@@ -931,9 +790,9 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
 /// It returns 1 on success and 0 otherwise.
 ///
 /// - `max_out_len` must be at least `in_len` less the result of
-///   [`EVP_AEAD_max_overhead`].
+///   [`EVP_AEAD::max_overhead`].
 /// - `nonce_len` must be equal to the result of
-///   [`EVP_AEAD_nonce_length`].
+///   [`EVP_AEAD::nonce_length`].
 /// - If `nonce_len` is zero, `nonce` must be null.
 /// - If `in_` is null, `in_len` must be zero.
 /// - If `in_` is non-null, `in_len` must be non-zero.
@@ -976,7 +835,7 @@ pub unsafe fn evp_aead_ctx_open<T: Aeads>(
     // - We have to trust that the caller initialized `ctx`.
     let ctx = try_ptr_as_ref!(@unsafe ctx)?;
 
-    let Some(aead) = ctx.vtable else {
+    let Some(vtable) = ctx.vtable else {
         return Err(invalid_arg("ctx", "not initialized"));
     };
 
@@ -993,7 +852,7 @@ pub unsafe fn evp_aead_ctx_open<T: Aeads>(
         if any_overlap(out, max_out_len, nonce, nonce_len) {
             return Err(invalid_arg("nonce", "cannot overlap with `out`"));
         }
-        if nonce_len != aead.nonce_len {
+        if nonce_len != vtable.nonce_len {
             return Err(OpenError::InvalidNonceSize(InvalidNonceSize).into());
         }
         // SAFETY:
@@ -1007,7 +866,7 @@ pub unsafe fn evp_aead_ctx_open<T: Aeads>(
         try_from_raw_parts!(@unsafe nonce, nonce_len)?
     };
 
-    if !less_or_eq(in_len, aead.p_max) {
+    if !less_or_eq(in_len, vtable.p_max) {
         return Err(OpenError::PlaintextTooLong.into());
     }
     // Sanity check `in_`, but don't convert it to a slice yet
@@ -1018,7 +877,7 @@ pub unsafe fn evp_aead_ctx_open<T: Aeads>(
         if any_overlap(out, max_out_len, ad, ad_len) {
             return Err(invalid_arg("ad", "cannot overlap with `out`"));
         }
-        if !less_or_eq(ad_len, aead.a_max) {
+        if !less_or_eq(ad_len, vtable.a_max) {
             return Err(OpenError::AdditionalDataTooLong.into());
         }
         // SAFETY:
@@ -1042,7 +901,7 @@ pub unsafe fn evp_aead_ctx_open<T: Aeads>(
     // The number of bytes written to `out`.
     //
     // `in_len` <= `c_max` and `c_max` = `p_max` + `overhead`.
-    let Some(nw) = in_len.checked_sub(aead.overhead) else {
+    let Some(nw) = in_len.checked_sub(vtable.overhead) else {
         // If the ciphertext does not have a full tag, etc. it
         // cannot be authenticated.
         return Err(OpenError::Authentication.into());
@@ -1055,7 +914,7 @@ pub unsafe fn evp_aead_ctx_open<T: Aeads>(
     //   requirements for any other uses of `out`.
     let out = try_from_raw_parts_mut!(@unsafe out, max_out_len)?;
     if out.len() < nw {
-        return Err(OpenError::BufferTooSmall(BufferTooSmallError(Some(aead.overhead))).into());
+        return Err(OpenError::BufferTooSmall(BufferTooSmallError(Some(vtable.overhead))).into());
     }
 
     let result = if in_ == out.as_ptr() {

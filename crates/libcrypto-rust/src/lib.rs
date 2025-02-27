@@ -6,15 +6,17 @@
 #![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
 
 use spideroak_crypto::{aead::Tls13Aead, rust::Aes256Gcm};
-use spideroak_libcrypto::libcrypto;
+
+/// ```c
+#[doc = include_str!(concat!(env!("OUT_DIR"), "/openssl/__all.h"))]
+/// ```
+pub fn test() {}
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-libcrypto! {
-    aeads {
-        EVP_aead_aes_256_gcm => Aes256Gcm,
-        EVP_aead_aes_256_gcm_tls13 => Tls13Aead<Aes256Gcm>,
-    }
+spideroak_libcrypto::aeads! {
+    EVP_aead_aes_256_gcm => Aes256Gcm,
+    EVP_aead_aes_256_gcm_tls13 => Tls13Aead<Aes256Gcm>,
 }
 
 cfg_if::cfg_if! {

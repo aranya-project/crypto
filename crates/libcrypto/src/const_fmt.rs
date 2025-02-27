@@ -162,7 +162,7 @@ impl Arg<'_> {
     /// Returns the space in bytes needed to encode this arg to
     /// a string.
     #[inline(always)]
-    #[allow(clippy::arithmetic_side_effects)]
+    #[allow(clippy::arithmetic_side_effects, clippy::len_without_is_empty)]
     pub const fn len(&self) -> usize {
         match self {
             Self::Uint(mut x) => {
@@ -281,6 +281,13 @@ impl<const N: usize> WriteBuf<N> {
         let b = unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.idx) };
         // SAFETY: We only write UTF-8 to `self.buf`.
         unsafe { str::from_utf8_unchecked(b) }
+    }
+}
+
+impl<const N: usize> Default for WriteBuf<N> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 
