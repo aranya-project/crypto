@@ -36,29 +36,6 @@ pub(super) fn aeads(item: TokenStream) -> Result<TokenStream> {
 
     let ident = &item.ident;
 
-    let default_impl = {
-        let field = &item.fields.named[0];
-        let Some(name) = &field.ident else {
-            return Err(Error::new_spanned(field, "field must have a name"));
-        };
-        quote! {
-            #[automatically_derived]
-            impl Default for #ident {
-                #[inline]
-                fn default() -> Self {
-                    Self {
-                        // It doesn't really matter which field
-                        // we choose since Rust unions don't have
-                        // an "active field."
-                        #name: ::core::mem::ManuallyDrop::new(
-                            ::core::mem::MaybeUninit::uninit(),
-                        ),
-                    }
-                }
-            }
-        }
-    };
-
     let aeads_impl = {
         let map = BTreeMap::from_iter(AEADS.iter().map(|aead| {
             (
@@ -105,7 +82,6 @@ pub(super) fn aeads(item: TokenStream) -> Result<TokenStream> {
 
     let code = quote! {
         #item
-        #default_impl
         #aeads_impl
     };
     Ok(code)

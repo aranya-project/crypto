@@ -33,6 +33,7 @@ cbindgen = []
 # Use std.
 std = [
 	"buggy/std",
+	"inout/std",
 	"spideroak-crypto/std",
 	"thiserror/std",
 ]
@@ -44,9 +45,14 @@ testing = []
 spideroak-crypto = { version = "0.3.0-pre.1", path = "../crypto", default-features = false }
 spideroak-libcrypto-macro = { version = "0.1.0", path = "../libcrypto-macro", default-features = false }
 
-cfg-if = { workspace = true, default-features = false }
 buggy = { version = "0.1", default-features = false }
 
+# TODO(eric): This is only used by `spideroak-libcrypto-rust`. We
+# should really add `BlockCipher`, etc, types to
+# `spideroak-crypto`.
+cipher = { version = "0.4", default-features = false, features = ["block-padding", "zeroize"] }
+cfg-if = { workspace = true, default-features = false }
+inout = { version = "0.1", default-features = false, features = ["block-padding"] }
 thiserror = { workspace = true, default-features = false }
 
 [dev-dependencies]

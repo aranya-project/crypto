@@ -2,6 +2,11 @@
 
 mod opaque;
 
+/// Used as `*const Void` or `*mut Void`.
+///
+/// It's a little more clear than `*const ()` or `*mut ()`.
+pub(crate) type Void = ();
+
 /// Casts `ptr` to a shared ref.
 ///
 /// Evalutes to `Result<&T, Error>`.
@@ -76,6 +81,41 @@ macro_rules! try_ptr_as_mut {
 }
 pub(crate) use try_ptr_as_mut;
 
+/// Casts `ptr` to an optional shared ref.
+///
+/// Evalutes to `Result<Option<&T>, Error>`.
+///
+/// # Safety
+///
+/// - You must uphold Rust's aliasing requirements.
+/// - You must ensure that, if non-null, the referent memory is
+///   initialized.
+#[macro_export]
+macro_rules! try_ptr_as_opt_ref {
+    (@unsafe $ptr:expr $(,)?) => {
+        match $ptr {
+            ptr => {
+                if ptr.is_null() {
+                    Ok(None)
+                } else if !ptr.is_aligned() {
+                    Err($crate::error::invalid_arg(
+                        stringify!($ptr),
+                        "pointer is not suitably aligned",
+                    ))
+                } else {
+                    // SAFETY:
+                    // - `ptr` is non-null and suitably aligned.
+                    // - We have to trust the caller to uphold
+                    //   the remaining invariants.
+                    let xref = unsafe { &*ptr };
+                    Ok(Some(xref))
+                }
+            }
+        }
+    };
+}
+pub(crate) use try_ptr_as_opt_ref;
+
 /// Performs checks on the "slice" (ptr, len).
 ///
 /// It returns `Err` if:
@@ -122,7 +162,7 @@ pub fn pedantic_slice_checks_mut<T>(
 /// Like [`slice::from_raw_parts`][core::slice::from_raw_parts]
 /// but with extra checks on `ptr` and `len`.
 ///
-/// It returns `Err` if:
+/// It evaluates to `Err` if:
 ///
 /// - `ptr` is not suitably aligned.
 /// - `len` is greater than `isize::MAX`.
@@ -160,7 +200,7 @@ pub(crate) use try_from_raw_parts;
 /// Like [`slice::from_raw_parts_mut`][core::slice::from_raw_parts_mut]
 /// but with extra checks on `ptr` and `len`.
 ///
-/// It returns `Err` if:
+/// It evaluates to `Err` if:
 ///
 /// - `ptr` is not suitably aligned.
 /// - `len` is greater than `isize::MAX`.
@@ -194,6 +234,60 @@ macro_rules! try_from_raw_parts_mut {
     }};
 }
 pub(crate) use try_from_raw_parts_mut;
+
+/// Like [`try_from_raw_parts`], but evaluates to `Ok(None)`
+/// if the resulting slice has a length of zero.
+///
+/// It evaluates to `Err` if:
+///
+/// - `ptr` is not suitably aligned.
+/// - `len` is greater than `isize::MAX`.
+/// - `ptr` is null and `len` is non-zero.
+/// - `ptr` is non-null and `len` is zero.
+///
+/// # Safety
+///
+/// - `ptr` must be valid (initialized, etc.) for reads up to
+///   `len` bytes.
+/// - You must uphold Rust's aliasing requirements.
+#[macro_export]
+macro_rules! try_from_raw_parts_opt {
+    (@unsafe $ptr:expr, $len:expr $(,)?) => {{
+        match $crate::util::try_from_raw_parts!(@unsafe $ptr, $len) {
+            Ok(&[]) => Ok(None),
+            Ok(s) => Ok(Some(s)),
+            Err(err) => Err(err),
+        }
+    }};
+}
+pub(crate) use try_from_raw_parts_opt;
+
+/// Like [`try_from_raw_parts_mut`], but evaluates to `Ok(None)`
+/// if the resulting slice has a length of zero.
+///
+/// It evaluates to `Err` if:
+///
+/// - `ptr` is not suitably aligned.
+/// - `len` is greater than `isize::MAX`.
+/// - `ptr` is null and `len` is non-zero.
+/// - `ptr` is non-null and `len` is zero.
+///
+/// # Safety
+///
+/// - `ptr` must be valid (initialized, etc.) for reads up to
+///   `len` bytes.
+/// - You must uphold Rust's aliasing requirements.
+#[macro_export]
+macro_rules! try_from_raw_parts_opt_mut {
+    (@unsafe $ptr:expr, $len:expr $(,)?) => {{
+        match $crate::util::try_from_raw_parts_mut!(@unsafe $ptr, $len) {
+            Ok(&mut []) => Ok(None),
+            Ok(s) => Ok(Some(s)),
+            Err(err) => Err(err),
+        }
+    }};
+}
+pub(crate) use try_from_raw_parts_opt_mut;
 
 /// Reports whether the memory regions `x[..x_len]` and
 /// `y[..y_len]` overlap at non-corresponding addresses.

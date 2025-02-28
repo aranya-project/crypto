@@ -15,14 +15,14 @@ use buggy::{bug, Bug};
 use spideroak_crypto::{
     aead::{Aead, BufferTooSmallError, InvalidNonceSize, OpenError, SealError},
     import::{Import, ImportError},
-    zeroize::{zeroize_flat_type, Zeroize},
+    zeroize::Zeroize,
 };
 
 use crate::{
     error::{invalid_arg, Error},
     util::{
         any_overlap, inexact_overlap, less_or_eq, pedantic_slice_checks, try_from_raw_parts,
-        try_from_raw_parts_mut, try_ptr_as_mut, try_ptr_as_ref,
+        try_from_raw_parts_mut, try_ptr_as_mut, try_ptr_as_ref, Void,
     },
 };
 
@@ -66,7 +66,7 @@ pub struct EVP_AEAD {
     #[allow(clippy::type_complexity)]
     init: unsafe fn(
         // A pointer to the uninitialized `Aead`.
-        ptr: *mut MaybeUninit<ManuallyDrop<()>>,
+        ptr: *mut MaybeUninit<Void>,
         key: &[u8],
     ) -> Result<(), ImportError>,
 
@@ -77,9 +77,9 @@ pub struct EVP_AEAD {
     /// - `ptr` must be non-null and suitably aligned for the
     ///   `Aead` it points to.
     /// - The memory that `ptr` points to must be an initialized
-    ///   `Aead` that matches `type_id`.
+    ///   `Aead`.
     /// - `ptr` must not be used after this function is called.
-    cleanup: unsafe fn(ptr: *mut ManuallyDrop<()>),
+    cleanup: unsafe fn(ptr: *mut ManuallyDrop<Void>),
 
     /// [`Aead::seal`].
     ///
@@ -92,7 +92,7 @@ pub struct EVP_AEAD {
     #[allow(clippy::type_complexity)]
     seal: unsafe fn(
         // A pointer to the `Aead`.
-        ptr: *const (),
+        ptr: *const Void,
         dst: &mut [u8],
         nonce: &[u8],
         plaintext: &[u8],
@@ -110,7 +110,7 @@ pub struct EVP_AEAD {
     #[allow(clippy::type_complexity)]
     seal_in_place: unsafe fn(
         // A pointer to the `Aead`.
-        ptr: *const (),
+        ptr: *const Void,
         nonce: &[u8],
         data: &mut [u8],
         overhead: &mut [u8],
@@ -128,7 +128,7 @@ pub struct EVP_AEAD {
     #[allow(clippy::type_complexity)]
     open: unsafe fn(
         // A pointer to the `Aead`.
-        ptr: *const (),
+        ptr: *const Void,
         dst: &mut [u8],
         nonce: &[u8],
         ciphertext: &[u8],
@@ -146,7 +146,7 @@ pub struct EVP_AEAD {
     #[allow(clippy::type_complexity)]
     open_in_place: unsafe fn(
         // A pointer to the `Aead`.
-        ptr: *const (),
+        ptr: *const Void,
         nonce: &[u8],
         data: &mut [u8],
         overhead: &mut [u8],
@@ -308,11 +308,11 @@ const fn max(a: usize, b: usize) -> usize {
     [a, b][(a < b) as usize]
 }
 
-/// A number that's at least [`size_of::<EVP_AEAD_CTX<()>>()`].
+/// A number that's at least [`size_of::<EVP_AEAD_CTX<Void>>()`].
 #[doc(hidden)]
 pub const EVP_AEAD_CTX_BASE_SIZE: usize = 8;
 
-/// A number that's at least [`align_of::<EVP_AEAD_CTX<()>>()`].
+/// A number that's at least [`align_of::<EVP_AEAD_CTX<Void>>()`].
 #[doc(hidden)]
 pub const EVP_AEAD_CTX_BASE_ALIGN: usize = 8;
 
@@ -333,14 +333,17 @@ pub struct EVP_AEAD_CTX<T> {
 
     /// The `Aead` instance.
     ///
-    /// If `self.vtable` is `Some`, then this field is initialized.
+    /// # Invariants
+    ///
+    /// - If `self.vtable` is `Some`, then this field is
+    ///   initialized.
     ///
     /// # Caveats
     ///
     /// It is obviously very easy for C code to corrupt memory,
     /// so this is a best-effort attempt. We can't control what
     /// other languages do to violate Rust's invariants.
-    aead: ManuallyDrop<T>,
+    aead: MaybeUninit<T>,
 }
 
 impl<T: Aeads> EVP_AEAD_CTX<T> {
@@ -351,26 +354,34 @@ impl<T: Aeads> EVP_AEAD_CTX<T> {
     /// if the [`EVP_AEAD`] refers to an unknown [`Aead`].
     fn with_aead<F, R>(&self, f: F) -> Result<R, Bug>
     where
-        F: FnOnce(&EVP_AEAD, *const ()) -> R,
+        F: FnOnce(&EVP_AEAD, *const Void) -> R,
     {
-        let Some(aead) = self.vtable else {
+        let Some(vtable) = self.vtable else {
+            // All code paths should have checked `self.vtable`
+            // by this point.
             bug!("`EVP_AEAD_CTX` is not initialized");
         };
 
-        let ptr = ptr::addr_of!(self.aead).cast::<()>();
+        // `vtable` is `Some`, so `self.aead` is initialized.
+        let ptr = self.aead.as_ptr().cast::<Void>();
 
-        Ok(f(aead, ptr))
+        Ok(f(vtable, ptr))
     }
 
     fn init(&mut self, vtable: &'static EVP_AEAD, key: &[u8]) -> Result<(), ImportError> {
-        let ptr = ptr::addr_of_mut!(self.aead).cast::<MaybeUninit<ManuallyDrop<()>>>();
+        if self.vtable.is_some() {
+            self.cleanup()?;
+        }
+        debug_assert!(self.vtable.is_none());
+
+        let ptr = ptr::addr_of_mut!(self.aead).cast::<MaybeUninit<Void>>();
 
         // SAFETY: `ptr` is non-null and suitably aligned for
         // the `Aead`.
         unsafe { (vtable.init)(ptr, key)? }
 
         // Only set `self.vtable` after we've initialized
-        // `self.aead` since this field indicates whether
+        // `self.aead` since `self.vtable` indicates whether
         // `self.aead` is initialized.
         self.vtable = Some(vtable);
 
@@ -378,21 +389,30 @@ impl<T: Aeads> EVP_AEAD_CTX<T> {
     }
 
     fn cleanup(&mut self) -> Result<(), Bug> {
-        let Some(aead) = self.vtable.take() else {
+        let Some(vtable) = self.vtable.take() else {
+            // All code paths should have checked `self.vtable`
+            // by this point.
             bug!("`EVP_AEAD_CTX` is not initialized");
         };
 
-        let ptr = ptr::addr_of_mut!(self.aead).cast::<ManuallyDrop<()>>();
+        // `ManuallyDrop<T>` is a transparent wrapper around `T`,
+        // so the cast is valid.
+        let ptr = self.aead.as_mut_ptr().cast::<ManuallyDrop<Void>>();
 
-        unsafe { (aead.cleanup)(ptr) }
+        // SAFETY:
+        // - `ptr` is non-null and suitably aligned because (a)
+        //   we used `MaybeUninit::as_mut_ptr`, and (b) `T`
+        //   implements `Aeads` is required to be suitably
+        //   aligned for all supported AEADs.
+        // - The memory `ptr` points is initialized to because
+        //   `vtable` is (was) `Some`.
+        // - We do not use `ptr` (except to re-initialize it)
+        //   after this call.
+        unsafe { (vtable.cleanup)(ptr) }
 
         // Clobber `self.aead` in case the `Aead` isn't
         // `ZeroizeOnDrop`.
-        //
-        // NB: This is safe because every field in `self.aead`
-        // is `MaybeUninit` and `MaybeUninit` is valid for every
-        // bit pattern.
-        unsafe { zeroize_flat_type(&mut self.aead) }
+        self.aead.zeroize();
 
         Ok(())
     }
@@ -462,12 +482,12 @@ impl<T: Aeads> EVP_AEAD_CTX<T> {
     }
 }
 
-impl<T: Default> Default for EVP_AEAD_CTX<T> {
+impl<T> Default for EVP_AEAD_CTX<T> {
     #[inline]
     fn default() -> Self {
         Self {
             vtable: None,
-            aead: ManuallyDrop::new(T::default()),
+            aead: MaybeUninit::uninit(),
         }
     }
 }
@@ -633,33 +653,36 @@ pub unsafe fn evp_aead_ctx_cleanup<T: Aeads>(ctx: *mut EVP_AEAD_CTX<T>) {
 ///
 /// It returns 1 on success and 0 otherwise.
 ///
-/// - `max_out_len` must be at least `in_len` plus the result of
-///   [`EVP_AEAD::max_overhead`].
+/// - `ctx` must be non-null and suitably aligned.
+/// - If non-null, `out` must be suitably aligned.
+/// - `out_len` must be non-null and suitably aligned.
+/// - `max_out_len` must be at least `in_len` less the result of
+///   [`EVP_AEAD::max_overhead`] and at most `isize::MAX`.
 /// - `nonce_len` must be equal to the result of
-///   [`EVP_AEAD::nonce_length`].
-/// - If `nonce_len` is zero, `nonce` must be null.
-/// - If `in_` is null, `in_len` must be zero.
-/// - If `in_` is non-null, `in_len` must be non-zero.
-/// - If `ad` is null, `ad_len` must be zero.
-/// - If `ad` is non-null, `ad_len` must be non-zero.
+///   [`EVP_AEAD::nonce_length`] and at most `isize::MAX`.
+/// - If `nonce` is non-null then it must be suitably aligned.
+/// - `nonce` must not overlap at all with `out`.
+/// - If non-null, `in_` must be suitably aligned.
+/// - If `in_` is null, `in_len` must be zero. Otherwise,
+///   `in_len` must be non-zero and at most `isize::MAX`.
+/// - If non-null, `ad` must be suitably aligned.
+/// - If `ad` is null, `ad_len` must be zero. Otherwise, `ad_len`
+///   must be non-zero and at most `isize::MAX`.
+/// - `ad` must not overlap at all with `out`.
 /// - `out` and `in_` must overlap entirely or not at all.
 ///
 /// # Safety
 ///
-/// - `ctx` and `out_len` must be non-null and suitably aligned.
-/// - If non-null, all other pointers must be suitably aligned.
+/// - `ctx` must have been initialized with
+///   [`evp_aead_ctx_init`].
 /// - If non-null, `out` must be valid for writes up to
 ///   `max_out_len` bytes.
-/// - `max_out_len` must be at most `isize::MAX`.
 /// - If non-null, `nonce` must be valid for reads up to
 ///   `nonce_len` bytes.
-/// - `nonce_len` must be at most `isize::MAX`.
 /// - If non-null, `in_` must be valid for reads up to `in_len`
 ///   bytes.
-/// - `in_len` must be at most `isize::MAX`.
 /// - If non-null `ad` must be valid for reads up to `ad_len`
 ///   bytes.
-/// - `ad_len` must be at most `isize::MAX`.
 #[allow(clippy::too_many_arguments, reason = "I didn't come up with the API")]
 pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
     ctx: *const EVP_AEAD_CTX<T>,
@@ -789,33 +812,36 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
 ///
 /// It returns 1 on success and 0 otherwise.
 ///
+/// - `ctx` must be non-null and suitably aligned.
+/// - If non-null, `out` must be suitably aligned.
+/// - `out_len` must be non-null and suitably aligned.
 /// - `max_out_len` must be at least `in_len` less the result of
-///   [`EVP_AEAD::max_overhead`].
+///   [`EVP_AEAD::max_overhead`] and at most `isize::MAX`.
 /// - `nonce_len` must be equal to the result of
-///   [`EVP_AEAD::nonce_length`].
-/// - If `nonce_len` is zero, `nonce` must be null.
-/// - If `in_` is null, `in_len` must be zero.
-/// - If `in_` is non-null, `in_len` must be non-zero.
-/// - If `ad` is null, `ad_len` must be zero.
-/// - If `ad` is non-null, `ad_len` must be non-zero.
+///   [`EVP_AEAD::nonce_length`] and at most `isize::MAX`.
+/// - If `nonce` is non-null then it must be suitably aligned.
+/// - `nonce` must not overlap at all with `out`.
+/// - If non-null, `in_` must be suitably aligned.
+/// - If `in_` is null, `in_len` must be zero. Otherwise,
+///   `in_len` must be non-zero and at most `isize::MAX`.
+/// - If non-null, `ad` must be suitably aligned.
+/// - If `ad` is null, `ad_len` must be zero. Otherwise, `ad_len`
+///   must be non-zero and at most `isize::MAX`.
+/// - `ad` must not overlap at all with `out`.
 /// - `out` and `in_` must overlap entirely or not at all.
 ///
 /// # Safety
 ///
-/// - `ctx` and `out_len` must be non-null and suitably aligned.
-/// - If non-null, all other pointers must be suitably aligned.
+/// - `ctx` must have been initialized with
+///   [`evp_aead_ctx_init`].
 /// - If non-null, `out` must be valid for writes up to
 ///   `max_out_len` bytes.
-/// - `max_out_len` must be at most `isize::MAX`.
 /// - If non-null, `nonce` must be valid for reads up to
 ///   `nonce_len` bytes.
-/// - `nonce_len` must be at most `isize::MAX`.
 /// - If non-null, `in_` must be valid for reads up to `in_len`
 ///   bytes.
-/// - `in_len` must be at most `isize::MAX`.
 /// - If non-null `ad` must be valid for reads up to `ad_len`
 ///   bytes.
-/// - `ad_len` must be at most `isize::MAX`.
 #[allow(clippy::too_many_arguments, reason = "I didn't come up with the API")]
 pub unsafe fn evp_aead_ctx_open<T: Aeads>(
     ctx: *const EVP_AEAD_CTX<T>,

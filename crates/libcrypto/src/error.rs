@@ -2,11 +2,15 @@
 
 use core::fmt;
 
+use buggy::Bug;
 use spideroak_crypto::aead::{OpenError, SealError};
 
 /// An internal error.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum Error {
+    #[error("{0}")]
+    Bug(#[from] Bug),
+
     #[error("{0}")]
     InvalidArg(#[from] InvalidArg),
 
