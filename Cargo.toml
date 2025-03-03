@@ -11,7 +11,13 @@ default-members = [
 ]
 
 # TODO
-exclude = ["crates/s2n-tls"]
+exclude = [
+	"crates/s2n-tls",
+	"crates/libcrypto",
+	"crates/libcrypto-rust",
+	"crates/libcrypto-macro",
+	"crates/libcrypto-codegen",
+]
 
 [workspace.package]
 authors = ["SpiderOak, Inc."]

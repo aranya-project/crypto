@@ -1,11 +1,11 @@
-//! Utility crate for
+//! TODO
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(any(test, doctest, feature = "std")), no_std)]
 
 extern crate alloc;
 
-pub use spideroak_libcrypto_macro::{aeads, libcrypto};
+pub use spideroak_libcrypto_macro::aeads;
 
 pub mod aead;
 pub mod cipher;
@@ -22,3 +22,8 @@ pub use buggy;
 pub use cfg_if;
 #[doc(hidden)]
 pub use spideroak_crypto;
+
+#[doc(hidden)]
+pub mod api {
+    pub use super::{aead::*, cipher::*};
+}

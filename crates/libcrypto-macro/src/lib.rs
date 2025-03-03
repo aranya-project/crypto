@@ -1,7 +1,7 @@
 //! TODO
 
 mod aeads;
-mod build;
+mod api;
 mod util;
 
 use syn::Error;
@@ -9,17 +9,20 @@ use syn::Error;
 // Use via the `spideroak-libcrypto` crate.
 #[doc(hidden)]
 #[proc_macro]
-pub fn libcrypto(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    build::build(item.into())
+pub fn aeads(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    aeads::aeads(item.into())
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }
 
-// Use via the `spideroak-libcrypto` crate.
+// Used by `spideroak-libcrypto`.
 #[doc(hidden)]
-#[proc_macro]
-pub fn aeads(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    aeads::aeads(item.into())
+#[proc_macro_attribute]
+pub fn api(
+    attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    api::api(attr.into(), item.into())
         .unwrap_or_else(Error::into_compile_error)
         .into()
 }

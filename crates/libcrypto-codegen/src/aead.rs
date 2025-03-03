@@ -4,14 +4,14 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse_quote;
 
-use crate::{util::opaque_wrapper, Bindings};
+use crate::{api, util::opaque_wrapper, Bindings};
 
 /// An AEAD.
 #[derive(Debug)]
 pub struct Aead<'a> {
     /// Simple docs.
     pub doc: &'a str,
-    /// The constant ident in `spideroak_libcrypto::aead::Aeads`.
+    /// The constant ident in `Aeads`.
     pub name: &'a str,
     /// `EVP_aead_xxx`.
     pub constructor: &'a str,
@@ -46,6 +46,8 @@ pub const AEADS: &[Aead<'_>] = &[
     },
 ];
 
+const API: &str = include_str!("aead.inc");
+
 impl Bindings {
     pub(super) fn aead(&self) -> anyhow::Result<TokenStream> {
         let Self {
@@ -53,6 +55,8 @@ impl Bindings {
             max_aead_size,
             max_aead_align,
         } = self;
+
+        let api = api::parse_str(API)?;
 
         let aeads_impl = format_ident!("__AeadsImpl");
 
@@ -67,8 +71,7 @@ impl Bindings {
             quote! {
                 #[doc = #doc]
                 ///
-                /// Returns `NULL` if the AEAD is not
-                /// supported.
+                /// Returns `NULL` if the AEAD is not supported.
                 #[no_mangle]
                 pub extern "C" fn #constructor() -> *const EVP_AEAD {
                     let ptr = match <#aeads_impl as #libcrypto::aead::Aeads>::#name {
@@ -154,6 +157,14 @@ impl Bindings {
             #(#aeads)*
 
             #evp_aead_ctx
+
+            #api
+        };
+        Ok(code)
+    }
+}
+
+/*
 
             /// Sets an uninitialized `ctx` to all zeros. This is
             /// equivalent to
@@ -403,7 +414,4 @@ impl Bindings {
                     0
                 }
             }
-        };
-        Ok(code)
-    }
-}
+*/

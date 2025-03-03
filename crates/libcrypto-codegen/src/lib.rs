@@ -1,6 +1,8 @@
 //! Code generation for `spideroak-libcrypto`.
 
 mod aead;
+#[doc(hidden)]
+pub mod api;
 mod cipher;
 mod error;
 mod util;
@@ -10,7 +12,9 @@ use std::{collections::HashMap, env, fs, path::Path};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
-pub use crate::{aead::AEADS, error::BuildError};
+#[doc(hidden)]
+pub use crate::aead::AEADS;
+pub use crate::error::BuildError;
 
 /// Formats a [`TokenStream`] as a string.
 pub fn format(tokens: &TokenStream) -> String {
@@ -155,6 +159,10 @@ impl Headers {
             Braces, Builder, Config, DocumentationLength, DocumentationStyle, Language, RenameRule,
             Style, VERSION,
         };
+
+        if true {
+            return Ok(());
+        }
 
         TraceLogger::init().unwrap();
 

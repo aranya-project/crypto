@@ -17,6 +17,7 @@ use spideroak_crypto::{
     import::{Import, ImportError},
     zeroize::Zeroize,
 };
+use spideroak_libcrypto_macro::api;
 
 use crate::{
     error::{invalid_arg, Error},
@@ -254,7 +255,7 @@ impl EVP_AEAD {
 /// - `Self` must be a `repr(C)` union.
 /// - The size of `Self` must be exactly `MAX_SIZE` bytes.
 /// - The alignment of `Self` must be exactly `MAX_ALIGN` bytes.
-pub unsafe trait Aeads: Default + Sized {
+pub unsafe trait Aeads: Sized {
     /// AES-128-GCM.
     const AES_128_GCM: Option<&EVP_AEAD>;
     /// AES-256-GCM.
@@ -843,6 +844,7 @@ pub unsafe fn evp_aead_ctx_seal<T: Aeads>(
 /// - If non-null `ad` must be valid for reads up to `ad_len`
 ///   bytes.
 #[allow(clippy::too_many_arguments, reason = "I didn't come up with the API")]
+#[api(alias = "EVP_AEAD_CTX_open")]
 pub unsafe fn evp_aead_ctx_open<T: Aeads>(
     ctx: *const EVP_AEAD_CTX<T>,
     out: *mut u8,

@@ -203,10 +203,10 @@ impl EVP_CIPHER {
 
                 // SAFETY: See the function pointer's safety
                 // docs.
-                let aead = unsafe { &mut *(ptr.cast::<ManuallyDrop<A>>()) };
+                let aead = unsafe { &mut *(ptr.cast::<T>()) };
                 // SAFETY: See the function pointer's safety
                 // docs.
-                unsafe { ManuallyDrop::drop(aead) }
+                unsafe { ptr::drop_in_place(aead) }
             },
         }
     }
