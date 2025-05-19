@@ -37,7 +37,7 @@ use crate::{
     hex::ToHex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
-    hpke::{AeadId, KdfId, KemId},
+    hpke::{AeadId, HpkeAead, KdfId, KemId},
     import::{ExportError, Import, ImportError},
     kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey, SharedSecret},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
@@ -239,7 +239,7 @@ impl Identified for Aes256Gcm {
 }
 
 impl HpkeAead for Aes256Gcm {
-    const ID: AeadId = Aead::Aes256Gcm;
+    const ID: AeadId = AeadId::Aes256Gcm;
 }
 
 #[cfg(feature = "committing-aead")]

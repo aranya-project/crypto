@@ -36,7 +36,7 @@ use crate::{
     hex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
-    hpke::{AeadId, KdfId, KemId},
+    hpke::{AeadId, HpkeAead, KdfId, KemId},
     import::{try_from_slice, ExportError, Import, ImportError},
     kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
