@@ -225,9 +225,9 @@ mod tests {
             hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384, KdfId::HkdfSha384);
             hkdf_impl!(HkdfSha512, "HKDF-SHA512", Sha512, KdfId::HkdfSha512);
 
-            test_kdf!(mod hkdf_sha256, HkdfSha256);
-            test_kdf!(mod hkdf_sha384, HkdfSha384);
-            test_kdf!(mod hkdf_sha512, HkdfSha512);
+            test_kdf!(hkdf_sha256, HkdfSha256);
+            test_kdf!(hkdf_sha384, HkdfSha384);
+            test_kdf!(hkdf_sha512, HkdfSha512);
         };
     }
 

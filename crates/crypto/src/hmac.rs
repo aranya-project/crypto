@@ -323,11 +323,7 @@ mod tests {
     macro_rules! hmac_tests {
         () => {
             use crate::{
-                oid::consts::{
-                    HMAC_WITH_SHA2_256,
-                    HMAC_WITH_SHA2_384,
-                    HMAC_WITH_SHA2_512,
-                },
+                oid::consts::{HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512},
                 test_util::test_mac,
             };
 
@@ -335,9 +331,9 @@ mod tests {
             hmac_impl!(HmacSha2_384, "HMAC-SHA384", Sha384, HMAC_WITH_SHA2_384);
             hmac_impl!(HmacSha2_512, "HMAC-SHA512", Sha512, HMAC_WITH_SHA2_512);
 
-            test_mac!(mod hmac_sha256, HmacSha2_256);
-            test_mac!(mod hmac_sha384, HmacSha2_384);
-            test_mac!(mod hmac_sha512, HmacSha2_512);
+            test_mac!(hmac_sha256, HmacSha2_256);
+            test_mac!(hmac_sha384, HmacSha2_384);
+            test_mac!(hmac_sha512, HmacSha2_512);
         };
     }
 

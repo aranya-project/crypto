@@ -650,49 +650,56 @@ mod tests {
         use super::*;
         use crate::test_util::test_aead;
 
-        test_aead!(mod aes256gcm, Aes256Gcm);
+        test_aead!(aes256gcm, Aes256Gcm);
 
         #[cfg(feature = "committing-aead")]
         mod committing {
             use super::*;
 
-            test_aead!(mod cmd1_aead_aes256_gcm, Cmt1Aes256Gcm);
-            test_aead!(mod cmd4_aead_aes256_gcm, Cmt4Aes256Gcm);
+            test_aead!(cmd1_aead_aes256_gcm, Cmt1Aes256Gcm);
+            test_aead!(cmd4_aead_aes256_gcm, Cmt4Aes256Gcm);
         }
     }
 
     mod ecdh_tests {
         use super::*;
-        use crate::test_util::test_ecdh;
+        use crate::test_util::vectors::{test_ecdh, EcdhTest};
 
-        test_ecdh!(mod p256, P256);
-        test_ecdh!(mod p384, P384);
+        #[test]
+        fn test_ecdh_p256() {
+            test_ecdh::<P256>(EcdhTest::EcdhSecp256r1Ecpoint);
+        }
+
+        #[test]
+        fn test_ecdh_p384() {
+            test_ecdh::<P384>(EcdhTest::EcdhSecp384r1Ecpoint);
+        }
     }
 
     mod ecdsa_tests {
         use super::*;
         use crate::test_util::test_signer;
 
-        test_signer!(mod p256, P256);
-        test_signer!(mod p384, P384);
+        test_signer!(p256, P256);
+        test_signer!(p384, P384);
     }
 
     mod hkdf_tests {
         use super::*;
         use crate::test_util::test_kdf;
 
-        test_kdf!(mod hkdf_sha256, HkdfSha256);
-        test_kdf!(mod hkdf_sha384, HkdfSha384);
-        test_kdf!(mod hkdf_sha512, HkdfSha512);
+        test_kdf!(hkdf_sha256, HkdfSha256);
+        test_kdf!(hkdf_sha384, HkdfSha384);
+        test_kdf!(hkdf_sha512, HkdfSha512);
     }
 
     mod hmac_tests {
         use super::*;
         use crate::test_util::test_mac;
 
-        test_mac!(mod hmac_sha256, HmacSha256);
-        test_mac!(mod hmac_sha384, HmacSha384);
-        test_mac!(mod hmac_sha512, HmacSha512);
+        test_mac!(hmac_sha256, HmacSha256);
+        test_mac!(hmac_sha384, HmacSha384);
+        test_mac!(hmac_sha512, HmacSha512);
     }
 
     // mod hpke_tests {
@@ -719,9 +726,9 @@ mod tests {
         use super::*;
         use crate::test_util::test_hash;
 
-        test_hash!(mod sha2_256, Sha256);
-        test_hash!(mod sha2_384, Sha384);
-        test_hash!(mod sha2_512, Sha512);
-        test_hash!(mod sha2_512_256, Sha512_256);
+        test_hash!(sha2_256, Sha256);
+        test_hash!(sha2_384, Sha384);
+        test_hash!(sha2_512, Sha512);
+        test_hash!(sha2_512_256, Sha512_256);
     }
 }
