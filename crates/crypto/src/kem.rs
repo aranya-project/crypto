@@ -613,7 +613,7 @@ macro_rules! dhkem_impl {
             }
         }
 
-        impl $crate::hpke::AlgId<$crate::hpke::KemId> for $name {
+        impl $crate::hpke::HpkeKem for $name {
             const ID: $crate::hpke::KemId = Self::KEM_ID;
         }
     };

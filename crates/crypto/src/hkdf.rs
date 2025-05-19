@@ -205,7 +205,7 @@ macro_rules! hkdf_impl {
             }
         }
 
-        $(impl $crate::hpke::AlgId<$crate::hpke::KdfId> for $name {
+        $(impl $crate::hpke::HpkeKdf for $name {
             const ID: $crate::hpke::KdfId = $kdf_id;
         })?
 

@@ -36,7 +36,7 @@ use crate::{
     hex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
-    hpke::{AeadId, AlgId, KdfId, KemId},
+    hpke::{AeadId, KdfId, KemId},
     import::{try_from_slice, ExportError, Import, ImportError},
     kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
@@ -134,7 +134,7 @@ impl Identified for Aes256Gcm {
     const OID: &'static Oid = AES_256_GCM;
 }
 
-impl AlgId<AeadId> for Aes256Gcm {
+impl HpkeAead for Aes256Gcm {
     const ID: AeadId = AeadId::Aes256Gcm;
 }
 

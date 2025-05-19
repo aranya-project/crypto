@@ -162,12 +162,6 @@ impl ConstantTimeEq for Psk<'_> {
     }
 }
 
-/// Associates a 16-bit HPKE identifier with the algorithm.
-pub trait AlgId<T> {
-    /// Uniquely identifies the algorithm.
-    const ID: T;
-}
-
 /// KEM algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
