@@ -9,7 +9,7 @@ use more_asserts::assert_ge;
 use super::{assert_all_zero, assert_ct_ne};
 use crate::{
     aead::{Aead, Nonce, OpenError},
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     keys::SecretKey,
 };
 
@@ -119,14 +119,14 @@ pub fn test_basic<A: Aead, R: Csprng>(_rng: &mut R) {
 
 /// Tests that `Aead::Key::new` returns unique keys.
 pub fn test_new_key<A: Aead, R: Csprng>(rng: &mut R) {
-    let k1 = A::Key::new(rng);
-    let k2 = A::Key::new(rng);
+    let k1 = A::Key::random(rng);
+    let k2 = A::Key::random(rng);
     assert_ct_ne!(k1, k2);
 }
 
 /// A round-trip positive test.
 pub fn test_round_trip<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::new(rng);
+    let key = A::Key::random(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -150,7 +150,7 @@ pub fn test_round_trip<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// An in-place round-trip positive test.
 pub fn test_in_place_round_trip<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::new(rng);
+    let key = A::Key::random(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -181,7 +181,7 @@ pub fn test_bad_key<A: Aead, R: Csprng>(rng: &mut R) {
     assert_all_zero!(nonce);
 
     let ciphertext = {
-        let key = A::Key::new(rng);
+        let key = A::Key::random(rng);
 
         let mut dst = vec![0u8; GOLDEN.len() + A::OVERHEAD];
         A::new(&key)
@@ -190,7 +190,7 @@ pub fn test_bad_key<A: Aead, R: Csprng>(rng: &mut R) {
         dst
     };
 
-    let key = A::Key::new(rng);
+    let key = A::Key::random(rng);
     let mut dst = vec![0u8; ciphertext.len() - A::OVERHEAD];
     let err = A::new(&key)
         .open(&mut dst[..], nonce.as_ref(), &ciphertext, AD)
@@ -200,7 +200,7 @@ pub fn test_bad_key<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// Decryption should fail with an incorrect nonce.
 pub fn test_bad_nonce<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::new(rng);
+    let key = A::Key::random(rng);
 
     let ciphertext = {
         let mut nonce = Nonce::<A::NonceSize>::default();
@@ -227,7 +227,7 @@ pub fn test_bad_nonce<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// Decryption should fail with a modified AD.
 pub fn test_bad_ad<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::new(rng);
+    let key = A::Key::random(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -248,7 +248,7 @@ pub fn test_bad_ad<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// Decryption should fail with a modified ciphertext.
 pub fn test_bad_ciphertext<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::new(rng);
+    let key = A::Key::random(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -272,7 +272,7 @@ pub fn test_bad_ciphertext<A: Aead, R: Csprng>(rng: &mut R) {
 /// Decryption should fail with a modified authentication
 /// tag.
 pub fn test_bad_tag<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::new(rng);
+    let key = A::Key::random(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 

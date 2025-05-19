@@ -205,11 +205,9 @@ macro_rules! hkdf_impl {
             }
         }
 
-        $(
-            impl $crate::hpke::AlgId<$crate::hpke::KdfId> for $name {
-                const ID: $crate::hpke::KdfId = $kdf_id;
-            }
-        )?
+        $(impl $crate::hpke::AlgId<$crate::hpke::KdfId> for $name {
+            const ID: $crate::hpke::KdfId = $kdf_id;
+        })?
 
         // TODO(eric): OID
     };

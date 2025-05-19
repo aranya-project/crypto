@@ -9,7 +9,7 @@ use typenum::U64;
 
 use crate::{
     aead::{Aead, IndCca2},
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     hpke::{Hpke, HpkeAead, HpkeKdf, HpkeKem, Mode, OpenCtx, SealCtx},
     kdf::{Expand, Kdf, KdfError, Prk},
     kem::{DecapKey, Kem},
@@ -130,7 +130,7 @@ pub fn test_round_trip<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>
     const AD: &[u8] = b"some additional data";
     const INFO: &[u8] = b"some contextual binding";
 
-    let skR = K::DecapKey::new(rng);
+    let skR = K::DecapKey::random(rng);
     let pkR = skR.public().expect("encap key should be valid");
 
     let (enc, mut send) = Hpke::<K, F, A>::setup_send(rng, Mode::Base, &pkR, INFO)
@@ -160,7 +160,7 @@ pub fn test_round_trip<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>
 pub fn test_export<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng: &mut R) {
     const INFO: &[u8] = b"some contextual binding";
 
-    let skR = K::DecapKey::new(rng);
+    let skR = K::DecapKey::random(rng);
     let pkR = skR.public().expect("encap key should be valid");
 
     let (enc, send) = Hpke::<K, F, A>::setup_send(rng, Mode::Base, &pkR, INFO)

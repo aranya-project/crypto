@@ -33,7 +33,7 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::{
     aead::{Aead, Lifetime, OpenError, SealError},
-    csprng::Csprng,
+    csprng::{Csprng, Random},
     import::{ExportError, Import, ImportError},
     kdf::{Kdf, KdfError, Prk},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
@@ -245,12 +245,14 @@ impl<T: Signer + ?Sized> SigningKey<SignerWithDefaults<T>> for SigningKeyWithDef
 impl<T: Signer + ?Sized> SecretKey for SigningKeyWithDefaults<T> {
     type Size = <T::SigningKey as SecretKey>::Size;
 
-    fn new<R: Csprng>(rng: &mut R) -> Self {
-        Self(T::SigningKey::new(rng))
-    }
-
     fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
         self.0.try_export_secret()
+    }
+}
+
+impl<T: Signer + ?Sized> Random for SigningKeyWithDefaults<T> {
+    fn random<R: Csprng>(rng: &mut R) -> Self {
+        Self(T::SigningKey::random(rng))
     }
 }
 

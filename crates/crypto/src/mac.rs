@@ -109,7 +109,7 @@ pub trait Mac: Clone + Sized {
         }
     }
 
-    /// Computes the tag for `data` using `key`.
+    /// Returns the tag for `data` using `key`.
     ///
     /// While this function is provided by default,
     /// implementations of [`Mac`] are encouraged to provide
@@ -118,17 +118,6 @@ pub trait Mac: Clone + Sized {
         let mut h = Self::new(key);
         h.update(data);
         h.tag()
-    }
-
-    /// Attempts to compute tag for `data` using `key`.
-    ///
-    /// While this function is provided by default,
-    /// implementations of [`Mac`] are encouraged to provide
-    /// optimized "single-shot" implementations.
-    fn try_mac(key: &[u8], data: &[u8]) -> Result<Self::Tag, InvalidKey> {
-        let mut h = Self::try_new(key)?;
-        h.update(data);
-        Ok(h.tag())
     }
 }
 
