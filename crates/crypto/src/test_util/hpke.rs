@@ -8,12 +8,11 @@ use generic_array::GenericArray;
 use typenum::U64;
 
 use crate::{
-    aead::{Aead, IndCca2},
+    aead::IndCca2,
     csprng::{Csprng, Random},
     hpke::{Hpke, HpkeAead, HpkeKdf, HpkeKem, Mode, OpenCtx, SealCtx},
     kdf::{Expand, Kdf, KdfError, Prk},
-    kem::{DecapKey, Kem},
-    keys::SecretKey,
+    kem::DecapKey,
 };
 
 /// Invokes `callback` for each HPKE test.

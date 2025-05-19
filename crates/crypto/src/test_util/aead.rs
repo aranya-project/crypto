@@ -10,7 +10,6 @@ use super::{assert_all_zero, assert_ct_ne};
 use crate::{
     aead::{Aead, Nonce, OpenError},
     csprng::{Csprng, Random},
-    keys::SecretKey,
 };
 
 /// Invokes `callback` for each AEAD test.

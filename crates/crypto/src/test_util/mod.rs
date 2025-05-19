@@ -36,7 +36,7 @@ use crate::{
     csprng::{Csprng, Random},
     import::{ExportError, Import, ImportError},
     kdf::{Kdf, KdfError, Prk},
-    keys::{PublicKey, SecretKey, SecretKeyBytes},
+    keys::{InvalidKey, PublicKey, SecretKey, SecretKeyBytes},
     mac::Mac,
     oid::{Identified, Oid},
     signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
@@ -198,9 +198,13 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
 
     type Key = T::Key;
     type KeySize = T::KeySize;
+    type MinKeySize = T::MinKeySize;
 
     fn new(key: &Self::Key) -> Self {
         Self(T::new(key))
+    }
+    fn try_new(key: &[u8]) -> Result<Self, InvalidKey> {
+        Ok(Self(T::try_new(key)?))
     }
 
     fn update(&mut self, data: &[u8]) {

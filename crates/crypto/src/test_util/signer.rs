@@ -8,7 +8,6 @@ use core::borrow::Borrow;
 use super::{assert_ct_eq, assert_ct_ne};
 use crate::{
     csprng::{Csprng, Random},
-    keys::SecretKey,
     signer::{Signer, SigningKey, VerifyingKey},
 };
 

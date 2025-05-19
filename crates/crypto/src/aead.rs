@@ -1234,11 +1234,9 @@ mod committing {
                 }
             }
 
-            $(
-                impl $crate::oid::Identified for $name {
-                    const OID: &$crate::oid::Oid = $oid;
-                }
-            )?
+            $(impl $crate::oid::Identified for $name {
+                const OID: &$crate::oid::Oid = $oid;
+            })?
         };
     }
     pub(crate) use utc_aead;
@@ -1494,11 +1492,9 @@ mod committing {
                 }
             }
 
-            $(
-                impl $crate::oid::Identified for $name {
-                    const OID: &$crate::oid::Oid = $oid;
-                }
-            )?
+            $(impl $crate::oid::Identified for $name {
+                const OID: &$crate::oid::Oid = $oid;
+            })?
         };
     }
     pub(crate) use hte_aead;

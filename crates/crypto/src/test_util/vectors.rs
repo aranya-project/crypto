@@ -15,11 +15,11 @@ use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac};
 
 use super::{AeadWithDefaults, KdfWithDefaults, MacWithDefaults, SignerWithDefaults};
 use crate::{
-    aead::{Aead, IndCca2, Nonce},
+    aead::{Aead, Nonce},
     hpke::{Hpke, HpkeAead, HpkeKdf, HpkeKem, SealCtx},
     import::Import,
     kdf::Kdf,
-    kem::{Ecdh, Kem},
+    kem::Ecdh,
     mac::Mac,
     signer::{Signer, VerifyingKey},
 };
@@ -558,12 +558,11 @@ where
                 Err(_) => continue,
             };
 
-            let key = match T::Key::import(&tc.key[..]) {
+            let mut h = match T::try_new(&tc.key[..]) {
                 Ok(h) => h,
                 // Skip insecure keys.
                 Err(_) => continue,
             };
-            let mut h = T::new(&key);
 
             // Update one character at a time.
             for c in tc.msg.iter() {
