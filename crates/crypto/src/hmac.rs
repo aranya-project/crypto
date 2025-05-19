@@ -132,18 +132,6 @@ cfg_if::cfg_if! {
     }
 }
 
-// NB: this is hidden because the only safe way to use a MAC is
-// to compare it for equality using `ConstantTimeEq`. It's needed
-// by the `test_util` module, however.
-#[doc(hidden)]
-#[cfg(feature = "test_util")]
-impl<N: ArrayLength> AsRef<[u8]> for Tag<N> {
-    #[inline]
-    fn as_ref(&self) -> &[u8] {
-        self.as_bytes()
-    }
-}
-
 impl<N: ArrayLength> ConstantTimeEq for Tag<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
@@ -308,11 +296,9 @@ macro_rules! hmac_impl {
             }
         }
 
-        $(
-            impl $crate::oid::Identified for $name {
-                const OID: &'static $crate::oid::Oid = $oid;
-            }
-        )?
+        $(impl $crate::oid::Identified for $name {
+            const OID: &'static $crate::oid::Oid = $oid;
+        })?
     };
 }
 pub(crate) use hmac_impl;
@@ -331,9 +317,9 @@ mod tests {
             hmac_impl!(HmacSha2_384, "HMAC-SHA384", Sha384, HMAC_WITH_SHA2_384);
             hmac_impl!(HmacSha2_512, "HMAC-SHA512", Sha512, HMAC_WITH_SHA2_512);
 
-            test_mac!(hmac_sha256, HmacSha2_256);
-            test_mac!(hmac_sha384, HmacSha2_384);
-            test_mac!(hmac_sha512, HmacSha2_512);
+            test_mac!(hmac_sha256, HmacSha2_256, MacTest::HmacSha256);
+            test_mac!(hmac_sha384, HmacSha2_384, MacTest::HmacSha384);
+            test_mac!(hmac_sha512, HmacSha2_512, MacTest::HmacSha512);
         };
     }
 

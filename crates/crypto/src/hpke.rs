@@ -33,6 +33,7 @@ use crate::{
     kdf::{Context, Expand, Kdf, KdfError, Prk},
     kem::{Kem, KemError},
     keys::RawSecretBytes,
+    AlgId,
 };
 
 /// Converts `v` to a big-endian byte array.
@@ -165,7 +166,7 @@ impl ConstantTimeEq for Psk<'_> {
 /// KEM algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, crate::AlgId)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
 pub enum KemId {
     /// DHKEM(P-256, HKDF-SHA256).
     #[alg_id(0x0010)]
@@ -241,7 +242,7 @@ impl Display for KemId {
 /// KDF algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, crate::AlgId)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
 pub enum KdfId {
     /// HKDF-SHA256.
     #[alg_id(0x0001)]
@@ -273,7 +274,7 @@ impl Display for KdfId {
 /// AEAD algorithm identifiers per [IANA].
 ///
 /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, crate::AlgId)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
 pub enum AeadId {
     /// AES-128-GCM.
     #[alg_id(0x0001)]

@@ -179,7 +179,6 @@ getrandom = { version = "0.2", default-features = false, optional = true }
 # Used by `test_util`.
 # TODO(eric): still needed?
 hex = { version = "0.4", optional = true }
-hybrid-array = { version = "0.2", default-features = false, features = ["extra-sizes", "serde", "zeroize"] }
 lazy_static = { version = "1.4", default-features = false, features = ["spin_no_std"], optional = true }
 more-asserts = { version = "0.3", default-features = false, optional = true }
 p256 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }

@@ -1,12 +1,13 @@
 //! Cryptographic hash functions.
 
+#![forbid(unsafe_code)]
+
 use core::{
     fmt::{self, Debug},
     ops::{Deref, DerefMut},
-    ptr,
 };
 
-use generic_array::{ArrayLength, GenericArray, IntoArrayLength, LengthError};
+use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use sha3_utils::{encode_string, right_encode_bytes};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
@@ -83,21 +84,6 @@ impl<N: ArrayLength> Digest<N> {
         Self::new(GenericArray::from_array(digest))
     }
 
-    /// Creates a hash digest from a slice.
-    #[inline]
-    pub const fn try_from_slice(digest: &[u8]) -> Result<&Self, LengthError> {
-        match GenericArray::<u8, N>::try_from_slice(digest) {
-            Ok(array) => {
-                // SAFETY: `Self` is a `#[repr(transparent)]` wrapper
-                // around `GenericArray<u8, N>`, so they both have the
-                // same layout in memory.
-                let digest = unsafe { &*(ptr::from_ref(array).cast::<Self>()) };
-                Ok(digest)
-            }
-            Err(err) => Err(err),
-        }
-    }
-
     /// Returns the length of the hash digest.
     #[inline]
     #[allow(clippy::len_without_is_empty)]
@@ -125,16 +111,6 @@ impl<N: ArrayLength> Digest<N> {
 }
 
 impl<N: ArrayLength> Copy for Digest<N> where N::ArrayType<u8>: Copy {}
-
-impl<N: ArrayLength, T> AsRef<T> for Digest<N>
-where
-    T: ?Sized,
-    <Digest<N> as Deref>::Target: AsRef<T>,
-{
-    fn as_ref(&self) -> &T {
-        self.deref().as_ref()
-    }
-}
 
 impl<N: ArrayLength> Deref for Digest<N> {
     type Target = [u8];
@@ -187,15 +163,6 @@ impl<N: ArrayLength> ConstantTimeEq for Digest<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.as_bytes().ct_eq(other.as_bytes())
-    }
-}
-
-impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for &'a Digest<N> {
-    type Error = LengthError;
-
-    #[inline]
-    fn try_from(digest: &'a [u8]) -> Result<Self, Self::Error> {
-        Digest::try_from_slice(digest)
     }
 }
 
