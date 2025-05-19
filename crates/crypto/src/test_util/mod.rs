@@ -254,9 +254,13 @@ impl<T: Signer + ?Sized> SecretKey for SigningKeyWithDefaults<T> {
     }
 }
 
-impl<T: Signer + ?Sized> Random for SigningKeyWithDefaults<T> {
+impl<T> Random for SigningKeyWithDefaults<T>
+where
+    T: Signer + ?Sized,
+    T::SigningKey: Random,
+{
     fn random<R: Csprng>(rng: &mut R) -> Self {
-        Self(T::SigningKey::random(rng))
+        Self(<T::SigningKey as Random>::random(rng))
     }
 }
 
@@ -266,7 +270,10 @@ impl<T: Signer + ?Sized> ConstantTimeEq for SigningKeyWithDefaults<T> {
     }
 }
 
-impl<'a, T: Signer + ?Sized> Import<&'a [u8]> for SigningKeyWithDefaults<T> {
+impl<'a, T: Signer + ?Sized> Import<&'a [u8]> for SigningKeyWithDefaults<T>
+where
+    T::SigningKey: Import<&'a [u8]>,
+{
     fn import(data: &'a [u8]) -> Result<Self, ImportError> {
         Ok(Self(T::SigningKey::import(data)?))
     }
