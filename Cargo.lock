@@ -3,21 +3,6 @@
 version = 3
 
 [[package]]
-name = "acvp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "either",
- "hex",
- "prettyplease",
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn 2.0.96",
-]
-
-[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -61,12 +46,6 @@ checksum = "8e60d3430d3a69478ad0993f19238d2df97c507009a52b3c10addcd7f6bcb916"
 dependencies = [
  "memchr",
 ]
-
-[[package]]
-name = "anyhow"
-version = "1.0.95"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
 
 [[package]]
 name = "aranya-bearssl-sys"
@@ -533,9 +512,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "hkdf"
@@ -1040,7 +1016,6 @@ dependencies = [
 name = "spideroak-crypto"
 version = "0.3.0-pre.1"
 dependencies = [
- "acvp",
  "aes",
  "aes-gcm",
  "aranya-bearssl-sys",

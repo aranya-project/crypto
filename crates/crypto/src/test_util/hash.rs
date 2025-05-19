@@ -1,6 +1,6 @@
 //! [`Hash`] tests.
 
-use crate::{hash::Hash, oid::Identified};
+use crate::hash::Hash;
 
 /// Invokes `callback` for each hash test.
 ///
@@ -21,14 +21,13 @@ macro_rules! for_each_hash_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
-            test_vectors,
             test_basic,
         }
     };
 }
 pub use for_each_hash_test;
 
-/// Performs cryptographic hash tests.
+/// Performs all of the tests in this module.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -38,11 +37,11 @@ pub use for_each_hash_test;
 /// ```
 /// use spideroak_crypto::{test_hash, rust::Sha256};
 ///
-/// test_hash!(mod sha256, Sha256);
+/// test_hash!(sha256, Sha256);
 /// ```
 #[macro_export]
 macro_rules! test_hash {
-    (mod $name:ident, $hash:ty) => {
+    ($name:ident, $hash:ty) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
@@ -55,10 +54,7 @@ macro_rules! test_hash {
             ($test:ident) => {
                 #[test]
                 fn $test() {
-                    use $crate::test_util::{hash::$test, HashWithDefaults};
-
-                    $test::<$hash>();
-                    $test::<HashWithDefaults<$hash>>();
+                    $crate::test_util::hash::$test::<$hash>()
                 }
             };
         }
@@ -66,34 +62,6 @@ macro_rules! test_hash {
     };
 }
 pub use test_hash;
-
-/// Tests against hash-specific vectors.
-///
-/// Unknown hash algorithms are ignored.
-pub fn test_vectors<T: Hash + Identified>() {
-    use acvp::vectors::{sha2, sha3};
-
-    use crate::{
-        oid::consts::{SHA2_256, SHA2_512, SHA2_512_256, SHA3_256},
-        test_util::acvp::{test_sha2, test_sha3},
-    };
-
-    if let Some(alg) = super::try_map! { T::OID;
-        SHA2_256 => sha2::Algorithm::Sha2_256,
-        SHA2_512 => sha2::Algorithm::Sha2_512,
-        SHA2_512_256 => sha2::Algorithm::Sha2_512_256,
-    } {
-        let vectors = sha2::load(alg).expect("should be able to load SHA-2 test vectors");
-        test_sha2::<T>(&vectors);
-    }
-
-    if let Some(alg) = super::try_map! { T::OID;
-        SHA3_256 => sha3::Algorithm::Sha3_256,
-    } {
-        let vectors = sha3::load(alg).expect("should be able to load SHA-3 test vectors");
-        test_sha3::<T>(&vectors);
-    }
-}
 
 /// A basic test for a `Hash`.
 pub fn test_basic<T: Hash>() {

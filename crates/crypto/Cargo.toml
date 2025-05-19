@@ -99,7 +99,6 @@ std = [
 	# Pull in `rand` for `ThreadRng`.
 	"dep:rand",
 
-	"acvp?/std",
 	"aes-gcm/std",
 	"buggy/std",
 	"crypto-common/std",
@@ -131,7 +130,6 @@ std = [
 test_util = [
 	"alloc",
 
-	"dep:acvp",
 	"dep:hex",
 	"dep:more-asserts",
 	"dep:serde_json",
@@ -155,7 +153,6 @@ trng = [
 # Only pulled into non-dev builds if `test_util` is enabled. It
 # won't bloat release builds, though, since users of this crate
 # should only use this feature inside [dev-dependencies].
-acvp = { version = "0.1.0", path = "../acvp", default-features = false, features = ["all", "vectors"], optional = true }
 spideroak-crypto-derive = { version = "0.1.0", path = "../crypto-derive" }
 
 ##

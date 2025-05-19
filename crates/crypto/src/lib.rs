@@ -38,7 +38,6 @@ pub mod keys;
 pub mod mac;
 pub mod oid;
 pub mod rust;
-pub(crate) mod sha3;
 pub mod signer;
 pub mod test_util;
 mod util;

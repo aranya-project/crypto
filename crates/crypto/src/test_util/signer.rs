@@ -1,15 +1,15 @@
 //! [`Signer`] tests.
 
+extern crate alloc;
+
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 
+use super::{assert_ct_eq, assert_ct_ne};
 use crate::{
-    csprng::{Csprng, Random},
-    import::Import,
-    keys::RawSecretBytes,
-    oid::Identified,
+    csprng::Csprng,
+    keys::SecretKey,
     signer::{Signer, SigningKey, VerifyingKey},
-    test_util::{assert_ct_eq, assert_ct_ne},
 };
 
 /// Invokes `callback` for each signer test.
@@ -32,7 +32,6 @@ macro_rules! for_each_signer_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
-            test_vectors,
             test_default,
             test_pk_eq,
             test_sk_ct_eq,
@@ -44,7 +43,7 @@ macro_rules! for_each_signer_test {
 }
 pub use for_each_signer_test;
 
-/// Performs signer (digital signature) tests.
+/// Performs all of the tests in this module.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -54,19 +53,15 @@ pub use for_each_signer_test;
 /// ```
 /// use spideroak_crypto::{test_signer, rust::P256};
 ///
-/// test_signer!(mod p256, P256);
+/// // Without test vectors.
+/// test_signer!(p256, P256);
+///
+/// // With test vectors.
+/// test_signer!(p256_with_vecs, P256, EcdsaTest::Secp256r1Sha256);
 /// ```
 #[macro_export]
 macro_rules! test_signer {
-    (mod $name:ident, $signer:ty) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            $crate::test_signer!($signer);
-        }
-    };
-    ($signer:ty) => {
+    (@test $signer:ty $(, $f:ident, $which:ident, $vectors:ident)? $(,)?) => {
         macro_rules! __signer_test {
             ($test:ident) => {
                 #[test]
@@ -76,55 +71,56 @@ macro_rules! test_signer {
             };
         }
         $crate::for_each_signer_test!(__signer_test);
+
+        $(
+            #[test]
+            fn vectors() {
+                $crate::test_util::vectors::$f::<$signer>(
+                    $crate::test_util::vectors::$which::$vectors,
+                );
+            }
+        )?
+    };
+    ($name:ident, $signer:ty) => {
+        mod $name {
+            #[allow(unused_imports)]
+            use super::*;
+
+            $crate::test_signer!($signer);
+        }
+    };
+    ($signer:ty) => {
+        $crate::test_signer!(@test $signer);
+    };
+    ($name:ident, $signer:ty, EcdsaTest::$vectors:ident $(,)?) => {
+        mod $name {
+            #[allow(unused_imports)]
+            use super::*;
+
+            $crate::test_signer!($signer, EcdsaTest::$vectors);
+        }
+    };
+    ($signer:ty, EcdsaTest::$vectors:ident $(,)?) => {
+        $crate::test_signer!(@test $signer, test_ecdsa, EcdsaTest, $vectors);
+    };
+    ($name:ident, $signer:ty, EddsaTest::$vectors:ident $(,)?) => {
+        mod $name {
+            #[allow(unused_imports)]
+            use super::*;
+
+            $crate::test_signer!($signer, EddsaTest::$vectors);
+        }
+    };
+    ($signer:ty, EddsaTest::$vectors:ident $(,)?) => {
+        $crate::test_signer!(@test $signer, test_eddsa, EddsaTest, $vectors);
     };
 }
 pub use test_signer;
 
-/// Tests against signer-specific vectors.
-pub fn test_vectors<T, R>(_rng: &mut R)
-where
-    T: Signer + Identified,
-    T::Signature: Identified,
-    R: Csprng,
-{
-    use crate::{
-        oid::consts::{
-            ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512, ED25519, ED448,
-            SECP256R1, SECP384R1, SECP521R1,
-        },
-        test_util::wycheproof::{
-            test_ecdsa, test_eddsa,
-            EcdsaTest::{
-                EcdsaSecp256r1Sha256, EcdsaSecp256r1Sha512, EcdsaSecp384r1Sha384,
-                EcdsaSecp521r1Sha512,
-            },
-            EddsaTest::{Ed25519, Ed448},
-        },
-    };
-
-    if let Some(name) = super::try_map! {
-        (T::OID, <T::Signature as Identified>::OID);
-
-        (SECP256R1, ECDSA_WITH_SHA2_256) => EcdsaSecp256r1Sha256,
-        (SECP256R1, ECDSA_WITH_SHA2_512) => EcdsaSecp256r1Sha512,
-        (SECP384R1, ECDSA_WITH_SHA2_384) => EcdsaSecp384r1Sha384,
-        (SECP521R1, ECDSA_WITH_SHA2_512) => EcdsaSecp521r1Sha512,
-    } {
-        test_ecdsa::<T>(name);
-    }
-
-    if let Some(name) = super::try_map! { T::OID;
-        ED25519 => Ed25519,
-        ED448 => Ed448,
-    } {
-        test_eddsa::<T>(name);
-    }
-}
-
 /// The base positive test.
 pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
     const MSG: &[u8] = b"hello, world!";
-    let sk = T::SigningKey::random(rng);
+    let sk = T::SigningKey::new(rng);
     let sig = sk.sign(MSG).expect("unable to create signature");
     sk.public()
         .expect("signing key should be valid")
@@ -136,10 +132,10 @@ pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
 ///
 /// It also tests `Signer::SigningKey::import`.
 pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
-    let sk1 = T::SigningKey::random(rng);
-    let sk2 = T::SigningKey::random(rng);
+    let sk1 = T::SigningKey::new(rng);
+    let sk2 = T::SigningKey::new(rng);
 
-    fn same_key<T: Signer, K: SigningKey<T> + for<'a> Import<&'a [u8]>>(k: K) {
+    fn same_key<T: Signer, K: SigningKey<T>>(k: K) {
         let data = match k.try_export_secret() {
             Ok(data) => data,
             Err(_) => {
@@ -147,8 +143,8 @@ pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
                 return;
             }
         };
-        let sk1 = K::import(data.raw_secret_bytes()).expect("should be able to import key");
-        let sk2 = K::import(data.raw_secret_bytes()).expect("should be able to import key");
+        let sk1 = K::import(data.as_bytes()).expect("should be able to import key");
+        let sk2 = K::import(data.as_bytes()).expect("should be able to import key");
         assert_ct_eq!(sk1, sk2);
     }
 
@@ -163,10 +159,10 @@ pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
 ///
 /// It also tests `Signer::VerifyingKey::import`.
 pub fn test_pk_eq<T: Signer, R: Csprng>(rng: &mut R) {
-    let pk1 = T::SigningKey::random(rng)
+    let pk1 = T::SigningKey::new(rng)
         .public()
         .expect("signing key should be valid");
-    let pk2 = T::SigningKey::random(rng)
+    let pk2 = T::SigningKey::new(rng)
         .public()
         .expect("signing key should be valid");
 
@@ -185,7 +181,7 @@ pub fn test_pk_eq<T: Signer, R: Csprng>(rng: &mut R) {
 
 /// [`SigningKey::public`] should always return the same key.
 pub fn test_public<T: Signer, R: Csprng>(rng: &mut R) {
-    let sk = T::SigningKey::random(rng);
+    let sk = T::SigningKey::new(rng);
     assert_eq!(sk.public(), sk.public());
 }
 
@@ -205,7 +201,7 @@ pub fn test_batch_simple_good<T: Signer, R: Csprng>(rng: &mut R) {
     let (pks, sigs): (Vec<_>, Vec<_>) = MSGS
         .iter()
         .map(|msg| {
-            let sk = T::SigningKey::random(rng);
+            let sk = T::SigningKey::new(rng);
             let sig = sk.sign(msg).expect("should not fail");
             (sk.public().expect("signer key should be valid"), sig)
         })
@@ -229,7 +225,7 @@ pub fn test_batch_simple_bad<T: Signer, R: Csprng>(rng: &mut R) {
     let (pks, sigs): (Vec<_>, Vec<_>) = msgs
         .iter()
         .map(|msg| {
-            let sk = T::SigningKey::random(rng);
+            let sk = T::SigningKey::new(rng);
             let sig = sk.sign(msg).expect("should not fail");
             (sk.public().expect("signing key should be valid"), sig)
         })

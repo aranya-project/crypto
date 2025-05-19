@@ -1,17 +1,16 @@
 //! [`Aead`] tests.
 
-// TODO(eric): add tests for boundaries. E.g., nonce is too long,
-// tag is too short, etc.
+extern crate alloc;
 
 use alloc::vec;
 
 use more_asserts::assert_ge;
 
+use super::{assert_all_zero, assert_ct_ne};
 use crate::{
     aead::{Aead, Nonce, OpenError},
-    csprng::{Csprng, Random},
-    oid::Identified,
-    test_util::{assert_all_zero, assert_ct_ne},
+    csprng::Csprng,
+    keys::SecretKey,
 };
 
 /// Invokes `callback` for each AEAD test.
@@ -34,7 +33,6 @@ macro_rules! for_each_aead_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
-            test_vectors,
             test_basic,
             test_new_key,
             test_round_trip,
@@ -49,7 +47,7 @@ macro_rules! for_each_aead_test {
 }
 pub use for_each_aead_test;
 
-/// Performs AEAD tests.
+/// Performs all of the tests in this module.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -59,54 +57,50 @@ pub use for_each_aead_test;
 /// ```
 /// use spideroak_crypto::{test_aead, rust::Aes256Gcm};
 ///
-/// test_aead!(mod aes256gcm, Aes256Gcm);
+/// // Without test vectors.
+/// test_aead!(aes256gcm, Aes256Gcm);
+///
+/// // With test vectors.
+/// test_aead!(aes256gcm_with_vecs, Aes256Gcm, AeadTest::AesGcm);
 /// ```
 #[macro_export]
 macro_rules! test_aead {
-    (mod $name:ident, $aead:ty) => {
+    ($name:ident, $aead:ty $(, AeadTest::$vectors:ident)?) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_aead!($aead);
+            $crate::test_aead!($aead $(, AeadTest::$vectors)?);
         }
     };
-    ($aead:ty) => {
+    ($aead:ty $(, AeadTest::$vectors:ident)?) => {
         macro_rules! __aead_test {
             ($test:ident) => {
                 #[test]
                 fn $test() {
                     $crate::test_util::aead::$test::<$aead, _>(&mut $crate::default::Rng)
                 }
-            };
+            }
         }
         $crate::for_each_aead_test!(__aead_test);
+
+        // TODO(eric): add tests for boundaries. E.g., nonce is
+        // too long, tag is too short, etc.
+
+        $(
+            #[test]
+            fn vectors() {
+                $crate::test_util::vectors::test_aead::<$aead>(
+                    $crate::test_util::vectors::AeadTest::$vectors,
+                );
+            }
+        )?
     };
 }
 pub use test_aead;
 
 const GOLDEN: &[u8] = b"hello, world!";
 const AD: &[u8] = b"some additional data";
-
-/// Tests against AEAD-specific vectors.
-pub fn test_vectors<A, R>(_rng: &mut R)
-where
-    A: Aead + Identified,
-    R: Csprng,
-{
-    use crate::{
-        oid::consts::{AES_128_GCM, AES_192_GCM, AES_256_GCM},
-        test_util::wycheproof::{test_aead, AeadTest::AesGcm},
-    };
-
-    if let Some(name) = super::try_map! { A::OID;
-        AES_128_GCM => AesGcm,
-        AES_192_GCM => AesGcm,
-        AES_256_GCM => AesGcm,
-    } {
-        test_aead::<A>(name);
-    }
-}
 
 /// A basic positive test.
 pub fn test_basic<A: Aead, R: Csprng>(_rng: &mut R) {
@@ -125,14 +119,14 @@ pub fn test_basic<A: Aead, R: Csprng>(_rng: &mut R) {
 
 /// Tests that `Aead::Key::new` returns unique keys.
 pub fn test_new_key<A: Aead, R: Csprng>(rng: &mut R) {
-    let k1 = A::Key::random(rng);
-    let k2 = A::Key::random(rng);
+    let k1 = A::Key::new(rng);
+    let k2 = A::Key::new(rng);
     assert_ct_ne!(k1, k2);
 }
 
 /// A round-trip positive test.
 pub fn test_round_trip<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::random(rng);
+    let key = A::Key::new(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -156,7 +150,7 @@ pub fn test_round_trip<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// An in-place round-trip positive test.
 pub fn test_in_place_round_trip<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::random(rng);
+    let key = A::Key::new(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -187,7 +181,7 @@ pub fn test_bad_key<A: Aead, R: Csprng>(rng: &mut R) {
     assert_all_zero!(nonce);
 
     let ciphertext = {
-        let key = A::Key::random(rng);
+        let key = A::Key::new(rng);
 
         let mut dst = vec![0u8; GOLDEN.len() + A::OVERHEAD];
         A::new(&key)
@@ -196,7 +190,7 @@ pub fn test_bad_key<A: Aead, R: Csprng>(rng: &mut R) {
         dst
     };
 
-    let key = A::Key::random(rng);
+    let key = A::Key::new(rng);
     let mut dst = vec![0u8; ciphertext.len() - A::OVERHEAD];
     let err = A::new(&key)
         .open(&mut dst[..], nonce.as_ref(), &ciphertext, AD)
@@ -206,7 +200,7 @@ pub fn test_bad_key<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// Decryption should fail with an incorrect nonce.
 pub fn test_bad_nonce<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::random(rng);
+    let key = A::Key::new(rng);
 
     let ciphertext = {
         let mut nonce = Nonce::<A::NonceSize>::default();
@@ -233,7 +227,7 @@ pub fn test_bad_nonce<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// Decryption should fail with a modified AD.
 pub fn test_bad_ad<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::random(rng);
+    let key = A::Key::new(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -254,7 +248,7 @@ pub fn test_bad_ad<A: Aead, R: Csprng>(rng: &mut R) {
 
 /// Decryption should fail with a modified ciphertext.
 pub fn test_bad_ciphertext<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::random(rng);
+    let key = A::Key::new(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 
@@ -278,7 +272,7 @@ pub fn test_bad_ciphertext<A: Aead, R: Csprng>(rng: &mut R) {
 /// Decryption should fail with a modified authentication
 /// tag.
 pub fn test_bad_tag<A: Aead, R: Csprng>(rng: &mut R) {
-    let key = A::Key::random(rng);
+    let key = A::Key::new(rng);
     let nonce = Nonce::<A::NonceSize>::default();
     assert_all_zero!(nonce);
 

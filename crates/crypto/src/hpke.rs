@@ -312,6 +312,30 @@ impl Display for AeadId {
     }
 }
 
+/// A [`Kem`] that can be used by HPKE.
+pub trait HpkeKem: Kem {
+    /// Identifies the KEM algorithm per [IANA].
+    ///
+    /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
+    const ID: KemId;
+}
+
+/// A [`Kdf`] that can be used by HPKE.
+pub trait HpkeKdf: Kdf {
+    /// Identifies the KDF algorithm per [IANA].
+    ///
+    /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
+    const ID: KdfId;
+}
+
+/// An [`Aead`] that can be used by HPKE.
+pub trait HpkeAead: Aead + IndCca2 {
+    /// Identifies the AEAD algorithm per [IANA].
+    ///
+    /// [IANA]: https://www.iana.org/assignments/hpke/hpke.xhtml
+    const ID: AeadId;
+}
+
 /// An error from an [`Hpke`].
 #[derive(Debug, Eq, PartialEq)]
 pub enum HpkeError {
@@ -423,9 +447,9 @@ pub struct Hpke<K, F, A> {
 
 impl<K, F, A> Hpke<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     /// Creates a randomized encryption context for encrypting
     /// messages for the receiver, `pkR`.
@@ -606,9 +630,9 @@ where
 
 struct Schedule<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     key: KeyData<A>,
     base_nonce: Nonce<A::NonceSize>,
@@ -618,9 +642,9 @@ where
 
 impl<K, F, A> Schedule<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     fn into_send_ctx(self) -> SendCtx<K, F, A> {
         SendCtx {
@@ -668,9 +692,9 @@ type RawKey<A> = (KeyData<A>, Nonce<<A as Aead>::NonceSize>);
 /// recipient.
 pub struct SendCtx<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     seal: Either<SealCtx<A>, RawKey<A>>,
     export: ExportCtx<K, F, A>,
@@ -678,9 +702,9 @@ where
 
 impl<K, F, A> SendCtx<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = SealCtx::<A>::OVERHEAD;
@@ -744,14 +768,14 @@ where
 /// a particular recipient.
 ///
 /// Unlike [`SendCtx`], it cannot export secrets.
-pub struct SealCtx<A: Aead + IndCca2 + AlgId<AeadId>> {
+pub struct SealCtx<A: HpkeAead> {
     aead: A,
     base_nonce: Nonce<A::NonceSize>,
     /// Incremented after each call to `seal`.
     seq: Seq,
 }
 
-impl<A: Aead + IndCca2 + AlgId<AeadId>> SealCtx<A> {
+impl<A: HpkeAead> SealCtx<A> {
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = A::OVERHEAD;
 
@@ -821,9 +845,9 @@ impl<A: Aead + IndCca2 + AlgId<AeadId>> SealCtx<A> {
 /// a particular sender.
 pub struct RecvCtx<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     open: Either<OpenCtx<A>, RawKey<A>>,
     export: ExportCtx<K, F, A>,
@@ -831,9 +855,9 @@ where
 
 impl<K, F, A> RecvCtx<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = OpenCtx::<A>::OVERHEAD;
@@ -1119,9 +1143,9 @@ impl Display for Seq {
 
 struct ExportCtx<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     exporter_secret: Prk<F::PrkSize>,
     _etc: PhantomData<(K, A)>,
@@ -1129,9 +1153,9 @@ where
 
 impl<K, F, A> ExportCtx<K, F, A>
 where
-    K: Kem + AlgId<KemId>,
-    F: Kdf + AlgId<KdfId>,
-    A: Aead + IndCca2 + AlgId<AeadId>,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     fn new(exporter_secret: Prk<F::PrkSize>) -> Self {
         Self {

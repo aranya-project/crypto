@@ -1,11 +1,7 @@
 //! [`Mac`] tests.
 
-use crate::{
-    csprng::{Csprng, Random},
-    mac::Mac,
-    oid::Identified,
-    test_util::{assert_ct_eq, assert_ct_ne},
-};
+use super::{assert_ct_eq, assert_ct_ne};
+use crate::{csprng::Csprng, keys::SecretKey, mac::Mac};
 
 /// Invokes `callback` for each MAC test.
 ///
@@ -27,7 +23,6 @@ macro_rules! for_each_mac_test {
     ($callback:ident) => {
         $crate::__apply! {
             $callback,
-            test_vectors,
             test_default,
             test_update,
             test_verify,
@@ -37,7 +32,7 @@ macro_rules! for_each_mac_test {
     };
 }
 
-/// Performs MAC tests.
+/// Performs all of the tests in this module.
 ///
 /// This macro expands into a bunch of individual `#[test]`
 /// functions.
@@ -47,80 +42,50 @@ macro_rules! for_each_mac_test {
 /// ```
 /// use spideroak_crypto::{test_mac, rust::HmacSha256};
 ///
-/// test_mac!(mod hmac_sha256, HmacSha256);
+/// // Without test vectors.
+/// test_mac!(hmac_sha256, HmacSha256);
+///
+/// // With test vectors.
+/// test_mac!(hmac_sha256_with_vecs, HmacSha256, MacTest::HmacSha256);
 /// ```
 #[macro_export]
 macro_rules! test_mac {
-    (mod $name:ident, $mac:ty) => {
+    ($name:ident, $mac:ty $(, MacTest::$vectors:ident)?) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            $crate::test_mac!($mac);
+            $crate::test_mac!($mac $(, MacTest::$vectors)?);
         }
     };
-    ($mac:ty) => {
+    ($mac:ty $(, MacTest::$vectors:ident)?) => {
         macro_rules! __mac_test {
             ($test:ident) => {
                 #[test]
                 fn $test() {
-                    use $crate::{
-                        default::Rng,
-                        test_util::{mac::$test, MacWithDefaults},
-                    };
-
-                    $test::<$mac, _>(&mut Rng);
-                    $test::<MacWithDefaults<$mac>, _>(&mut Rng);
+                    $crate::test_util::mac::$test::<$mac, _>(&mut $crate::default::Rng)
                 }
             };
         }
         $crate::for_each_mac_test!(__mac_test);
+
+        $(
+            #[test]
+            fn vectors() {
+                $crate::test_util::vectors::test_mac::<$mac>(
+                    $crate::test_util::vectors::MacTest::$vectors,
+                );
+            }
+        )?
     };
 }
 pub use test_mac;
 
 const DATA: &[u8] = b"hello, world!";
 
-/// Tests against MAC-specific vectors.
-///
-/// Unknown hash algorithms are ignored.
-pub fn test_vectors<T, R>(_rng: &mut R)
-where
-    T: Mac + Identified,
-    T::Tag: AsRef<[u8]>,
-    R: Csprng,
-{
-    use acvp::vectors::hmac::{
-        self,
-        Algorithm::{
-            HmacSha2_256, HmacSha2_384, HmacSha2_512, HmacSha3_256, HmacSha3_384, HmacSha3_512,
-        },
-    };
-
-    use crate::{
-        oid::consts::{
-            HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512, HMAC_WITH_SHA3_256,
-            HMAC_WITH_SHA3_384, HMAC_WITH_SHA3_512,
-        },
-        test_util::acvp::test_hmac,
-    };
-
-    if let Some(alg) = super::try_map! { T::OID;
-        HMAC_WITH_SHA2_256 => HmacSha2_256,
-        HMAC_WITH_SHA2_384 => HmacSha2_384,
-        HMAC_WITH_SHA2_512 => HmacSha2_512,
-        HMAC_WITH_SHA3_256 => HmacSha3_256,
-        HMAC_WITH_SHA3_384 => HmacSha3_384,
-        HMAC_WITH_SHA3_512 => HmacSha3_512,
-    } {
-        let vectors = hmac::load(alg).expect("should be able to load HMAC test vectors");
-        test_hmac::<T>(&vectors);
-    }
-}
-
 /// Basic positive test.
 pub fn test_default<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = Random::random(rng);
+    let key = T::Key::new(rng);
     let tag1 = T::mac(&key, DATA);
     let tag2 = T::mac(&key, DATA);
     assert_ct_eq!(tag1, tag2, "tags should be the same");
@@ -128,7 +93,7 @@ pub fn test_default<T: Mac, R: Csprng>(rng: &mut R) {
 
 /// Tests that [`Mac::update`] is the same as [`Mac::mac`].
 pub fn test_update<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = Random::random(rng);
+    let key = T::Key::new(rng);
     let tag1 = T::mac(&key, DATA);
     let tag2 = {
         let mut h = T::new(&key);
@@ -142,7 +107,7 @@ pub fn test_update<T: Mac, R: Csprng>(rng: &mut R) {
 
 /// Test [`Mac::verify`].
 pub fn test_verify<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = Random::random(rng);
+    let key = T::Key::new(rng);
     let tag1 = T::mac(&key, DATA);
 
     let mut h = T::new(&key);
@@ -154,8 +119,8 @@ pub fn test_verify<T: Mac, R: Csprng>(rng: &mut R) {
 
 /// Negative tests for different keys.
 pub fn test_different_keys<T: Mac, R: Csprng>(rng: &mut R) {
-    let key1 = Random::random(rng);
-    let key2 = Random::random(rng);
+    let key1 = T::Key::new(rng);
+    let key2 = T::Key::new(rng);
     assert_ct_ne!(key1, key2, "keys should differ");
 
     let tag1 = T::mac(&key1, DATA);
@@ -165,7 +130,7 @@ pub fn test_different_keys<T: Mac, R: Csprng>(rng: &mut R) {
 
 /// Negative test for MACs of different data.
 pub fn test_different_data<T: Mac, R: Csprng>(rng: &mut R) {
-    let key = Random::random(rng);
+    let key = T::Key::new(rng);
     let tag1 = T::mac(&key, b"hello");
     let tag2 = T::mac(&key, b"world");
     assert_ct_ne!(tag1, tag2, "tags should differ");
