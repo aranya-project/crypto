@@ -1112,7 +1112,6 @@ mod tests {
 
     use std::{collections::HashSet, ops::RangeInclusive};
 
-    use postcard::experimental::max_size::MaxSize;
     use typenum::{U1, U2};
 
     use super::*;
@@ -1182,24 +1181,8 @@ mod tests {
         let unassigned = 0x0004..=0xFFFE - 2;
         for id in unassigned {
             let want = AeadId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)
-                .expect("should be able to encode `u16`");
-            let got: AeadId = postcard::from_bytes(&encoded).unwrap_or_else(|err| {
-                panic!("should be able to decode unassigned `AeadId` {id}: {err}")
-            });
-            assert_eq!(got, want);
-        }
-    }
-
-    /// Tests that [`AeadId`] can be serialized and deserialized via [`serde_json`].
-    #[test]
-    fn test_aead_id_json() {
-        // NB: we include two unofficial IDs.
-        let unassigned = 0x0004..=0xFFFE - 2;
-        for id in unassigned {
-            let want = AeadId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = serde_json::to_string(&id).expect("should be able to encode `u16`");
-            let got: AeadId = serde_json::from_str(&encoded).unwrap_or_else(|err| {
+            let encoded = want.to_be_bytes();
+            let got = AeadId::try_from_be_bytes(encoded).unwrap_or_else(|err| {
                 panic!("should be able to decode unassigned `AeadId` {id}: {err}")
             });
             assert_eq!(got, want);
@@ -1212,9 +1195,8 @@ mod tests {
         let unassigned = 0x0004..=0xFFFF;
         for id in unassigned {
             let want = KdfId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)
-                .expect("should be able to encode `u16`");
-            let got: KdfId = postcard::from_bytes(&encoded).unwrap_or_else(|err| {
+            let encoded = want.to_be_bytes();
+            let got = KdfId::try_from_be_bytes(encoded).unwrap_or_else(|err| {
                 panic!("should be able to decode unassigned `KdfId` {id}: {err}")
             });
             assert_eq!(got, want);
@@ -1228,9 +1210,8 @@ mod tests {
             [0x0001..=0x000F, 0x0022..=0x002F, 0x0031..=0xFFFF];
         for id in unassigned.into_iter().flatten() {
             let want = KemId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)
-                .expect("should be able to encode `u16`");
-            let got: KemId = postcard::from_bytes(&encoded).unwrap_or_else(|err| {
+            let encoded = want.to_be_bytes();
+            let got = KemId::try_from_be_bytes(encoded).unwrap_or_else(|err| {
                 panic!("should be able to decode unassigned `KemId` {id}: {err}")
             });
             assert_eq!(got, want);

@@ -346,7 +346,7 @@ macro_rules! ecdh_impl {
         $pk:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -495,6 +495,14 @@ macro_rules! ecdh_impl {
             }
         }
 
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            #[inline]
+            fn drop(&mut self) {
+                is_zeroize_on_drop(&self.0);
+            }
+        }
+
         // We use Pin<&T> because `br_ec_private_key` holds
         // a pointer to `kbuf`.
         impl From<Pin<&$sk>> for br_ec_private_key {
@@ -623,7 +631,7 @@ macro_rules! ecdsa_impl {
         $sig:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -800,6 +808,14 @@ macro_rules! ecdsa_impl {
                 }
 
                 Ok(Self { kbuf })
+            }
+        }
+
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            #[inline]
+            fn drop(&mut self) {
+                is_zeroize_on_drop(&self.0);
             }
         }
 

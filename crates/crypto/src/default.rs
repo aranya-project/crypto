@@ -60,7 +60,7 @@ impl Csprng for Rng {
                 // Try to use `ThreadRng` if possible.
                 rand_core::RngCore::fill_bytes(&mut rand::thread_rng(), dst)
             } else if #[cfg(feature = "getrandom")] {
-                getrandom::getrandom(dst).expect("should not fail")
+                getrandom::fill(dst).expect("should not fail")
             } else {
                 extern "C" {
                     fn crypto_getrandom(dst: *mut u8, len: usize);

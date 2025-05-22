@@ -40,7 +40,7 @@ use crate::{
     kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
-    zeroize::ZeroizeOnDrop,
+    zeroize::{is_zeroize_on_drop, Zeroize, ZeroizeOnDrop},
 };
 
 /// AES-256-GCM.
@@ -197,7 +197,6 @@ curve_impl!(P256, "NIST-P256", p256::NistP256, P256Point, Secp256r1);
 curve_impl!(P384, "NIST-P256", p384::NistP384, P384Point, Secp384r1);
 
 /// An ECDH shared secret.
-#[derive(ZeroizeOnDrop)]
 pub struct SharedSecret<C>(ecdh::SharedSecret<C>)
 where
     C: CurveArithmetic;
@@ -211,6 +210,16 @@ where
     }
 }
 
+impl<C> ZeroizeOnDrop for SharedSecret<C> where C: CurveArithmetic {}
+impl<C> Drop for SharedSecret<C>
+where
+    C: CurveArithmetic,
+{
+    fn drop(&mut self) {
+        is_zeroize_on_drop(&self.0);
+    }
+}
+
 macro_rules! ecdh_impl {
     (
         $curve:ident,
@@ -220,7 +229,7 @@ macro_rules! ecdh_impl {
         $point:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone)]
         pub struct $sk(NonZeroScalar<$curve>);
 
         impl DecapKey for $sk {
@@ -270,6 +279,13 @@ macro_rules! ecdh_impl {
                 let sk = Option::from(NonZeroScalar::from_repr(bytes.into()))
                     .ok_or(ImportError::InvalidSyntax)?;
                 Ok(Self(sk))
+            }
+        }
+
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            fn drop(&mut self) {
+                self.0.zeroize();
             }
         }
 
@@ -356,7 +372,7 @@ macro_rules! ecdsa_impl {
         $point:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone)]
         pub struct $sk(ecdsa::SigningKey<$curve>);
 
         impl SigningKey<$curve> for $sk {
@@ -408,6 +424,14 @@ macro_rules! ecdsa_impl {
                 let sk =
                     ecdsa::SigningKey::from_slice(data).map_err(|_| ImportError::InvalidSyntax)?;
                 Ok(Self(sk))
+            }
+        }
+
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            #[inline]
+            fn drop(&mut self) {
+                is_zeroize_on_drop(&self.0);
             }
         }
 

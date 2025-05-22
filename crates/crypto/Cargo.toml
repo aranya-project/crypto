@@ -27,7 +27,6 @@ alloc = [
 	"buggy/alloc",
 	"der/alloc",
 	"ecdsa/alloc",
-	"postcard/alloc",
 	"rand?/alloc",
 	"rand_core/alloc",
 	"sha3-utils/alloc",
@@ -109,12 +108,11 @@ std = [
 	"getrandom?/std",
 	"p256/std",
 	"p384/std",
-	"postcard/use-std",
 	"rand?/std",
 	"rand?/std_rng",
 	"rand_chacha?/std",
 	"rand_core/std",
-	"serde/std",
+	"serde?/std",
 	"serde_json?/std",
 	"sha2/std",
 	"sha3-utils/std",
@@ -129,6 +127,7 @@ test_util = [
 	"alloc",
 
 	"dep:more-asserts",
+	"dep:serde",
 	"dep:serde_json",
 	"dep:serde_repr",
 	"dep:wycheproof",
@@ -156,26 +155,23 @@ der = { version = "0.7", default-features = false }
 ecdsa = { version = "0.16", default-features = false, features = ["signing", "verifying", "der"] }
 ed25519-dalek = { version = "2.0.0-rc.3", default-features = false, features = ["zeroize"] }
 elliptic-curve = { version = "0.13", default-features = false, features = ["ecdh", "arithmetic", "sec1"] }
-generic-array = { version = "1.1.*", default-features = false, features = ["const-default", "serde", "zeroize"] }
-getrandom = { version = "0.2", default-features = false, optional = true }
+generic-array = { version = "1.1.*", default-features = false, features = ["const-default", "zeroize"] }
+getrandom = { version = "0.3", default-features = false, optional = true }
 lazy_static = { version = "1.4", default-features = false, features = ["spin_no_std"], optional = true }
 more-asserts = { version = "0.3", default-features = false, optional = true }
 p256 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
 p384 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
-# Required by `aranya_crypto_derive::AlgId`.
-postcard = { workspace = true, default-features = false, features = ["heapless", "experimental-derive"] }
 rand = { workspace = true, default-features = false, optional = true }
 rand_chacha = { version = "0.3", default-features = false, optional = true }
 # `rand_core` is required by the `rust` backend.
 rand_core = { workspace = true, default-features = false }
-# TODO(eric): Make this optional, it should only be needed by
-# `test_util`.
-serde = { workspace = true, default-features = false, features = ["derive"] }
+# The "serde*" crates are only used by `test_util`.
+serde = { workspace = true, default-features = false, features = ["derive"], optional = true }
 serde_json = { version = "1", default-features = false, optional = true }
 serde_repr = { version = "0.1", default-features = false, optional = true }
 sha2 = { version = "0.10", default-features = false }
 sha3-utils = { version = "0.3.0", default-features = false }
-spin = { workspace = true, default-features = false, features = ["mutex", "once", "spin_mutex"], optional = true }
+spin = { workspace = true, default-features = false, features = ["spin_mutex"], optional = true }
 subtle = { version = "2.5", default-features = false, features = ["core_hint_black_box"] }
 thiserror = { version = "2", default-features = false }
 typenum = { version = "1", default-features = false, features = ["const-generics"] }
@@ -183,20 +179,12 @@ typenum = { version = "1", default-features = false, features = ["const-generics
 # won't bloat release builds, though, since users of this crate
 # should only use this feature inside [dev-dependencies].
 wycheproof = { version = "0.6", optional = true }
-zeroize = { version = "1", default-features = false, features = ["zeroize_derive"] }
+zeroize = { version = "1", default-features = false }
 
 [dev-dependencies]
 # A little bit of a hack: always certain features for tests and
 # examples.
 spideroak-crypto = { path = ".", features = ["alloc", "test_util"] }
-
-postcard = { workspace = true, features = ["alloc", "experimental-derive", "heapless"] }
-rand = { workspace = true, features = ["std", "std_rng"] }
-serde = { workspace = true, default-features = false, features = ["derive"] }
-serde_json = { version = "1", default-features = false }
-serde_repr = { version = "0.1", default-features = false }
-tempfile = { version = "3" }
-wycheproof = { version = "0.6" }
 
 [package.metadata.docs.rs]
 features = [
