@@ -421,6 +421,7 @@ macro_rules! ecdh_impl {
                 // Check that `$curve::SCALAR_SIZE` is correct.
                 #[cfg(debug_assertions)]
                 {
+                    // SAFETY: FFI call, no invariants.
                     let n = unsafe {
                         br_ec_keygen(
                             ptr::addr_of_mut!(rng.vtable), // rng_ctx
@@ -732,6 +733,7 @@ macro_rules! ecdsa_impl {
                 // Check that `$curve::SCALAR_SIZE` is correct.
                 #[cfg(debug_assertions)]
                 {
+                    // SAFETY: FFI call, no invariants.
                     let n = unsafe {
                         br_ec_keygen(
                             ptr::addr_of_mut!(rng.vtable), // rng_ctx
