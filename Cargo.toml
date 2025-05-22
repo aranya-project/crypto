@@ -14,7 +14,7 @@ default-members = [
 authors = ["SpiderOak, Inc."]
 edition = "2021"
 repository = "https://github.com/aranya-project/crypto"
-rust-version = "1.81.0"
+rust-version = "1.85.0"
 
 [workspace.lints.rust]
 missing_docs = "warn"
@@ -34,31 +34,6 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-anyhow = { version = "1.0" }
-byteorder = { version = "1", default-features = false }
-cfg-if = { version = "1", default-features = false }
-const_format = { version = "0.2", default-features = false }
-heapless = { version = "0.8", default-features = false }
-libc = { version = "0.2", default-features = false }
-log = { version = "0.4", default-features = false }
-proptest = { version = "1.6", default-features = false, features = ["no_std", "alloc"] }
-proptest-derive = { version = "0.5" }
-rand = { version = "0.8", default-features = false }
-rand_core = { version = "0.6", default-features = false }
-rustix = { version = "0.38", default-features = false }
-rustls = { version = "0.21.0", default-features = false }
-serde = { version = "1.0.210", default-features = false }
-spin = { version = "0.9.8", default-features = false }
-test-log = { version = "0.2", default-features = false, features = ["trace"] }
-thiserror = { version = "2", default-features = false }
-tokio = { version = "1.41.1", default-features = false, features = ["macros"] }
-tokio-util = { version = "0.7.8", default-features = false }
-tracing = { version = "0.1", default-features = false, features = ["attributes"] }
-tracing-subscriber = { version = "0.3.18", default-features = false }
-
-proc-macro2 = { version = "1" }
-quote = { version = "1" }
-syn = { version = "2" }
 
 [profile.dev]
 panic = "abort"

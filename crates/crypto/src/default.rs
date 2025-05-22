@@ -6,17 +6,12 @@ use crate::csprng::Csprng;
 
 /// The default CSPRNG.
 ///
-/// Certain feature flags will change the default CSPRNG:
+/// By default, it uses the system CSPRNG (see the `getrandom`
+/// feature). The `trng` flag can be set to use a user space
+/// CSPRNG seeded by a system TRNG instead.
 ///
-/// - `trng`: Uses a TRNG provided by the system.
-/// - `std`: Uses a thread-local CSPRNG seeded from the system
-///   CSPRNG.
-/// - `libc`: Uses the system CSPRNG.
-///
-/// The `libc` flag is enabled by default.
-///
-/// If all of those feature flags are disabled, `Rng` invokes the
-/// following routine:
+/// If neither are available, `Rng` invokes the following
+/// routine:
 ///
 /// ```
 /// extern "C" {
@@ -56,11 +51,8 @@ impl Csprng for Rng {
         cfg_if! {
             if #[cfg(feature = "trng")] {
                 crate::csprng::trng::thread_rng().fill_bytes(dst)
-            } else if #[cfg(feature = "std")] {
-                // Try to use `ThreadRng` if possible.
-                rand_core::RngCore::fill_bytes(&mut rand::thread_rng(), dst)
             } else if #[cfg(feature = "getrandom")] {
-                getrandom::fill(dst).expect("should not fail")
+                getrandom::getrandom(dst).expect("should not fail")
             } else {
                 extern "C" {
                     fn crypto_getrandom(dst: *mut u8, len: usize);
