@@ -4,6 +4,8 @@
 //! highly** recommended that you use these tests.
 
 #![allow(clippy::arithmetic_side_effects)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::missing_panics_doc)]
 #![allow(clippy::panic)]
 #![cfg(any(test, feature = "test_util"))]
 #![cfg_attr(docsrs, doc(cfg(feature = "test_util")))]
