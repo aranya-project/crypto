@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "spideroak-crypto"
-version = "0.3.0-pre.1"
+version = "0.3.0-pre.2"
 dependencies = [
  "aes",
  "aes-gcm",
