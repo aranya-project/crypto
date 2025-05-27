@@ -204,14 +204,15 @@ pub(crate) mod trng {
     // mutability.
     #[cfg(not(feature = "std"))]
     mod inner {
-        use lazy_static::lazy_static;
         use spin::mutex::SpinMutex;
 
         use super::{ChaCha8Csprng, HkdfSha512, OsTrng};
 
-        lazy_static! {
-            static ref THREAD_RNG: SpinMutex<ChaCha8Csprng> =
-                SpinMutex::new(ChaCha8Csprng::from_trng::<_, HkdfSha512>(OsTrng));
+        fn with_rng<F: FnOnce(&mut ChaCha8Csprng)>(f: F) {
+            static THREAD_RNG: SpinMutex<Option<ChaCha8Csprng>> = SpinMutex::new(None);
+            let mut rng = THREAD_RNG.lock();
+            let rng = rng.get_or_insert_with(|| ChaCha8Csprng::from_trng::<_, HkdfSha512>(OsTrng));
+            f(rng);
         }
 
         pub(super) fn thread_rng() -> ThreadRng {
@@ -224,8 +225,7 @@ pub(crate) mod trng {
         impl ThreadRng {
             #[inline(always)]
             pub(super) fn fill_bytes_and_reseed(&mut self, dst: &mut [u8]) {
-                let mut rng = THREAD_RNG.lock();
-                rng.fill_bytes_and_reseed(dst);
+                with_rng(|rng| rng.fill_bytes_and_reseed(dst))
             }
         }
     }
@@ -352,7 +352,8 @@ pub(crate) mod trng {
 
     #[cfg(test)]
     mod tests {
-        use rand::{rngs::OsRng, RngCore};
+        use rand::RngCore;
+        use rand_core::OsRng;
 
         use super::{random_seed, thread_rng, ChaCha8Csprng, ThreadRng};
         use crate::{csprng::Csprng, kdf::Kdf};
