@@ -136,7 +136,6 @@ test_util = [
 # Use a system provided TRNG for the default CSPRNG.
 trng = [
 	"dep:aes",
-	"dep:lazy_static",
 	"dep:rand_chacha",
 	"dep:spin",
 ]
@@ -157,7 +156,6 @@ ed25519-dalek = { version = "2", default-features = false, features = ["fast", "
 elliptic-curve = { version = "0.13", default-features = false, features = ["ecdh", "arithmetic", "sec1"] }
 generic-array = { version = "1.1.*", default-features = false, features = ["const-default", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, optional = true }
-lazy_static = { version = "1.4", default-features = false, features = ["spin_no_std"], optional = true }
 more-asserts = { version = "0.3", default-features = false, optional = true }
 p256 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
 p384 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
