@@ -2,66 +2,18 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     fmt,
-    fs::File,
     hash::{Hash, Hasher},
-    io::Write,
 };
 
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_quote, Data, DeriveInput, Error, Expr, ExprLit, Fields, Ident, Lit, LitInt, Path,
+    Data, DeriveInput, Error, Expr, ExprLit, Fields, Ident, Lit, LitInt,
 };
 
 pub(crate) fn parse(item: TokenStream) -> syn::Result<TokenStream> {
     let AlgId { name, variants } = syn::parse2(item)?;
-
-    // Our `extern crate`s.
-    let postcard: Path = parse_quote!(_postcard);
-    let serde: Path = parse_quote!(_serde);
-
-    let postcard_impl = quote! {
-        impl #postcard::experimental::max_size::MaxSize for #name {
-            const POSTCARD_MAX_SIZE: usize = <u16 as #postcard::experimental::max_size::MaxSize>::POSTCARD_MAX_SIZE;
-        }
-    };
-
-    let serde_impl = quote! {
-        impl #serde::Serialize for #name {
-            fn serialize<S>(&self, s: S) -> ::core::result::Result<S::Ok, S::Error>
-            where
-                S: #serde::Serializer,
-            {
-                s.serialize_u16(self.to_u16())
-            }
-        }
-
-        impl<'de> #serde::Deserialize<'de> for #name {
-            fn deserialize<D>(d: D) -> ::core::result::Result<Self, D::Error>
-            where
-                D: #serde::Deserializer<'de>,
-            {
-                struct AlgIdVisitor;
-                impl<'de> #serde::de::Visitor<'de> for AlgIdVisitor {
-                    type Value = #name;
-
-                    fn expecting(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                        ::core::write!(f, "{}", ::core::stringify!(#name))
-                    }
-
-                    fn visit_u64<E>(self, v: u64) -> ::core::result::Result<Self::Value, E>
-                    where
-                        E: #serde::de::Error,
-                    {
-                        let v = u16::try_from(v).map_err(E::custom)?;
-                        #name::try_from_u16(v).map_err(E::custom)
-                    }
-                }
-                d.deserialize_u16(AlgIdVisitor)
-            }
-        }
-    };
 
     let error = format_ident!("Invalid{name}");
     let error_impl = quote! {
@@ -72,7 +24,7 @@ pub(crate) fn parse(item: TokenStream) -> syn::Result<TokenStream> {
             ::core::cmp::Eq,
             ::core::cmp::PartialEq,
         )]
-        pub(crate) struct #error(());
+        pub struct #error(());
 
         impl ::core::fmt::Display for #error {
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
@@ -134,6 +86,12 @@ pub(crate) fn parse(item: TokenStream) -> syn::Result<TokenStream> {
                         #(#from_mappings),*,
                     }
                 }
+
+                /// Tries to parse the algorithm ID as big-endian
+                /// bytes.
+                pub const fn try_from_be_bytes(bytes: [u8; 2]) -> ::core::result::Result<Self, #error> {
+                    Self::try_from_u16(u16::from_be_bytes(bytes))
+                }
             }
         }
     };
@@ -142,27 +100,10 @@ pub(crate) fn parse(item: TokenStream) -> syn::Result<TokenStream> {
         #[doc(hidden)]
         #[allow(missing_docs, unused_extern_crates)]
         const _: () = {
-            extern crate postcard as #postcard;
-            extern crate serde as #serde;
-
             #base_impl
             #error_impl
-            #serde_impl
-            #postcard_impl
         };
     };
-
-    // Undocumented.
-    if cfg!(crypto_derive_debug) {
-        let mut data = block.to_string();
-        if let Ok(file) = syn::parse_file(&data) {
-            data = prettyplease::unparse(&file);
-        }
-        File::create("/tmp/expand.rs")
-            .expect("unable to create `/tmp/expand.rs`")
-            .write_all(data.as_bytes())
-            .expect("unable to write all data to `/tmp/expand.rs`");
-    }
     Ok(block)
 }
 

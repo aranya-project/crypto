@@ -107,6 +107,11 @@ where
     }
 
     /// Creates a hexadecimal string from `data`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the length of
+    /// [`data.borrow()`][Borrow::borrow] is not exactly `2*N`.
     pub fn from_bytes<T>(data: T) -> Self
     where
         T: Borrow<GenericArray<u8, N>>,
@@ -119,6 +124,11 @@ where
     }
 
     /// Converts the hexadecimal string to raw bytes.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the generic bounds are buggy.
+    /// The compiler should remove the panic.
     pub fn to_bytes(&self) -> GenericArray<u8, PartialQuot<N, U2>>
     where
         N: ArrayLength + Div<U2> + Rem<U2, Output = Z0> + Integer,
@@ -415,7 +425,7 @@ mod tests {
                     panic!("#{i}: should be able to decode pair '{ci:x}{cj:x}'")
                 });
                 assert_eq!(n, 1, "#{i}: {ci:x}{cj:x}");
-                let want = must_from_hex_char(ci) << 4 | must_from_hex_char(cj);
+                let want = (must_from_hex_char(ci) << 4) | must_from_hex_char(cj);
                 assert_eq!(&dst, &[want], "#{i}: {ci:x}{cj:x}");
             } else {
                 res.expect_err(&format!("#{i}: should not have decoded pair '{src:?}'"));

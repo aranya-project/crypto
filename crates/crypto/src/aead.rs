@@ -14,7 +14,6 @@ use core::{
 
 use buggy::{Bug, BugExt};
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
-use serde::{Deserialize, Serialize};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
     generic_const_mappings::Const,
@@ -693,10 +692,8 @@ impl<N: ArrayLength> AeadKey<N> {
 }
 
 /// An [`Aead`] nonce.
-#[derive(Clone, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, Hash, Eq, PartialEq)]
 #[repr(transparent)]
-#[serde(bound = "")]
-#[serde(transparent)]
 pub struct Nonce<N: ArrayLength>(GenericArray<u8, N>);
 
 impl<N: ArrayLength> Nonce<N> {
@@ -708,6 +705,12 @@ impl<N: ArrayLength> Nonce<N> {
     #[allow(clippy::len_without_is_empty)]
     pub const fn len(&self) -> usize {
         Self::SIZE
+    }
+
+    // For `aranya-crypto`. Do not use.
+    #[doc(hidden)]
+    pub fn into_inner(self) -> GenericArray<u8, N> {
+        self.0
     }
 
     pub(crate) const fn from_bytes(nonce: GenericArray<u8, N>) -> Self {
