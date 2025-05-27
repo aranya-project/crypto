@@ -32,10 +32,6 @@ url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/
 [imports.zcash.criteria-map]
 crypto-safe = "crypto-safe"
 
-[policy.acvp]
-audit-as-crates-io = false
-notes = "SpiderOak crate"
-
 [policy.spideroak-crypto]
 audit-as-crates-io = false
 notes = "SpiderOak crate"
