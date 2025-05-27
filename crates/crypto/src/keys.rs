@@ -1,6 +1,6 @@
 //! Basic keys and key material.
 
-use core::{borrow::Borrow, fmt::Debug, iter::IntoIterator, mem, result::Result};
+use core::{borrow::Borrow, fmt, iter::IntoIterator, mem, result::Result};
 
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use subtle::{Choice, ConstantTimeEq};
@@ -51,6 +51,12 @@ impl RawSecretBytes for [u8] {
 #[derive(Clone, Default)]
 #[repr(transparent)]
 pub struct SecretKeyBytes<N: ArrayLength>(GenericArray<u8, N>);
+
+impl<N: ArrayLength> fmt::Debug for SecretKeyBytes<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKeyBytes").finish_non_exhaustive()
+    }
+}
 
 impl<N: ArrayLength> ZeroizeOnDrop for SecretKeyBytes<N> {}
 impl<N: ArrayLength> Drop for SecretKeyBytes<N> {
@@ -151,7 +157,7 @@ impl<N: ArrayLength> RawSecretBytes for SecretKeyBytes<N> {
 }
 
 /// A fixed-length asymmetric public key.
-pub trait PublicKey: Clone + Debug + Eq + for<'a> Import<&'a [u8]> {
+pub trait PublicKey: Clone + fmt::Debug + Eq + for<'a> Import<&'a [u8]> {
     /// The fixed-length byte encoding of the key.
     type Data: Borrow<[u8]> + Clone + Sized;
 
@@ -300,6 +306,12 @@ macro_rules! raw_key {
                 let bytes = $crate::import::Import::<_>::import(data)?;
                 let sk = $crate::keys::SecretKeyBytes::new(bytes);
                 ::core::result::Result::Ok(Self(sk))
+            }
+        }
+
+        impl<N: ::generic_array::ArrayLength> ::core::fmt::Debug for $name<N> {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                f.debug_struct(stringify!($name)).finish_non_exhaustive()
             }
         }
 

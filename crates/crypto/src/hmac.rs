@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use core::cmp;
+use core::{cmp, fmt};
 
 use generic_array::{ArrayLength, GenericArray, LengthError};
 use subtle::{Choice, ConstantTimeEq};
@@ -21,7 +21,7 @@ use crate::{
 /// HMAC per [FIPS PUB 198-1] for some hash `H`.
 ///
 /// [FIPS PUB 198-1]: https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.198-1.pdf
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Hmac<H> {
     /// H(ipad).
     ipad: H,
@@ -210,6 +210,12 @@ impl<H: Hash + BlockSize> ConstantTimeEq for HmacKey<H> {
     }
 }
 
+impl<H: Hash + BlockSize> fmt::Debug for HmacKey<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HmacKey").finish_non_exhaustive()
+    }
+}
+
 impl<H: Hash + BlockSize> ZeroizeOnDrop for HmacKey<H> {}
 impl<H: Hash + BlockSize> Drop for HmacKey<H> {
     #[inline]
@@ -257,7 +263,7 @@ impl<H: Hash + BlockSize> Drop for HmacKey<H> {
 macro_rules! hmac_impl {
     ($name:ident, $doc:expr, $hash:ident) => {
         #[doc = concat!($doc, ".")]
-        #[derive(Clone)]
+        #[derive(Clone, Debug)]
         pub struct $name($crate::hmac::Hmac<$hash>);
 
         impl $crate::mac::Mac for $name {

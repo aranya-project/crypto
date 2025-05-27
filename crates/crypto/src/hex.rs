@@ -171,6 +171,16 @@ where
     }
 }
 
+impl<N: ArrayLength> fmt::Debug for HexString<N>
+where
+    N: ArrayLength + Shl<B1>,
+    Double<N>: ArrayLength,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("HexString").field(&self.0).finish()
+    }
+}
+
 impl<N: ArrayLength> fmt::LowerHex for HexString<N>
 where
     N: ArrayLength + Shl<B1>,

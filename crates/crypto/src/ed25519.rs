@@ -9,7 +9,7 @@
 //! [ed25519-dalek]: https://github.com/dalek-cryptography/ed25519-dalek
 //! [weak-key]: https://github.com/dalek-cryptography/ed25519-dalek/tree/58a967f6fb28806a21180c880bbec4fdeb907aef#weak-key-forgery-and-verify_strict
 
-use core::fmt::{self, Debug};
+use core::fmt;
 
 use ed25519_dalek as dalek;
 use subtle::{Choice, ConstantTimeEq};
@@ -25,6 +25,7 @@ use crate::{
 };
 
 /// EdDSA using Ed25519.
+#[derive(Copy, Clone, Debug)]
 pub struct Ed25519;
 
 impl Signer for Ed25519 {
@@ -108,6 +109,12 @@ impl Import<&[u8]> for SigningKey {
     }
 }
 
+impl fmt::Debug for SigningKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SigningKey").finish_non_exhaustive()
+    }
+}
+
 impl ZeroizeOnDrop for SigningKey {}
 impl Drop for SigningKey {
     fn drop(&mut self) {
@@ -155,7 +162,7 @@ impl<'a> Import<&'a [u8]> for VerifyingKey {
     }
 }
 
-impl Debug for VerifyingKey {
+impl fmt::Debug for VerifyingKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.export().to_hex())
     }

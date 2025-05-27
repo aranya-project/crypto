@@ -2,7 +2,7 @@
 
 use core::{
     borrow::{Borrow, BorrowMut},
-    fmt::Debug,
+    fmt,
     ops::Shl,
 };
 
@@ -60,7 +60,7 @@ macro_rules! pk_impl {
         #[doc = concat!(stringify!($name), " elliptic curve point per [SEC] section 2.3.3.\n\n")]
         #[doc = "This is equivalent to X9.62 encoding.\n\n"]
         #[doc = "[SEC]: https://www.secg.org/sec1-v2.pdf"]
-        #[derive(Clone, Default, Eq, PartialEq)]
+        #[derive(Clone, Default, Debug, Eq, PartialEq)]
         pub struct $name<C: Curve>(pub GenericArray<u8, C::$size>);
 
         impl<C: Curve> $name<C> {
@@ -297,6 +297,12 @@ impl<C: Curve> Import<&[u8]> for Scalar<C> {
             want: C::ScalarSize::USIZE..C::ScalarSize::USIZE,
         })?;
         Ok(Self(v.clone()))
+    }
+}
+
+impl<C: Curve> fmt::Debug for Scalar<C> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Scalar").finish_non_exhaustive()
     }
 }
 
