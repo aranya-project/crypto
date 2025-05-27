@@ -631,21 +631,6 @@ impl Arcs<'_> {
         }
         let mut der = self.der;
 
-        // TODO(eric): Figure out whether this is worth it.
-        while let Some((chunk, rest)) = der.split_first_chunk::<8>() {
-            const MASK: u64 = 0x8080808080808080;
-            let w = u64::from_le_bytes(
-                // SAFETY: `chunk` is exactly 8 bytes and has
-                // the same alignment as `*const [u8; 8]`.
-                unsafe { *(chunk.as_ptr().cast::<[u8; 8]>()) },
-            );
-            let ones = ((w & MASK).count_ones()) as usize;
-            // Cannot wrap, but avoids a lint.
-            n = n.wrapping_add(8usize.wrapping_sub(ones));
-
-            der = rest;
-        }
-
         while let Some((&v, rest)) = der.split_first() {
             if v & 0x80 == 0 {
                 n = n.wrapping_add(1);
