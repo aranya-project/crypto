@@ -177,7 +177,7 @@ where
     Double<N>: ArrayLength,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("HexString").field(&self.0).finish()
+        self.as_str().fmt(f)
     }
 }
 

@@ -714,7 +714,7 @@ impl<K: Kem, F: Kdf, A: Aead + IndCca2> SendCtx<K, F, A> {
 impl<K: Kem, F: Kdf, A: Aead + IndCca2 + fmt::Debug> fmt::Debug for SendCtx<K, F, A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SendCtx")
-            .field("open", &self.seal)
+            .field("seal", &self.seal)
             .field("export", &self.export)
             .finish()
     }
