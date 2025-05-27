@@ -1,7 +1,7 @@
 [package]
 name = "spideroak-crypto"
 description = "SpiderOak's cryptography library"
-version = "0.3.0-pre.2"
+version = "0.4.0"
 authors.workspace = true
 edition.workspace = true
 license = "BSD-3-Clause"
@@ -144,7 +144,7 @@ trng = [
 # This workspace
 ##
 
-spideroak-crypto-derive = { version = "0.1.0", path = "../crypto-derive" }
+spideroak-crypto-derive = { version = "0.2.0", path = "../crypto-derive" }
 
 ##
 # Other SpiderOak crates
