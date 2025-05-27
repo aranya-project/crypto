@@ -680,10 +680,6 @@ impl Iterator for Arcs<'_> {
 impl DoubleEndedIterator for Arcs<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let (arc, rest) = parse_arc_der_from_back(self.der).ok()?;
-        #[cfg(test)]
-        {
-            println!("arc = {arc}");
-        }
         if !rest.is_empty() {
             // There is still data at the start of the buffer, so
             // this is not the first or second arc.
@@ -1186,7 +1182,6 @@ mod tests {
                 }
                 want -= 1;
             }
-            println!();
         }
     }
 
