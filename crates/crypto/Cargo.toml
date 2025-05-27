@@ -127,7 +127,6 @@ std = [
 test_util = [
 	"alloc",
 
-	"dep:hex",
 	"dep:more-asserts",
 	"dep:serde",
 	"dep:serde_json",
@@ -174,9 +173,6 @@ elliptic-curve = { version = "0.13", default-features = false, features = ["ecdh
 # `generic-array@1.2` has an MSRV of 1.83, ours is 1.81.
 generic-array = { version = "1.1.*", default-features = false, features = ["const-default", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, optional = true }
-# Used by `test_util`.
-# TODO(eric): still needed?
-hex = { version = "0.4", optional = true }
 more-asserts = { version = "0.3", default-features = false, optional = true }
 p256 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
 p384 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
