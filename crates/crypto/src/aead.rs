@@ -873,12 +873,6 @@ mod committing {
         _cipher: PhantomData<fn() -> C>,
     }
 
-    impl<A, C> fmt::Debug for CtrThenXorPrf<A, C> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.debug_struct("CtrThenXorPrf").finish_non_exhaustive()
-        }
-    }
-
     impl<A, C> CtrThenXorPrf<A, C>
     where
         A: Aead,
@@ -977,6 +971,12 @@ mod committing {
                 chunk.copy_from_slice(&v_i[..chunk.len()]);
             }
             Ok(key)
+        }
+    }
+
+    impl<A, C> fmt::Debug for CtrThenXorPrf<A, C> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("CtrThenXorPrf").finish_non_exhaustive()
         }
     }
 
