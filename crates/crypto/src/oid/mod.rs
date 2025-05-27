@@ -6,6 +6,8 @@ pub mod consts;
 
 use core::{fmt, hash::Hash, iter::FusedIterator, ops::Deref, slice, str::FromStr};
 
+use crate::util::const_assert;
+
 macro_rules! const_try {
     ($expr:expr $(,)?) => {
         match $expr {
@@ -134,9 +136,13 @@ macro_rules! extend_oid {
     }};
 }
 
+use zerocopy::{Immutable, IntoBytes, KnownLayout, Unaligned};
+
 /// A slice of a DER-encoded OID.
-#[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-#[repr(transparent)]
+#[derive(
+    Debug, Hash, Eq, PartialEq, Ord, PartialOrd, KnownLayout, Immutable, Unaligned, IntoBytes,
+)]
+#[repr(C)]
 pub struct Oid([u8]);
 
 impl Oid {
@@ -162,9 +168,13 @@ impl Oid {
 
     /// Converts the DER-encoded OID into an `Oid`.
     const fn from_bytes_unchecked(der: &[u8]) -> &Self {
+        const_assert!(size_of::<&Oid>() == size_of::<&[u8]>());
+        const_assert!(align_of::<&Oid>() == align_of::<&[u8]>());
+
         // SAFETY: `Oid` and `[u8]` have the same layout in
-        // memory since `Oid` is a `#[repr(transparent)]` wrapper
-        // around `[u8]`.
+        // memory since `Oid` is newtype wrapper around `[u8]`.
+        // NB: `Oid` is not `#[repr(transparent)]`, but it is
+        // `#[repr(C)]`.
         unsafe { &*(der as *const [u8] as *const Self) }
     }
 

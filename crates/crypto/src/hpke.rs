@@ -772,7 +772,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SendCtx")
-            .field("open", &self.seal)
+            .field("seal", &self.seal)
             .field("export", &self.export)
             .finish()
     }

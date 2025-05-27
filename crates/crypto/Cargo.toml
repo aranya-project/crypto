@@ -167,8 +167,7 @@ der = { version = "0.7", default-features = false }
 ecdsa = { version = "0.16", default-features = false, features = ["signing", "verifying", "der"] }
 ed25519-dalek = { version = "2", default-features = false, features = ["fast", "zeroize"] }
 elliptic-curve = { version = "0.13", default-features = false, features = ["ecdh", "arithmetic", "sec1"] }
-# `generic-array@1.2` has an MSRV of 1.83, ours is 1.81.
-generic-array = { version = "1.1.*", default-features = false, features = ["const-default", "zeroize"] }
+generic-array = { version = "1", default-features = false, features = ["const-default", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, optional = true }
 more-asserts = { version = "0.3", default-features = false, optional = true }
 p256 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
@@ -191,6 +190,7 @@ typenum = { version = "1", default-features = false, features = ["const-generics
 # won't bloat release builds, though, since users of this crate
 # should only use this feature inside [dev-dependencies].
 wycheproof = { version = "0.6", optional = true }
+zerocopy = { version = "0.8", default-features = false, features = ["derive"] }
 zeroize = { version = "1", default-features = false }
 
 [dev-dependencies]
