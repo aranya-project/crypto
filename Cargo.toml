@@ -46,9 +46,8 @@ wildcard_imports = "warn"
 [workspace.dependencies]
 
 [profile.dev]
-# Required for some of the tests to run in a reasonable amount of
-# time.
-opt-level = 2
+panic = "abort"
+opt-level = 1
 
 [profile.dev-std]
 inherits = "dev"
