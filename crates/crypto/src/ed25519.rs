@@ -9,7 +9,7 @@
 //! [ed25519-dalek]: https://github.com/dalek-cryptography/ed25519-dalek
 //! [weak-key]: https://github.com/dalek-cryptography/ed25519-dalek/tree/58a967f6fb28806a21180c880bbec4fdeb907aef#weak-key-forgery-and-verify_strict
 
-use core::fmt::{self, Debug};
+use core::fmt;
 
 use ed25519_dalek as dalek;
 use subtle::{Choice, ConstantTimeEq};
@@ -21,11 +21,12 @@ use crate::{
     import::{try_import, ExportError, Import, ImportError},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{consts::ED25519, Identified, Oid},
-    signer::{self, PkError, Signer, SignerError},
-    zeroize::ZeroizeOnDrop,
+    signer::{self, PkError, Signer, SignerError, SignerId},
+    zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
 };
 
 /// EdDSA using Ed25519.
+#[derive(Copy, Clone, Debug)]
 pub struct Ed25519;
 
 impl Signer for Ed25519 {
@@ -56,7 +57,7 @@ impl Identified for Ed25519 {
 }
 
 /// An Ed25519 signing key.
-#[derive(Clone, ZeroizeOnDrop)]
+#[derive(Clone)]
 pub struct SigningKey(dalek::SigningKey);
 
 impl signer::SigningKey<Ed25519> for SigningKey {
@@ -111,6 +112,19 @@ impl Import<&[u8]> for SigningKey {
     }
 }
 
+impl fmt::Debug for SigningKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SigningKey").finish_non_exhaustive()
+    }
+}
+
+impl ZeroizeOnDrop for SigningKey {}
+impl Drop for SigningKey {
+    fn drop(&mut self) {
+        is_zeroize_on_drop(&self.0);
+    }
+}
+
 /// An Ed25519 signature verifying key.
 #[derive(Clone, Eq, PartialEq)]
 #[repr(transparent)]
@@ -151,7 +165,7 @@ impl<'a> Import<&'a [u8]> for VerifyingKey {
     }
 }
 
-impl Debug for VerifyingKey {
+impl fmt::Debug for VerifyingKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.export().to_hex())
     }

@@ -6,15 +6,7 @@
 #![cfg(feature = "bearssl")]
 
 use core::{
-    borrow::Borrow,
-    cmp,
-    ffi::c_void,
-    fmt::{self, Debug},
-    mem::size_of,
-    ops::Range,
-    pin::Pin,
-    ptr,
-    result::Result,
+    borrow::Borrow, cmp, ffi::c_void, fmt, mem::size_of, ops::Range, pin::Pin, ptr, result::Result,
     slice,
 };
 
@@ -33,8 +25,7 @@ use crate::{
     block::BlockSize,
     csprng::{Csprng, Random},
     ec::{Curve, Curve25519, Scalar, Secp256r1, Secp384r1, Secp521r1, Uncompressed},
-    hash::{Digest, Hash},
-    hex::ToHex,
+    hash::{Digest, Hash, HashId},
     hkdf::hkdf_impl,
     hmac::hmac_impl,
     hpke::{AeadId, HpkeAead, KdfId, KemId},
@@ -49,17 +40,17 @@ use crate::{
         },
         Identified, Oid,
     },
-    signer::{PkError, Signature, Signer, SignerError, SigningKey, VerifyingKey},
-    zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
+    signer::{PkError, Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    zeroize::{is_zeroize_on_drop, Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
 /// Reports in constant time whether `x == 0`.
 fn ct_eq_zero(x: &[u8]) -> Choice {
-    let mut v = Choice::from(0u8);
+    let mut is_zero = Choice::from(1u8);
     for c in x {
-        v |= c.ct_ne(&0);
+        is_zero &= c.ct_eq(&0);
     }
-    v
+    is_zero
 }
 
 /// Compares the big-endian integers `x` and `y`, which must have
@@ -101,6 +92,12 @@ impl Drop for Aes256Gcm {
         // fiddle with these fields, but since we're about to
         // drop the memory it's probably fine.
         self.0.skey.zeroize();
+    }
+}
+
+impl fmt::Debug for Aes256Gcm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Aes256Gcm").finish_non_exhaustive()
     }
 }
 
@@ -407,7 +404,7 @@ macro_rules! ecdh_impl {
         $id:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone, Debug)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -482,6 +479,7 @@ macro_rules! ecdh_impl {
                 // Check that `$curve::SCALAR_SIZE` is correct.
                 #[cfg(debug_assertions)]
                 {
+                    // SAFETY: FFI call, no invariants.
                     let n = unsafe {
                         br_ec_keygen(
                             ptr::addr_of_mut!(rng.vtable), // rng_ctx
@@ -515,13 +513,6 @@ macro_rules! ecdh_impl {
             }
         }
 
-        #[cfg(test)]
-        impl Debug for $sk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
-            }
-        }
-
         impl Import<SecretKeyBytes<<Self as SecretKey>::Size>> for $sk {
             #[inline]
             fn import(
@@ -542,7 +533,7 @@ macro_rules! ecdh_impl {
                 // less than the (subgroup) order.
 
                 // First check that the key is non-zero.
-                if !bool::from(ct_eq_zero(kbuf.as_ref())) {
+                if bool::from(ct_eq_zero(kbuf.as_ref())) {
                     return Err(ImportError::InvalidSyntax);
                 }
 
@@ -553,6 +544,14 @@ macro_rules! ecdh_impl {
                 }
 
                 Ok(Self { kbuf })
+            }
+        }
+
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            #[inline]
+            fn drop(&mut self) {
+                is_zeroize_on_drop(&self.kbuf);
             }
         }
 
@@ -572,7 +571,7 @@ macro_rules! ecdh_impl {
         }
 
         #[doc = concat!($doc, " ECDH public key.")]
-        #[derive(Clone, Eq, PartialEq)]
+        #[derive(Clone, Debug, Eq, PartialEq)]
         pub struct $pk {
             /// The public data.
             ///
@@ -591,12 +590,6 @@ macro_rules! ecdh_impl {
 
             fn export(&self) -> Self::Data {
                 self.kbuf
-            }
-        }
-
-        impl Debug for $pk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
             }
         }
 
@@ -685,7 +678,7 @@ macro_rules! ecdsa_impl {
         $sig_oid:expr $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone, Debug)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -786,6 +779,7 @@ macro_rules! ecdsa_impl {
                 // Check that `$curve::SCALAR_SIZE` is correct.
                 #[cfg(debug_assertions)]
                 {
+                    // SAFETY: FFI call, no invariants.
                     let n = unsafe {
                         br_ec_keygen(
                             ptr::addr_of_mut!(rng.vtable), // rng_ctx
@@ -820,13 +814,6 @@ macro_rules! ecdsa_impl {
             }
         }
 
-        #[cfg(test)]
-        impl Debug for $sk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
-            }
-        }
-
         impl ConstantTimeEq for $sk {
             fn ct_eq(&self, other: &Self) -> Choice {
                 self.kbuf.ct_eq(&other.kbuf)
@@ -851,7 +838,7 @@ macro_rules! ecdsa_impl {
                 // less than the (subgroup) order.
 
                 // First check that the key is non-zero.
-                if !bool::from(ct_eq_zero(kbuf.as_ref())) {
+                if bool::from(ct_eq_zero(kbuf.as_ref())) {
                     return Err(ImportError::InvalidSyntax);
                 }
 
@@ -862,6 +849,14 @@ macro_rules! ecdsa_impl {
                 }
 
                 Ok(Self { kbuf })
+            }
+        }
+
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            #[inline]
+            fn drop(&mut self) {
+                is_zeroize_on_drop(&self.kbuf);
             }
         }
 
@@ -881,7 +876,7 @@ macro_rules! ecdsa_impl {
         }
 
         #[doc = concat!($doc, " ECDSA public key.")]
-        #[derive(Clone, Eq, PartialEq)]
+        #[derive(Clone, Debug, Eq, PartialEq)]
         pub struct $pk {
             /// The public data.
             ///
@@ -931,12 +926,6 @@ macro_rules! ecdsa_impl {
             #[inline]
             fn export(&self) -> Self::Data {
                 self.kbuf
-            }
-        }
-
-        impl Debug for $pk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
             }
         }
 
@@ -1199,6 +1188,12 @@ impl Csprng for HmacDrbg {
     }
 }
 
+impl fmt::Debug for HmacDrbg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HmacDrbg").finish_non_exhaustive()
+    }
+}
+
 /// The vtable that lets BearSSL call [`RngWrapper`].
 static RNG_WRAPPER_VTABLE: br_prng_class = br_prng_class {
     context_size: size_of::<RngWrapper<'_>>(),
@@ -1278,6 +1273,22 @@ mod tests {
         use super::*;
 
         #[test]
+        fn test_ct_eq_zero() {
+            let tests: &[(&[u8], bool)] = &[
+                (&[], true),
+                (&[0], true),
+                (&[0, 0, 0, 0, 0, 0, 0], true),
+                (&[1], false),
+                (&[0, 0, 0, 0, 1], false),
+                (&[1, 0, 0, 0, 0], false),
+            ];
+            for (i, (data, want)) in tests.iter().enumerate() {
+                let got = bool::from(ct_eq_zero(data));
+                assert_eq!(got, *want, "#{i}");
+            }
+        }
+
+        #[test]
         fn test_ct_be_lt() {
             struct TestCase(u8, &'static [u8], &'static [u8]);
             let tests = &[
@@ -1292,7 +1303,7 @@ mod tests {
                 TestCase(1u8, &[2, 0], &[2, 1]),
             ];
             for (i, tc) in tests.iter().enumerate() {
-                assert_eq!(tc.0, ct_be_lt(tc.1, tc.2).unwrap_u8(), "tc={i}");
+                assert_eq!(tc.0, ct_be_lt(tc.1, tc.2).unwrap_u8(), "#{i}");
             }
         }
     }

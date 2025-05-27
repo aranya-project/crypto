@@ -14,7 +14,7 @@ use typenum::{
 
 use crate::{
     keys::{RawSecretBytes, SecretKeyBytes},
-    zeroize::ZeroizeOnDrop,
+    zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
 };
 
 /// An error from a [`Kdf`].
@@ -178,7 +178,7 @@ pub trait Kdf {
 }
 
 /// A pseudorandom key.
-#[derive(Clone, Default, ZeroizeOnDrop)]
+#[derive(Clone, Default)]
 #[repr(transparent)]
 pub struct Prk<N: ArrayLength>(SecretKeyBytes<N>);
 
@@ -248,6 +248,19 @@ where
     }
 }
 
+impl<N: ArrayLength> fmt::Debug for Prk<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Prk").finish_non_exhaustive()
+    }
+}
+
+impl<N: ArrayLength> ZeroizeOnDrop for Prk<N> {}
+impl<N: ArrayLength> Drop for Prk<N> {
+    fn drop(&mut self) {
+        is_zeroize_on_drop(&self.0);
+    }
+}
+
 /// Implemented by types that can expand themselves from a PRK.
 pub trait Expand: Sized {
     /// The size in octets of the derived key.
@@ -304,6 +317,7 @@ where
 }
 
 /// Context for labeled key derivation per RFC 9180.
+#[derive(Debug)]
 pub struct Context {
     /// A domain separation string.
     pub domain: &'static str,

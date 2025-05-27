@@ -1,6 +1,6 @@
 //! Basic keys and key material.
 
-use core::{borrow::Borrow, fmt::Debug, iter::IntoIterator, mem, result::Result};
+use core::{borrow::Borrow, fmt, iter::IntoIterator, mem, result::Result};
 
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use subtle::{Choice, ConstantTimeEq};
@@ -10,7 +10,7 @@ use crate::{
     csprng::{Csprng, Random},
     import::{ExportError, Import},
     kdf::{Expand, Kdf, KdfError, Prk},
-    zeroize::ZeroizeOnDrop,
+    zeroize::{zeroize_flat_type, ZeroizeOnDrop},
 };
 
 /// A fixed-length secret key.
@@ -48,9 +48,30 @@ impl RawSecretBytes for [u8] {
 }
 
 /// A fixed-length byte encoding of a [`SecretKey`]'s data.
-#[derive(Clone, Default, ZeroizeOnDrop)]
+#[derive(Clone, Default)]
 #[repr(transparent)]
 pub struct SecretKeyBytes<N: ArrayLength>(GenericArray<u8, N>);
+
+impl<N: ArrayLength> fmt::Debug for SecretKeyBytes<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKeyBytes").finish_non_exhaustive()
+    }
+}
+
+impl<N: ArrayLength> ZeroizeOnDrop for SecretKeyBytes<N> {}
+impl<N: ArrayLength> Drop for SecretKeyBytes<N> {
+    fn drop(&mut self) {
+        // SAFETY:
+        // - `self.0` does not contain references or dynamically
+        //   sized data.
+        // - `self.0` does not have a `Drop` impl.
+        // - `self.0` is not used after this function returns.
+        // - The bit pattern of all zeros is valid for `self.0`.
+        unsafe {
+            zeroize_flat_type(&mut self.0);
+        }
+    }
+}
 
 impl<N: ArrayLength> SecretKeyBytes<N> {
     /// The size in bytes of the secret key.
@@ -136,7 +157,7 @@ impl<N: ArrayLength> RawSecretBytes for SecretKeyBytes<N> {
 }
 
 /// A fixed-length asymmetric public key.
-pub trait PublicKey: Clone + Debug + Eq + for<'a> Import<&'a [u8]> {
+pub trait PublicKey: Clone + fmt::Debug + Eq + for<'a> Import<&'a [u8]> {
     /// The fixed-length byte encoding of the key.
     type Data: Borrow<[u8]> + Clone + Sized;
 
@@ -172,9 +193,9 @@ macro_rules! raw_key {
         $($tail:tt)*
     ) => {
         $(#[$meta])*
-        #[derive(::core::clone::Clone, $crate::zeroize::ZeroizeOnDrop)]
+        #[derive(::core::clone::Clone)]
         #[repr(transparent)]
-        $vis struct $name<N: ::generic_array::ArrayLength>($crate::keys::SecretKeyBytes<N>);
+        $vis struct $name<N: $crate::generic_array::ArrayLength>($crate::keys::SecretKeyBytes<N>);
 
         impl<N: ::generic_array::ArrayLength> $name<N> {
             /// Creates a new raw key.
@@ -215,7 +236,7 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> $crate::keys::SecretKey for $name<N> {
+        impl<N: $crate::generic_array::ArrayLength> $crate::keys::SecretKey for $name<N> {
             type Size = N;
 
             #[inline]
@@ -227,21 +248,21 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> $crate::csprng::Random for $name<N> {
+        impl<N: $crate::generic_array::ArrayLength> $crate::csprng::Random for $name<N> {
             fn random<R: $crate::csprng::Csprng>(rng: &mut R) -> Self {
                 let sk = <$crate::keys::SecretKeyBytes<N> as $crate::csprng::Random>::random(rng);
                 Self(sk)
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> $crate::keys::RawSecretBytes for $name<N> {
+        impl<N: $crate::generic_array::ArrayLength> $crate::keys::RawSecretBytes for $name<N> {
             #[inline]
             fn raw_secret_bytes(&self) -> &[u8] {
                 $crate::keys::RawSecretBytes::raw_secret_bytes(&self.0)
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> $crate::kdf::Expand for $name<N>
+        impl<N: $crate::generic_array::ArrayLength> $crate::kdf::Expand for $name<N>
         where
             N: ::typenum::IsLess<::typenum::U65536>
         {
@@ -260,7 +281,7 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> ::subtle::ConstantTimeEq for $name<N> {
+        impl<N: $crate::generic_array::ArrayLength> ::subtle::ConstantTimeEq for $name<N> {
             #[inline]
             fn ct_eq(&self, other: &Self) -> ::subtle::Choice {
                 self.0.ct_eq(&other.0)
@@ -269,8 +290,8 @@ macro_rules! raw_key {
 
         impl<N, const U: usize> $crate::import::Import<[u8; U]> for $name<N>
         where
-            N: ::generic_array::ArrayLength,
-            ::typenum::generic_const_mappings::Const<U>: ::generic_array::IntoArrayLength<ArrayLength = N>,
+            N: $crate::generic_array::ArrayLength,
+            ::typenum::generic_const_mappings::Const<U>: $crate::generic_array::IntoArrayLength<ArrayLength = N>,
         {
             #[inline]
             fn import(key: [u8; U]) -> ::core::result::Result<Self, $crate::import::ImportError> {
@@ -279,12 +300,35 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> $crate::import::Import<&[u8]> for $name<N> {
+        impl<N: $crate::generic_array::ArrayLength> $crate::import::Import<&[u8]> for $name<N> {
             #[inline]
             fn import(data: &[u8]) -> ::core::result::Result<Self, $crate::import::ImportError> {
                 let bytes = $crate::import::Import::<_>::import(data)?;
                 let sk = $crate::keys::SecretKeyBytes::new(bytes);
                 ::core::result::Result::Ok(Self(sk))
+            }
+        }
+
+        impl<N: ::generic_array::ArrayLength> ::core::fmt::Debug for $name<N> {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                f.debug_struct(stringify!($name)).finish_non_exhaustive()
+            }
+        }
+
+        impl<N: $crate::generic_array::ArrayLength> $crate::zeroize::ZeroizeOnDrop for $name<N> {}
+        impl<N: $crate::generic_array::ArrayLength> Drop for $name<N> {
+            fn drop(&mut self) {
+                // SAFETY:
+                // - `self.0` does not contain references or
+                //   dynamically sized data.
+                // - `self.0` does not have a `Drop` impl.
+                // - `self.0` is not used after this function
+                //   returns.
+                // - The bit pattern of all zeros is valid for
+                //   `self.0`.
+                unsafe {
+                    $crate::zeroize::zeroize_flat_type(&mut self.0);
+                }
             }
         }
 

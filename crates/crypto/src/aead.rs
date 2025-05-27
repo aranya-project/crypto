@@ -14,7 +14,6 @@ use core::{
 
 use buggy::{Bug, BugExt};
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
-use serde::{Deserialize, Serialize};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
     generic_const_mappings::Const,
@@ -688,10 +687,8 @@ impl<N: ArrayLength> AeadKey<N> {
 }
 
 /// An [`Aead`] nonce.
-#[derive(Clone, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Default, Hash, Eq, PartialEq)]
 #[repr(transparent)]
-#[serde(bound = "")]
-#[serde(transparent)]
 pub struct Nonce<N: ArrayLength>(GenericArray<u8, N>);
 
 impl<N: ArrayLength> Nonce<N> {
@@ -703,6 +700,12 @@ impl<N: ArrayLength> Nonce<N> {
     #[allow(clippy::len_without_is_empty)]
     pub const fn len(&self) -> usize {
         Self::SIZE
+    }
+
+    // For `aranya-crypto`. Do not use.
+    #[doc(hidden)]
+    pub fn into_inner(self) -> GenericArray<u8, N> {
+        self.0
     }
 
     pub(crate) const fn from_bytes(nonce: GenericArray<u8, N>) -> Self {
@@ -861,8 +864,8 @@ mod committing {
     /// [bellare]: https://eprint.iacr.org/2022/268
     #[doc(hidden)]
     pub struct CtrThenXorPrf<A, C> {
-        _aead: PhantomData<A>,
-        _cipher: PhantomData<C>,
+        _aead: PhantomData<fn() -> A>,
+        _cipher: PhantomData<fn() -> C>,
     }
 
     impl<A, C> CtrThenXorPrf<A, C>
@@ -966,6 +969,12 @@ mod committing {
         }
     }
 
+    impl<A, C> fmt::Debug for CtrThenXorPrf<A, C> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("CtrThenXorPrf").finish_non_exhaustive()
+        }
+    }
+
     /// An error occurred during the UNAE-then-Commit transform.
     #[derive(Debug, Eq, PartialEq)]
     pub enum UtcError {
@@ -1054,6 +1063,7 @@ mod committing {
     macro_rules! utc_aead {
         ($name:ident, $inner:ty, $cipher:ty, $doc:expr $(, $oid:expr)? $(,)?) => {
             #[doc = $doc]
+            #[derive(Debug)]
             pub struct $name {
                 key: <$inner as $crate::aead::Aead>::Key,
             }
@@ -1329,6 +1339,7 @@ mod committing {
     macro_rules! hte_aead {
         ($name:ident, $inner:ty, $hash:ty, $doc:expr $(, $oid:expr)? $(,)?) => {
             #[doc = $doc]
+            #[derive(Debug)]
             pub struct $name {
                 key: <$inner as $crate::aead::Aead>::Key,
             }

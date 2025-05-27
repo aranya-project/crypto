@@ -1,14 +1,6 @@
 //! Key Encapsulation Mechanisms.
 
-#![forbid(unsafe_code)]
-
-use core::{
-    array::TryFromSliceError,
-    borrow::Borrow,
-    fmt::{self, Debug, Display},
-    marker::PhantomData,
-    result::Result,
-};
+use core::{array::TryFromSliceError, borrow::Borrow, fmt, marker::PhantomData, result::Result};
 
 use crate::{
     csprng::{Csprng, Random},
@@ -17,7 +9,7 @@ use crate::{
     kdf::{Kdf, KdfError, Prk},
     keys::{PublicKey, RawSecretBytes, SecretKey},
     signer::PkError,
-    zeroize::ZeroizeOnDrop,
+    zeroize::{zeroize_flat_type, ZeroizeOnDrop},
 };
 
 /// An error from a [`Kem`].
@@ -39,7 +31,7 @@ pub enum KemError {
     PublicKey(PkError),
 }
 
-impl Display for KemError {
+impl fmt::Display for KemError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidDecapKeyFormat => write!(f, "invalid secret key data"),
@@ -205,7 +197,7 @@ pub enum EcdhError {
     Other(&'static str),
 }
 
-impl Display for EcdhError {
+impl fmt::Display for EcdhError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Other(msg) => write!(f, "{}", msg),
@@ -255,7 +247,6 @@ pub trait Ecdh {
 }
 
 /// An ECDH shared secret.
-#[derive(ZeroizeOnDrop)]
 pub struct SharedSecret<const N: usize>([u8; N]);
 
 impl<const N: usize> SharedSecret<N> {
@@ -291,6 +282,25 @@ impl<const N: usize> TryFrom<&[u8]> for SharedSecret<N> {
     }
 }
 
+impl<const N: usize> fmt::Debug for SharedSecret<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("SharedSecret").finish_non_exhaustive()
+    }
+}
+
+impl<const N: usize> ZeroizeOnDrop for SharedSecret<N> {}
+impl<const N: usize> Drop for SharedSecret<N> {
+    fn drop(&mut self) {
+        // SAFETY:
+        // - `self.0` does not contain references or dynamically
+        //   sized data.
+        // - `self.0` does not have a `Drop` impl.
+        // - `self.0` is not used after this function returns.
+        // - The bit pattern of all zeros is valid for `self.0`.
+        unsafe { zeroize_flat_type(&mut self.0) }
+    }
+}
+
 /// An error from a DHKEM.
 #[derive(Debug, Eq, PartialEq)]
 pub enum DhKemError {
@@ -302,7 +312,7 @@ pub enum DhKemError {
     Import(ImportError),
 }
 
-impl Display for DhKemError {
+impl fmt::Display for DhKemError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ecdh(err) => write!(f, "{}", err),
@@ -520,6 +530,12 @@ impl<E: Ecdh, F: Kdf> DhKem<E, F> {
         ];
         F::extract_and_expand_multi(out.as_bytes_mut(), &labeled_ikm, &[], &labeled_info)?;
         Ok(out)
+    }
+}
+
+impl<E, F> fmt::Debug for DhKem<E, F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DhKem").field("id", &self.id).finish()
     }
 }
 

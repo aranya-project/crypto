@@ -2,7 +2,7 @@
 
 use core::{
     borrow::{Borrow, BorrowMut},
-    fmt::Debug,
+    fmt,
     ops::Shl,
 };
 
@@ -13,7 +13,7 @@ use typenum::{Const, Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U
 use crate::{
     hex::{HexString, ToHex},
     import::{Import, ImportError, InvalidSizeError},
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    zeroize::{zeroize_flat_type, Zeroize, ZeroizeOnDrop},
 };
 
 // TODO(eric): validate the input for `Uncompressed`,
@@ -60,7 +60,7 @@ macro_rules! pk_impl {
         #[doc = concat!(stringify!($name), " elliptic curve point per [SEC] section 2.3.3.\n\n")]
         #[doc = "This is equivalent to X9.62 encoding.\n\n"]
         #[doc = "[SEC]: https://www.secg.org/sec1-v2.pdf"]
-        #[derive(Clone, Default, Eq, PartialEq, Zeroize)]
+        #[derive(Clone, Default, Eq, PartialEq)]
         pub struct $name<C: Curve>(pub GenericArray<u8, C::$size>);
 
         impl<C: Curve> $name<C> {
@@ -167,13 +167,39 @@ macro_rules! pk_impl {
                 Ok(Self(Import::<_>::import(data)?))
             }
         }
+
+        impl<C: Curve> Zeroize for $name<C> {
+            fn zeroize(&mut self) {
+                // SAFETY:
+                // - `self.0` does not contain references or dynamically
+                //   sized data.
+                // - `self.0` does not have a `Drop` impl.
+                // - `self.0` is not used after this function returns.
+                // - The bit pattern of all zeros is valid for `self.0`.
+                unsafe {
+                    zeroize_flat_type(&mut self.0);
+                }
+            }
+        }
+
+        impl<C: Curve> fmt::Debug for $name<C>
+        where
+            <C as Curve>::$size: ArrayLength + Shl<B1>,
+            Double<C::$size>: ArrayLength,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple(stringify!($name))
+                    .field(&self.to_hex())
+                    .finish()
+            }
+        }
     };
 }
 pk_impl!(Compressed, CompressedSize);
 pk_impl!(Uncompressed, UncompressedSize);
 
 /// An elliptic curve scalar.
-#[derive(Default, ZeroizeOnDrop)]
+#[derive(Default)]
 pub struct Scalar<C: Curve>(pub GenericArray<u8, C::ScalarSize>);
 
 impl<C: Curve> Scalar<C> {
@@ -286,6 +312,12 @@ impl<C: Curve> Import<&[u8]> for Scalar<C> {
     }
 }
 
+impl<C: Curve> fmt::Debug for Scalar<C> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Scalar").finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 impl<C: Curve> ToHex for Scalar<C>
 where
@@ -296,5 +328,20 @@ where
 
     fn to_hex(&self) -> Self::Output {
         self.0.to_hex()
+    }
+}
+
+impl<C: Curve> ZeroizeOnDrop for Scalar<C> {}
+impl<C: Curve> Drop for Scalar<C> {
+    fn drop(&mut self) {
+        // SAFETY:
+        // - `self.0` does not contain references or dynamically
+        //   sized data.
+        // - `self.0` does not have a `Drop` impl.
+        // - `self.0` is not used after this function returns.
+        // - The bit pattern of all zeros is valid for `self.0`.
+        unsafe {
+            zeroize_flat_type(&mut self.0);
+        }
     }
 }

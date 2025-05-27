@@ -14,9 +14,10 @@ default-members = [
 authors = ["SpiderOak, Inc."]
 edition = "2021"
 repository = "https://github.com/aranya-project/crypto"
-rust-version = "1.81.0"
+rust-version = "1.85.0"
 
 [workspace.lints.rust]
+missing_debug_implementations = "warn"
 missing_docs = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
 unsafe_op_in_unsafe_fn = "warn"
@@ -24,25 +25,25 @@ unused_lifetimes = "warn"
 unused_qualifications = "warn"
 
 [workspace.lints.clippy]
+alloc_instead_of_core = "warn"
 arithmetic_side_effects = "warn"
 cast_lossless = "warn"
 cast_possible_wrap = "warn"
 cast_precision_loss = "warn"
 cast_sign_loss = "warn"
+# expect_used = "warn"
+implicit_saturating_sub = "warn"
+# indexing_slicing = "warn"
+missing_panics_doc = "warn"
 panic = "warn"
+# ptr_as_ptr = "warn"
+string_slice = "warn"
+# transmute_ptr_to_ptr = "warn"
+undocumented_unsafe_blocks = "warn"
 unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-anyhow = { version = "1.0", default-features = false }
-cfg-if = { version = "1", default-features = false }
-serde = { version = ">= 1.0.184", default-features = false }
-thiserror = { version = "2", default-features = false }
-
-prettyplease = { version = "0.2" }
-proc-macro2 = { version = "1" }
-quote = { version = "1" }
-syn = { version = "2" }
 
 [profile.dev]
 # Required for some of the tests to run in a reasonable amount of

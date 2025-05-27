@@ -48,8 +48,8 @@ use crate::{
         },
         Identified, Oid,
     },
-    signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
-    zeroize::ZeroizeOnDrop,
+    signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    zeroize::{is_zeroize_on_drop, Zeroize, ZeroizeOnDrop},
 };
 
 /// AES-256-GCM.
@@ -138,6 +138,12 @@ impl HpkeAead for Aes256Gcm {
     const ID: AeadId = AeadId::Aes256Gcm;
 }
 
+impl fmt::Debug for Aes256Gcm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Aes256Gcm").finish_non_exhaustive()
+    }
+}
+
 #[cfg(feature = "committing-aead")]
 mod committing {
     use aes::cipher::{BlockEncrypt, BlockSizeUser, KeyInit};
@@ -152,6 +158,7 @@ mod committing {
 
     /// AES-256.
     #[doc(hidden)]
+    #[derive(Debug)]
     pub struct Aes256(aes::Aes256);
 
     impl BlockCipher for Aes256 {
@@ -216,7 +223,7 @@ macro_rules! curve_impl {
         }
 
         #[doc = concat!("An encoded ", $doc, "point.")]
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, Debug)]
         pub struct $point(EncodedPoint<$inner>);
 
         impl Borrow<[u8]> for $point {
@@ -252,7 +259,6 @@ curve_impl!(
 );
 
 /// An ECDH shared secret.
-#[derive(ZeroizeOnDrop)]
 pub struct SharedSecret<C>(ecdh::SharedSecret<C>)
 where
     C: CurveArithmetic;
@@ -266,6 +272,25 @@ where
     }
 }
 
+impl<C> fmt::Debug for SharedSecret<C>
+where
+    C: CurveArithmetic,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SharedSecret").finish_non_exhaustive()
+    }
+}
+
+impl<C> ZeroizeOnDrop for SharedSecret<C> where C: CurveArithmetic {}
+impl<C> Drop for SharedSecret<C>
+where
+    C: CurveArithmetic,
+{
+    fn drop(&mut self) {
+        is_zeroize_on_drop(&self.0);
+    }
+}
+
 macro_rules! ecdh_impl {
     (
         $curve:ident,
@@ -275,7 +300,7 @@ macro_rules! ecdh_impl {
         $point:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone)]
         pub struct $sk(NonZeroScalar<$curve>);
 
         impl DecapKey for $sk {
@@ -306,10 +331,9 @@ macro_rules! ecdh_impl {
             }
         }
 
-        #[cfg(test)]
         impl fmt::Debug for $sk {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                hex::ct_write(f, self.0.to_bytes().as_slice())
+                f.debug_struct(stringify!($sk)).finish_non_exhaustive()
             }
         }
 
@@ -325,6 +349,13 @@ macro_rules! ecdh_impl {
                 let sk = Option::from(NonZeroScalar::from_repr(bytes.into()))
                     .ok_or(ImportError::InvalidSyntax)?;
                 Ok(Self(sk))
+            }
+        }
+
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            fn drop(&mut self) {
+                self.0.zeroize();
             }
         }
 
@@ -344,7 +375,9 @@ macro_rules! ecdh_impl {
 
         impl fmt::Debug for $pk {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                hex::ct_write(f, self.export().borrow())
+                write!(f, "{}(", stringify!($pk))?;
+                hex::ct_write(f, self.export().borrow())?;
+                write!(f, ")")
             }
         }
 
@@ -390,7 +423,7 @@ dhkem_impl!(
 );
 
 /// An ASN.1 DER encoded ECDSA signature.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SigBytes<T>(T);
 
 impl<T> Borrow<[u8]> for SigBytes<T>
@@ -413,7 +446,7 @@ macro_rules! ecdsa_impl {
         $sig_oid:expr $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
-        #[derive(Clone, ZeroizeOnDrop)]
+        #[derive(Clone)]
         pub struct $sk(ecdsa::SigningKey<$curve>);
 
         impl SigningKey<$curve> for $sk {
@@ -447,10 +480,9 @@ macro_rules! ecdsa_impl {
             }
         }
 
-        #[cfg(test)]
         impl fmt::Debug for $sk {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                hex::ct_write(f, self.0.to_bytes().as_slice())
+                f.debug_struct(stringify!($sk)).finish_non_exhaustive()
             }
         }
 
@@ -465,6 +497,14 @@ macro_rules! ecdsa_impl {
                 let sk =
                     ecdsa::SigningKey::from_slice(data).map_err(|_| ImportError::InvalidSyntax)?;
                 Ok(Self(sk))
+            }
+        }
+
+        impl ZeroizeOnDrop for $sk {}
+        impl Drop for $sk {
+            #[inline]
+            fn drop(&mut self) {
+                is_zeroize_on_drop(&self.0);
             }
         }
 
@@ -490,7 +530,9 @@ macro_rules! ecdsa_impl {
 
         impl fmt::Debug for $pk {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                hex::ct_write(f, self.export().borrow())
+                write!(f, "{}(", stringify!($pk))?;
+                hex::ct_write(f, self.export().borrow())?;
+                write!(f, ")")
             }
         }
 

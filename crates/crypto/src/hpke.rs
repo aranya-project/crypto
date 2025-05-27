@@ -15,12 +15,7 @@
 // We use the same variable names used in the HPKE RFC.
 #![allow(non_snake_case)]
 
-use core::{
-    fmt::{self, Debug, Display},
-    marker::PhantomData,
-    num::NonZeroU16,
-    result::Result,
-};
+use core::{fmt, marker::PhantomData, num::NonZeroU16, result::Result};
 
 use buggy::{bug, Bug, BugExt};
 use generic_array::ArrayLength;
@@ -60,7 +55,7 @@ macro_rules! i2osp {
 }
 
 /// An HPKE operation mode.
-#[cfg_attr(test, derive(Debug))]
+#[derive(Debug)]
 pub enum Mode<'a, T> {
     /// The most basic operation mode.
     Base,
@@ -76,7 +71,7 @@ pub enum Mode<'a, T> {
     AuthPsk(T, Psk<'a>),
 }
 
-impl<T> Display for Mode<'_, T> {
+impl<T> fmt::Display for Mode<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Base => write!(f, "mode_base"),
@@ -127,7 +122,7 @@ impl<'a, T> Mode<'a, T> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct InvalidPsk;
 
-impl Display for InvalidPsk {
+impl fmt::Display for InvalidPsk {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("invalid pre-shared key: PSK or PSK ID are empty")
     }
@@ -136,7 +131,6 @@ impl Display for InvalidPsk {
 impl core::error::Error for InvalidPsk {}
 
 /// A pre-shared key and its ID.
-#[cfg_attr(test, derive(Debug))]
 #[derive(Copy, Clone)]
 pub struct Psk<'a> {
     /// The pre-shared key.
@@ -160,6 +154,14 @@ impl<'a> Psk<'a> {
 impl ConstantTimeEq for Psk<'_> {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.psk.ct_eq(other.psk) & self.psk_id.ct_eq(other.psk_id)
+    }
+}
+
+impl fmt::Debug for Psk<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Psk")
+            .field("psk_id", &self.psk_id)
+            .finish_non_exhaustive()
     }
 }
 
@@ -217,7 +219,7 @@ pub enum KemId {
     Other(NonZeroU16),
 }
 
-impl Display for KemId {
+impl fmt::Display for KemId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DhKemP256HkdfSha256 => write!(f, "DHKEM(P-256, HKDF-SHA256)"),
@@ -260,7 +262,7 @@ pub enum KdfId {
     Other(NonZeroU16),
 }
 
-impl Display for KdfId {
+impl fmt::Display for KdfId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::HkdfSha256 => write!(f, "HkdfSha256"),
@@ -295,7 +297,7 @@ pub enum AeadId {
     ExportOnly,
 }
 
-impl Display for AeadId {
+impl fmt::Display for AeadId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Aes128Gcm => write!(f, "Aes128Gcm"),
@@ -353,7 +355,7 @@ pub enum HpkeError {
     Bug(Bug),
 }
 
-impl Display for HpkeError {
+impl fmt::Display for HpkeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Seal(err) => write!(f, "{}", err),
@@ -434,10 +436,11 @@ impl From<MessageLimitReached> for HpkeError {
 /// Hybrid Public Key Encryption (HPKE) per [RFC 9180].
 ///
 /// [RFC 9180]: <https://www.rfc-editor.org/rfc/rfc9180.html>
+#[derive(Debug)]
 pub struct Hpke<K, F, A> {
-    _kem: PhantomData<K>,
-    _kdf: PhantomData<F>,
-    _aead: PhantomData<A>,
+    _kem: PhantomData<fn() -> K>,
+    _kdf: PhantomData<fn() -> F>,
+    _aead: PhantomData<fn() -> A>,
 }
 
 impl<K, F, A> Hpke<K, F, A>
@@ -623,6 +626,7 @@ where
     }
 }
 
+#[derive(Debug)]
 struct Schedule<K, F, A>
 where
     K: HpkeKem,
@@ -632,7 +636,7 @@ where
     key: KeyData<A>,
     base_nonce: Nonce<A::NonceSize>,
     exporter_secret: Prk<F::PrkSize>,
-    _kem: PhantomData<K>,
+    _kem: PhantomData<fn() -> K>,
 }
 
 impl<K, F, A> Schedule<K, F, A>
@@ -657,6 +661,7 @@ where
 }
 
 /// Either `L` or `R`.
+#[derive(Debug)]
 enum Either<L, R> {
     Left(L),
     Right(R),
@@ -759,6 +764,15 @@ where
     }
 }
 
+impl<K: Kem, F: Kdf, A: Aead + IndCca2 + fmt::Debug> fmt::Debug for SendCtx<K, F, A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SendCtx")
+            .field("open", &self.seal)
+            .field("export", &self.export)
+            .finish()
+    }
+}
+
 /// An encryption context that can only encrypt messages for
 /// a particular recipient.
 ///
@@ -833,6 +847,16 @@ impl<A: HpkeAead> SealCtx<A> {
     /// Returns the current sequence number.
     pub fn seq(&self) -> Seq {
         self.seq
+    }
+}
+
+impl<A: Aead + IndCca2 + fmt::Debug> fmt::Debug for SealCtx<A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SealCtx")
+            .field("aead", &self.aead)
+            .field("base_nonce", &self.base_nonce)
+            .field("seq", &self.seq)
+            .finish()
     }
 }
 
@@ -941,6 +965,15 @@ where
     }
 }
 
+impl<K: Kem, F: Kdf, A: Aead + IndCca2 + fmt::Debug> fmt::Debug for RecvCtx<K, F, A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecvCtx")
+            .field("open", &self.open)
+            .field("export", &self.export)
+            .finish()
+    }
+}
+
 /// An encryption context that can only decrypt messages from
 /// a particular sender.
 ///
@@ -1037,11 +1070,21 @@ impl<A: Aead + IndCca2> OpenCtx<A> {
     }
 }
 
+impl<A: Aead + IndCca2 + fmt::Debug> fmt::Debug for OpenCtx<A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OpenCtx")
+            .field("aead", &self.aead)
+            .field("base_nonce", &self.base_nonce)
+            .field("seq", &self.seq)
+            .finish()
+    }
+}
+
 /// HPKE's message limit has been reached.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct MessageLimitReached;
 
-impl Display for MessageLimitReached {
+impl fmt::Display for MessageLimitReached {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("message limit reached")
     }
@@ -1130,7 +1173,7 @@ impl Seq {
     }
 }
 
-impl Display for Seq {
+impl fmt::Display for Seq {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.seq)
     }
@@ -1143,7 +1186,7 @@ where
     A: HpkeAead,
 {
     exporter_secret: Prk<F::PrkSize>,
-    _etc: PhantomData<(K, A)>,
+    _etc: PhantomData<fn() -> (K, A)>,
 }
 
 impl<K, F, A> ExportCtx<K, F, A>
@@ -1179,13 +1222,18 @@ where
     }
 }
 
+impl<K: Kem, F: Kdf, A: Aead + IndCca2> fmt::Debug for ExportCtx<K, F, A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ExportCtx").finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::panic)]
 
     use std::{collections::HashSet, ops::RangeInclusive};
 
-    use postcard::experimental::max_size::MaxSize;
     use typenum::{U1, U2};
 
     use super::*;
@@ -1254,24 +1302,8 @@ mod tests {
         let unassigned = 0x0004..=0xFFFE;
         for id in unassigned {
             let want = AeadId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)
-                .expect("should be able to encode `u16`");
-            let got: AeadId = postcard::from_bytes(&encoded).unwrap_or_else(|err| {
-                panic!("should be able to decode unassigned `AeadId` {id}: {err}")
-            });
-            assert_eq!(got, want);
-        }
-    }
-
-    /// Tests that [`AeadId`] can be serialized and deserialized
-    /// via [`serde_json`].
-    #[test]
-    fn test_aead_id_json() {
-        let unassigned = 0x0004..=0xFFFE;
-        for id in unassigned {
-            let want = AeadId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = serde_json::to_string(&id).expect("should be able to encode `u16`");
-            let got: AeadId = serde_json::from_str(&encoded).unwrap_or_else(|err| {
+            let encoded = want.to_be_bytes();
+            let got = AeadId::try_from_be_bytes(encoded).unwrap_or_else(|err| {
                 panic!("should be able to decode unassigned `AeadId` {id}: {err}")
             });
             assert_eq!(got, want);
@@ -1284,9 +1316,8 @@ mod tests {
         let unassigned = 0x0004..=0xFFFF;
         for id in unassigned {
             let want = KdfId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)
-                .expect("should be able to encode `u16`");
-            let got: KdfId = postcard::from_bytes(&encoded).unwrap_or_else(|err| {
+            let encoded = want.to_be_bytes();
+            let got = KdfId::try_from_be_bytes(encoded).unwrap_or_else(|err| {
                 panic!("should be able to decode unassigned `KdfId` {id}: {err}")
             });
             assert_eq!(got, want);
@@ -1306,9 +1337,8 @@ mod tests {
         ];
         for id in unassigned.into_iter().flatten() {
             let want = KemId::Other(NonZeroU16::new(id).expect("`id` should be non-zero"));
-            let encoded = postcard::to_vec::<_, { u16::POSTCARD_MAX_SIZE }>(&id)
-                .expect("should be able to encode `u16`");
-            let got: KemId = postcard::from_bytes(&encoded).unwrap_or_else(|err| {
+            let encoded = want.to_be_bytes();
+            let got = KemId::try_from_be_bytes(encoded).unwrap_or_else(|err| {
                 panic!("should be able to decode unassigned `KemId` {id}: {err}")
             });
             assert_eq!(got, want);
