@@ -47,6 +47,11 @@ who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.13.0 -> 0.13.1"
 
+[[audits.generic-array]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.1.1 -> 1.2.0"
+
 [[audits.getrandom]]
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -76,6 +81,11 @@ delta = "0.2.20 -> 0.2.21"
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.94 -> 1.0.95"
+
+[[audits.spin]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.9.8 -> 0.10.0"
 
 [[audits.typenum]]
 who = "Eric Lagergren <elagergren@spideroak.com>"
