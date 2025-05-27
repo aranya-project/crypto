@@ -191,7 +191,7 @@ subtle = { version = "2.5", default-features = false, features = ["core_hint_bla
 thiserror = { version = "2", default-features = false }
 typenum = { version = "1", default-features = false, features = ["const-generics"] }
 # Only pulled into non-dev builds if `test_util` is enabled. It
-# won't bloat release builds, though, since users of this crati
+# won't bloat release builds, though, since users of this crate
 # should only use this feature inside [dev-dependencies].
 wycheproof = { version = "0.6", optional = true }
 zeroize = { version = "1", default-features = false }
