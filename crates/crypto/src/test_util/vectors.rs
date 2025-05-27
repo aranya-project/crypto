@@ -52,6 +52,7 @@ pub mod hpke {
 
     macro_rules! test_names {
             ($($name:ident),* $(,)?) => {
+                #[derive(Clone, Debug)]
                 pub enum TestName {
                     $($name,)*
                 }

@@ -140,6 +140,7 @@ mod committing {
 
     /// AES-256.
     #[doc(hidden)]
+    #[derive(Debug)]
     pub struct Aes256(aes::Aes256);
 
     impl BlockCipher for Aes256 {

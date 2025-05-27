@@ -60,7 +60,7 @@ macro_rules! pk_impl {
         #[doc = concat!(stringify!($name), " elliptic curve point per [SEC] section 2.3.3.\n\n")]
         #[doc = "This is equivalent to X9.62 encoding.\n\n"]
         #[doc = "[SEC]: https://www.secg.org/sec1-v2.pdf"]
-        #[derive(Clone, Default, Debug, Eq, PartialEq)]
+        #[derive(Clone, Default, Eq, PartialEq)]
         pub struct $name<C: Curve>(pub GenericArray<u8, C::$size>);
 
         impl<C: Curve> $name<C> {
@@ -179,6 +179,18 @@ macro_rules! pk_impl {
                 unsafe {
                     zeroize_flat_type(&mut self.0);
                 }
+            }
+        }
+
+        impl<C: Curve> fmt::Debug for $name<C>
+        where
+            <C as Curve>::$size: ArrayLength + Shl<B1>,
+            Double<C::$size>: ArrayLength,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple(stringify!($name))
+                    .field(&self.to_hex())
+                    .finish()
             }
         }
     };

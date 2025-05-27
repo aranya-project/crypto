@@ -19,10 +19,7 @@ pub mod mac;
 pub mod signer;
 pub mod vectors;
 
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
+use core::{fmt, marker::PhantomData};
 
 pub use aead::test_aead;
 pub use hash::test_hash;
@@ -110,6 +107,8 @@ macro_rules! __doctest_os_hardware_rand {
 }
 
 /// An [`Aead`] that that uses the default trait methods.
+#[derive(Debug)]
+#[cfg_attr(feature = "clone-aead", derive(Clone))]
 pub struct AeadWithDefaults<T>(T);
 
 impl<T: Aead> Aead for AeadWithDefaults<T> {
@@ -158,7 +157,8 @@ impl<T: Aead> Aead for AeadWithDefaults<T> {
 }
 
 /// A [`Kdf`] that that uses the default trait methods.
-pub struct KdfWithDefaults<T>(PhantomData<T>);
+#[derive(Clone)]
+pub struct KdfWithDefaults<T>(PhantomData<fn() -> T>);
 
 impl<T: Kdf> Kdf for KdfWithDefaults<T> {
     const ID: KdfId = T::ID;
@@ -185,8 +185,14 @@ impl<T: Kdf> Kdf for KdfWithDefaults<T> {
     }
 }
 
+impl<T> fmt::Debug for KdfWithDefaults<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KdfWithDefaults").finish_non_exhaustive()
+    }
+}
+
 /// A [`Mac`] that that uses the default trait methods.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MacWithDefaults<T>(T);
 
 impl<T: Mac> Mac for MacWithDefaults<T> {
@@ -216,6 +222,7 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
 }
 
 /// A [`Signer`] that that uses the default trait methods.
+#[derive(Clone, Debug)]
 pub struct SignerWithDefaults<T: ?Sized>(T);
 
 impl<T: Signer + ?Sized> Signer for SignerWithDefaults<T> {
@@ -278,6 +285,13 @@ impl<T: Signer + ?Sized> Clone for SigningKeyWithDefaults<T> {
     }
 }
 
+impl<T: Signer + ?Sized> fmt::Debug for SigningKeyWithDefaults<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SigningKeyWithDefaults")
+            .finish_non_exhaustive()
+    }
+}
+
 impl<T: Signer + ?Sized> ZeroizeOnDrop for SigningKeyWithDefaults<T> {}
 
 /// A [`VerifyingKey`] that uses the default trait methods.
@@ -309,9 +323,9 @@ impl<T: Signer + ?Sized> Clone for VerifyingKeyWithDefaults<T> {
     }
 }
 
-impl<T: Signer + ?Sized> Debug for VerifyingKeyWithDefaults<T> {
+impl<T: Signer + ?Sized> fmt::Debug for VerifyingKeyWithDefaults<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 
@@ -339,9 +353,9 @@ impl<T: Signer + ?Sized> Clone for SignatureWithDefaults<T> {
     }
 }
 
-impl<T: Signer + ?Sized> Debug for SignatureWithDefaults<T> {
+impl<T: Signer + ?Sized> fmt::Debug for SignatureWithDefaults<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Debug::fmt(&self.0, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 

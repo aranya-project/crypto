@@ -6,15 +6,7 @@
 #![cfg(feature = "bearssl")]
 
 use core::{
-    borrow::Borrow,
-    cmp,
-    ffi::c_void,
-    fmt::{self, Debug},
-    mem::size_of,
-    ops::Range,
-    pin::Pin,
-    ptr,
-    result::Result,
+    borrow::Borrow, cmp, ffi::c_void, fmt, mem::size_of, ops::Range, pin::Pin, ptr, result::Result,
     slice,
 };
 
@@ -34,7 +26,6 @@ use crate::{
     csprng::{Csprng, Random},
     ec::{Curve, Curve25519, Scalar, Secp256r1, Secp384r1, Secp521r1, Uncompressed},
     hash::{Digest, Hash, HashId},
-    hex::ToHex,
     hkdf::hkdf_impl,
     hmac::hmac_impl,
     import::{ExportError, Import, ImportError},
@@ -92,6 +83,12 @@ impl Drop for Aes256Gcm {
         // fiddle with these fields, but since we're about to
         // drop the memory it's probably fine.
         self.0.skey.zeroize();
+    }
+}
+
+impl fmt::Debug for Aes256Gcm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Aes256Gcm").finish_non_exhaustive()
     }
 }
 
@@ -346,7 +343,7 @@ macro_rules! ecdh_impl {
         $pk:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
-        #[derive(Clone)]
+        #[derive(Clone, Debug)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -455,13 +452,6 @@ macro_rules! ecdh_impl {
             }
         }
 
-        #[cfg(test)]
-        impl Debug for $sk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
-            }
-        }
-
         impl Import<SecretKeyBytes<<Self as SecretKey>::Size>> for $sk {
             #[inline]
             fn import(
@@ -520,7 +510,7 @@ macro_rules! ecdh_impl {
         }
 
         #[doc = concat!($doc, " ECDH public key.")]
-        #[derive(Clone, Eq, PartialEq)]
+        #[derive(Clone, Debug, Eq, PartialEq)]
         pub struct $pk {
             /// The public data.
             ///
@@ -539,12 +529,6 @@ macro_rules! ecdh_impl {
 
             fn export(&self) -> Self::Data {
                 self.kbuf
-            }
-        }
-
-        impl Debug for $pk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
             }
         }
 
@@ -632,7 +616,7 @@ macro_rules! ecdsa_impl {
         $sig:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
-        #[derive(Clone)]
+        #[derive(Clone, Debug)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -768,13 +752,6 @@ macro_rules! ecdsa_impl {
             }
         }
 
-        #[cfg(test)]
-        impl Debug for $sk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
-            }
-        }
-
         impl ConstantTimeEq for $sk {
             fn ct_eq(&self, other: &Self) -> Choice {
                 self.kbuf.ct_eq(&other.kbuf)
@@ -837,7 +814,7 @@ macro_rules! ecdsa_impl {
         }
 
         #[doc = concat!($doc, " ECDSA public key.")]
-        #[derive(Clone, Eq, PartialEq)]
+        #[derive(Clone, Debug, Eq, PartialEq)]
         pub struct $pk {
             /// The public data.
             ///
@@ -887,12 +864,6 @@ macro_rules! ecdsa_impl {
             #[inline]
             fn export(&self) -> Self::Data {
                 self.kbuf
-            }
-        }
-
-        impl Debug for $pk {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.kbuf.to_hex())
             }
         }
 
@@ -1117,6 +1088,12 @@ impl Csprng for HmacDrbg {
             }
             dst = &mut dst[n..];
         }
+    }
+}
+
+impl fmt::Debug for HmacDrbg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HmacDrbg").finish_non_exhaustive()
     }
 }
 
