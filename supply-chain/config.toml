@@ -52,10 +52,6 @@ criteria = "safe-to-deploy"
 version = "0.10.3"
 criteria = "safe-to-deploy"
 
-[[exemptions.aho-corasick]]
-version = "1.1.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.base16ct]]
 version = "0.2.0"
 criteria = "safe-to-deploy"
@@ -180,10 +176,6 @@ criteria = "safe-to-deploy"
 version = "0.8.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.memchr]]
-version = "2.6.3"
-criteria = "safe-to-deploy"
-
 [[exemptions.merlin]]
 version = "3.0.0"
 criteria = "safe-to-deploy"
@@ -220,32 +212,12 @@ criteria = "safe-to-deploy"
 version = "0.13.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.regex]]
-version = "1.11.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.regex-automata]]
-version = "0.4.9"
-criteria = "safe-to-deploy"
-
 [[exemptions.rfc6979]]
 version = "0.4.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.ryu]]
-version = "1.0.10"
-criteria = "safe-to-deploy"
-
 [[exemptions.sec1]]
 version = "0.7.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.serde_json]]
-version = "1.0.137"
-criteria = "safe-to-deploy"
-
-[[exemptions.serde_repr]]
-version = "0.1.19"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
@@ -254,18 +226,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.spki]]
 version = "0.7.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.syn]]
-version = "2.0.96"
-criteria = "safe-to-deploy"
-
-[[exemptions.thiserror]]
-version = "2.0.11"
-criteria = "safe-to-deploy"
-
-[[exemptions.thiserror-impl]]
-version = "2.0.11"
 criteria = "safe-to-deploy"
 
 [[exemptions.typenum]]
@@ -280,14 +240,6 @@ criteria = "safe-to-deploy"
 version = "0.11.0+wasi-snapshot-preview1"
 criteria = "safe-to-deploy"
 
-[[exemptions.windows-targets]]
-version = "0.52.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.windows_aarch64_gnullvm]]
-version = "0.52.6"
-criteria = "safe-to-deploy"
-
 [[exemptions.windows_aarch64_msvc]]
 version = "0.52.6"
 criteria = "safe-to-deploy"
@@ -296,19 +248,11 @@ criteria = "safe-to-deploy"
 version = "0.52.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.windows_i686_gnullvm]]
-version = "0.52.6"
-criteria = "safe-to-deploy"
-
 [[exemptions.windows_i686_msvc]]
 version = "0.52.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.windows_x86_64_gnu]]
-version = "0.52.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.windows_x86_64_gnullvm]]
 version = "0.52.6"
 criteria = "safe-to-deploy"
 
