@@ -2,10 +2,9 @@
 
 use core::{array::TryFromSliceError, borrow::Borrow, fmt, marker::PhantomData, result::Result};
 
-#[doc(inline)]
-pub use crate::hpke::KemId;
 use crate::{
     csprng::{Csprng, Random},
+    hpke::KemId,
     import::{Import, ImportError},
     kdf::{Kdf, KdfError, Prk},
     keys::{PublicKey, RawSecretBytes, SecretKey},
@@ -83,9 +82,6 @@ impl From<PkError> for KemError {
 /// * Have at least a 128-bit security level.
 #[allow(non_snake_case)]
 pub trait Kem {
-    /// Uniquely identifies the encapsulation algorithm.
-    const ID: KemId;
-
     /// A local secret (private) key used to decapsulate secrets.
     type DecapKey: DecapKey<EncapKey = Self::EncapKey>;
     /// A remote public key used to encapsulate secrets.
@@ -569,15 +565,17 @@ type PubKeyData<T> = <<T as Ecdh>::PublicKey as PublicKey>::Data;
 /// ```
 #[macro_export]
 macro_rules! dhkem_impl {
-    ($name:ident, $doc:expr, $ecdh:ty, $kdf:ty, $sk:ident, $pk:ident $(,)?) => {
+    ($name:ident, $doc:expr, $kem_id:expr, $ecdh:ty, $kdf:ty, $sk:ident, $pk:ident $(,)?) => {
         #[doc = concat!($doc, ".")]
         #[derive(Debug)]
         pub struct $name;
 
+        impl $name {
+            const KEM_ID: $crate::hpke::KemId = $kem_id;
+        }
+
         #[allow(non_snake_case)]
         impl $crate::kem::Kem for $name {
-            const ID: $crate::kem::KemId = $crate::kem::KemId::$name;
-
             type DecapKey = $sk;
             type EncapKey = $pk;
             type Secret = $crate::kdf::Prk<<$kdf as $crate::kdf::Kdf>::PrkSize>;
@@ -587,21 +585,22 @@ macro_rules! dhkem_impl {
                 rng: &mut R,
                 pkR: &Self::EncapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).encap(rng, pkR)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).encap(rng, pkR)
             }
 
             fn encap_deterministically(
                 pkR: &Self::EncapKey,
                 skE: Self::DecapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).encap_deterministically(pkR, skE)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID)
+                    .encap_deterministically(pkR, skE)
             }
 
             fn decap(
                 enc: &Self::Encap,
                 skR: &Self::DecapKey,
             ) -> ::core::result::Result<Self::Secret, $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).decap(enc, skR)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).decap(enc, skR)
             }
 
             fn auth_encap<R: $crate::csprng::Csprng>(
@@ -609,7 +608,7 @@ macro_rules! dhkem_impl {
                 pkR: &Self::EncapKey,
                 skS: &Self::DecapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).auth_encap(rng, pkR, skS)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).auth_encap(rng, pkR, skS)
             }
 
             fn auth_encap_deterministically(
@@ -617,7 +616,7 @@ macro_rules! dhkem_impl {
                 skS: &Self::DecapKey,
                 skE: Self::DecapKey,
             ) -> ::core::result::Result<(Self::Secret, Self::Encap), $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID)
                     .auth_encap_deterministically(pkR, skS, skE)
             }
 
@@ -626,8 +625,12 @@ macro_rules! dhkem_impl {
                 skR: &Self::DecapKey,
                 pkS: &Self::EncapKey,
             ) -> ::core::result::Result<Self::Secret, $crate::kem::KemError> {
-                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::ID).auth_decap(enc, skR, pkS)
+                $crate::kem::DhKem::<$ecdh, $kdf>::new(Self::KEM_ID).auth_decap(enc, skR, pkS)
             }
+        }
+
+        impl $crate::hpke::HpkeKem for $name {
+            const ID: $crate::hpke::KemId = Self::KEM_ID;
         }
     };
 }

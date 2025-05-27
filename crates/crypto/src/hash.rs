@@ -4,7 +4,6 @@
 
 use core::{
     fmt::{self, Debug},
-    num::NonZeroU16,
     ops::{Deref, DerefMut},
 };
 
@@ -16,28 +15,6 @@ use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
     Unsigned, U32, U65536,
 };
-
-use crate::AlgId;
-
-/// Hash algorithm identifiers.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, AlgId)]
-pub enum HashId {
-    /// SHA-256.
-    #[alg_id(0x0001)]
-    Sha256,
-    /// SHA-384.
-    #[alg_id(0x0002)]
-    Sha384,
-    /// SHA-512/256.
-    #[alg_id(0x0003)]
-    Sha512_256,
-    /// SHA-512.
-    #[alg_id(0x0004)]
-    Sha512,
-    /// Some other hash function.
-    #[alg_id(Other)]
-    Other(NonZeroU16),
-}
 
 /// A cryptographic hash function.
 ///
@@ -55,9 +32,6 @@ pub enum HashId {
 /// Examples of cryptographic hash functions that fulfill
 /// these requirements include SHA-256, SHA-512, and SHA3-512.
 pub trait Hash: Clone {
-    /// Uniquely identifies the hash algorithm.
-    const ID: HashId;
-
     /// The size in octets of a digest used by this [`Hash`].
     ///
     /// Must be at least 32 octets and less than 2¹⁶ octets.

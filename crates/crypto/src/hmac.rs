@@ -231,8 +231,9 @@ impl<H: Hash + BlockSize> Drop for HmacKey<H> {
 /// ```rust
 /// use spideroak_crypto::{
 ///     block::BlockSize,
-///     hash::{Digest, Hash, HashId},
+///     hash::{Digest, Hash},
 ///     hmac_impl,
+///     oid::consts::HMAC_WITH_SHA2_256,
 ///     typenum::{U32, U64},
 /// };
 ///
@@ -240,7 +241,6 @@ impl<H: Hash + BlockSize> Drop for HmacKey<H> {
 /// pub struct Sha256;
 ///
 /// impl Hash for Sha256 {
-///     const ID: HashId = HashId::Sha256;
 ///     type DigestSize = U32;
 ///     fn new() -> Self {
 ///         Self
@@ -257,18 +257,16 @@ impl<H: Hash + BlockSize> Drop for HmacKey<H> {
 ///     type BlockSize = U64;
 /// }
 ///
-/// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256);
+/// hmac_impl!(HmacSha256, "HMAC-SHA-256", Sha256, HMAC_WITH_SHA2_256);
 /// ```
 #[macro_export]
 macro_rules! hmac_impl {
-    ($name:ident, $doc:expr, $hash:ident) => {
+    ($name:ident, $doc:expr, $hash:ident $(, $oid:ident)? $(,)?) => {
         #[doc = concat!($doc, ".")]
         #[derive(Clone, Debug)]
         pub struct $name($crate::hmac::Hmac<$hash>);
 
         impl $crate::mac::Mac for $name {
-            const ID: $crate::mac::MacId = $crate::mac::MacId::$name;
-
             type Tag = $crate::hmac::Tag<Self::TagSize>;
             type TagSize = <$hash as $crate::hash::Hash>::DigestSize;
 
@@ -303,6 +301,10 @@ macro_rules! hmac_impl {
                 self.0.tag()
             }
         }
+
+        $(impl $crate::oid::Identified for $name {
+            const OID: &'static $crate::oid::Oid = $oid;
+        })?
     };
 }
 pub(crate) use hmac_impl;
@@ -312,15 +314,18 @@ pub(crate) use hmac_impl;
 mod tests {
     macro_rules! hmac_tests {
         () => {
-            use crate::test_util::test_mac;
+            use crate::{
+                oid::consts::{HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512},
+                test_util::test_mac,
+            };
 
-            hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256);
-            hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384);
-            hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512);
+            hmac_impl!(HmacSha2_256, "HMAC-SHA256", Sha256, HMAC_WITH_SHA2_256);
+            hmac_impl!(HmacSha2_384, "HMAC-SHA384", Sha384, HMAC_WITH_SHA2_384);
+            hmac_impl!(HmacSha2_512, "HMAC-SHA512", Sha512, HMAC_WITH_SHA2_512);
 
-            test_mac!(hmac_sha256, HmacSha256, MacTest::HmacSha256);
-            test_mac!(hmac_sha384, HmacSha384, MacTest::HmacSha384);
-            test_mac!(hmac_sha512, HmacSha512, MacTest::HmacSha512);
+            test_mac!(hmac_sha256, HmacSha2_256, MacTest::HmacSha256);
+            test_mac!(hmac_sha384, HmacSha2_384, MacTest::HmacSha384);
+            test_mac!(hmac_sha512, HmacSha2_512, MacTest::HmacSha512);
         };
     }
 

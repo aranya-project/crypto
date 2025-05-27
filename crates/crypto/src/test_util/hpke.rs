@@ -8,11 +8,11 @@ use generic_array::GenericArray;
 use typenum::U64;
 
 use crate::{
-    aead::{Aead, IndCca2},
+    aead::IndCca2,
     csprng::{Csprng, Random},
-    hpke::{Hpke, Mode, OpenCtx, SealCtx},
+    hpke::{Hpke, HpkeAead, HpkeKdf, HpkeKem, Mode, OpenCtx, SealCtx},
     kdf::{Expand, Kdf, KdfError, Prk},
-    kem::{DecapKey, Kem},
+    kem::DecapKey,
 };
 
 /// Invokes `callback` for each HPKE test.
@@ -124,7 +124,7 @@ pub use test_hpke;
 
 /// Tests the full encryption-decryption cycle.
 #[allow(non_snake_case)]
-pub fn test_round_trip<K: Kem, F: Kdf, A: Aead + IndCca2, R: Csprng>(rng: &mut R) {
+pub fn test_round_trip<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng: &mut R) {
     const GOLDEN: &[u8] = b"some plaintext";
     const AD: &[u8] = b"some additional data";
     const INFO: &[u8] = b"some contextual binding";
@@ -156,7 +156,7 @@ pub fn test_round_trip<K: Kem, F: Kdf, A: Aead + IndCca2, R: Csprng>(rng: &mut R
 /// [`crate::hpke::RecvCtx::export`] is the same as
 /// [`crate::hpke::RecvCtx::export_into`].
 #[allow(non_snake_case)]
-pub fn test_export<K: Kem, F: Kdf, A: Aead + IndCca2, R: Csprng>(rng: &mut R) {
+pub fn test_export<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng: &mut R) {
     const INFO: &[u8] = b"some contextual binding";
 
     let skR = K::DecapKey::random(rng);

@@ -15,11 +15,11 @@ use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac};
 
 use super::{AeadWithDefaults, KdfWithDefaults, MacWithDefaults, SignerWithDefaults};
 use crate::{
-    aead::{Aead, IndCca2, Nonce},
-    hpke::{Hpke, SealCtx},
+    aead::{Aead, Nonce},
+    hpke::{Hpke, HpkeAead, HpkeKdf, HpkeKem, SealCtx},
     import::Import,
     kdf::Kdf,
-    kem::{Ecdh, Kem},
+    kem::Ecdh,
     mac::Mac,
     signer::{Signer, VerifyingKey},
 };
@@ -457,9 +457,9 @@ fn test_hkdf_inner<T: Kdf>(name: HkdfTest) {
 #[allow(non_snake_case)]
 pub fn test_hpke<K, F, A>(name: HpkeTest)
 where
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
 {
     let set = hpke::TestSet::load(name).expect("should be able to load tests");
     for (i, g) in set.test_groups.iter().enumerate() {

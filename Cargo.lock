@@ -874,6 +874,7 @@ dependencies = [
  "thiserror",
  "typenum",
  "wycheproof",
+ "zerocopy",
  "zeroize",
 ]
 

@@ -31,13 +31,14 @@ use subtle::{Choice, ConstantTimeEq};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
-    aead::{Aead, AeadId, Lifetime, OpenError, SealError},
+    aead::{Aead, Lifetime, OpenError, SealError},
     csprng::{Csprng, Random},
     import::{ExportError, Import, ImportError},
-    kdf::{Kdf, KdfError, KdfId, Prk},
+    kdf::{Kdf, KdfError, Prk},
     keys::{InvalidKey, PublicKey, SecretKey, SecretKeyBytes},
-    mac::{Mac, MacId},
-    signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    mac::Mac,
+    oid::{Identified, Oid},
+    signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
 };
 
 #[macro_export]
@@ -112,8 +113,6 @@ macro_rules! __doctest_os_hardware_rand {
 pub struct AeadWithDefaults<T>(T);
 
 impl<T: Aead> Aead for AeadWithDefaults<T> {
-    const ID: AeadId = T::ID;
-
     const LIFETIME: Lifetime = T::LIFETIME;
 
     type KeySize = T::KeySize;
@@ -156,13 +155,15 @@ impl<T: Aead> Aead for AeadWithDefaults<T> {
     }
 }
 
+impl<T: Identified> Identified for AeadWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
+}
+
 /// A [`Kdf`] that that uses the default trait methods.
 #[derive(Clone)]
 pub struct KdfWithDefaults<T>(PhantomData<fn() -> T>);
 
 impl<T: Kdf> Kdf for KdfWithDefaults<T> {
-    const ID: KdfId = T::ID;
-
     type MaxOutput = T::MaxOutput;
 
     type PrkSize = T::PrkSize;
@@ -185,6 +186,10 @@ impl<T: Kdf> Kdf for KdfWithDefaults<T> {
     }
 }
 
+impl<T: Identified> Identified for KdfWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
+}
+
 impl<T> fmt::Debug for KdfWithDefaults<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("KdfWithDefaults").finish_non_exhaustive()
@@ -196,8 +201,6 @@ impl<T> fmt::Debug for KdfWithDefaults<T> {
 pub struct MacWithDefaults<T>(T);
 
 impl<T: Mac> Mac for MacWithDefaults<T> {
-    const ID: MacId = T::ID;
-
     type Tag = T::Tag;
     type TagSize = T::TagSize;
 
@@ -221,16 +224,22 @@ impl<T: Mac> Mac for MacWithDefaults<T> {
     }
 }
 
+impl<T: Identified> Identified for MacWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
+}
+
 /// A [`Signer`] that that uses the default trait methods.
 #[derive(Clone, Debug)]
 pub struct SignerWithDefaults<T: ?Sized>(T);
 
 impl<T: Signer + ?Sized> Signer for SignerWithDefaults<T> {
-    const ID: SignerId = T::ID;
-
     type SigningKey = SigningKeyWithDefaults<T>;
     type VerifyingKey = VerifyingKeyWithDefaults<T>;
     type Signature = SignatureWithDefaults<T>;
+}
+
+impl<T: Identified> Identified for SignerWithDefaults<T> {
+    const OID: &'static Oid = T::OID;
 }
 
 /// A [`SigningKey`] that uses the default trait methods.

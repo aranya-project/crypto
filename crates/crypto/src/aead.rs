@@ -21,8 +21,6 @@ use typenum::{
     Unsigned, U16, U65536,
 };
 
-#[doc(inline)]
-pub use crate::hpke::AeadId;
 use crate::{
     csprng::{Csprng, Random},
     kdf::{Expand, Kdf, KdfError, Prk},
@@ -354,9 +352,6 @@ impl PartialEq<u64> for Lifetime {
 /// [ChaCha20-Poly1305]: https://datatracker.ietf.org/doc/html/rfc8439
 /// [RFC 5116]: https://www.rfc-editor.org/rfc/rfc5116.html
 pub trait Aead {
-    /// Uniquely identifies the AEAD algorithm.
-    const ID: AeadId;
-
     /// The lifetime of a cryptographic key.
     const LIFETIME: Lifetime;
 
@@ -1066,7 +1061,7 @@ mod committing {
     #[cfg_attr(feature = "committing-aead", macro_export)]
     #[cfg_attr(docsrs, doc(cfg(feature = "committing-aead")))]
     macro_rules! utc_aead {
-        ($name:ident, $inner:ty, $cipher:ty, $doc:expr) => {
+        ($name:ident, $inner:ty, $cipher:ty, $doc:expr $(, $oid:expr)? $(,)?) => {
             #[doc = $doc]
             #[derive(Debug)]
             pub struct $name {
@@ -1083,7 +1078,6 @@ mod committing {
             impl $crate::aead::Cmt1Aead for $name {}
 
             impl $crate::aead::Aead for $name {
-                const ID: $crate::aead::AeadId = $crate::aead::AeadId::$name;
                 const LIFETIME: $crate::aead::Lifetime = <$inner as $crate::aead::Aead>::LIFETIME;
 
                 type KeySize = <$inner as $crate::aead::Aead>::KeySize;
@@ -1249,6 +1243,10 @@ mod committing {
                     }
                 }
             }
+
+            $(impl $crate::oid::Identified for $name {
+                const OID: &$crate::oid::Oid = $oid;
+            })?
         };
     }
     pub(crate) use utc_aead;
@@ -1339,7 +1337,7 @@ mod committing {
     #[cfg_attr(feature = "committing-aead", macro_export)]
     #[cfg_attr(docsrs, doc(cfg(feature = "committing-aead")))]
     macro_rules! hte_aead {
-        ($name:ident, $inner:ty, $hash:ty, $doc:expr) => {
+        ($name:ident, $inner:ty, $hash:ty, $doc:expr $(, $oid:expr)? $(,)?) => {
             #[doc = $doc]
             #[derive(Debug)]
             pub struct $name {
@@ -1394,7 +1392,6 @@ mod committing {
             impl $crate::aead::Cmt4Aead for $name where $inner: $crate::aead::Cmt1Aead {}
 
             impl $crate::aead::Aead for $name {
-                const ID: $crate::aead::AeadId = $crate::aead::AeadId::$name;
                 const LIFETIME: $crate::aead::Lifetime = <$inner as $crate::aead::Aead>::LIFETIME;
 
                 type KeySize = <$inner as $crate::aead::Aead>::KeySize;
@@ -1505,6 +1502,10 @@ mod committing {
                     )
                 }
             }
+
+            $(impl $crate::oid::Identified for $name {
+                const OID: &$crate::oid::Oid = $oid;
+            })?
         };
     }
     pub(crate) use hte_aead;

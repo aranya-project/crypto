@@ -12,8 +12,6 @@ use typenum::{
     Const, Unsigned, U32, U64, U65536,
 };
 
-#[doc(inline)]
-pub use crate::hpke::KdfId;
 use crate::{
     keys::{RawSecretBytes, SecretKeyBytes},
     zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
@@ -70,9 +68,6 @@ impl From<Bug> for KdfError {
 ///
 /// [HKDF]: https://eprint.iacr.org/2010/264
 pub trait Kdf {
-    /// Uniquely identifies the KDF.
-    const ID: KdfId;
-
     /// The size in octets of the largest key that can be created
     /// with [`expand`][Self::expand],
     /// [`expand_multi`][Self::expand_multi], or

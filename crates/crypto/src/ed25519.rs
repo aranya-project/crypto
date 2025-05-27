@@ -20,7 +20,8 @@ use crate::{
     hex::ToHex,
     import::{try_import, ExportError, Import, ImportError},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
-    signer::{self, PkError, Signer, SignerError, SignerId},
+    oid::{consts::ED25519, Identified, Oid},
+    signer::{self, PkError, Signer, SignerError},
     zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
 };
 
@@ -29,8 +30,6 @@ use crate::{
 pub struct Ed25519;
 
 impl Signer for Ed25519 {
-    const ID: SignerId = SignerId::Ed25519;
-
     type SigningKey = SigningKey;
     type VerifyingKey = VerifyingKey;
     type Signature = Signature;
@@ -51,6 +50,10 @@ impl Signer for Ed25519 {
         )
         .map_err(|_| SignerError::Verification)
     }
+}
+
+impl Identified for Ed25519 {
+    const OID: &Oid = ED25519;
 }
 
 /// An Ed25519 signing key.
@@ -197,6 +200,10 @@ impl Import<&[u8]> for Signature {
     fn import(data: &[u8]) -> Result<Self, ImportError> {
         try_import(data)
     }
+}
+
+impl Identified for Signature {
+    const OID: &Oid = ED25519;
 }
 
 impl SigningKey {

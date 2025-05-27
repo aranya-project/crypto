@@ -31,6 +31,7 @@ pub mod kdf;
 pub mod kem;
 pub mod keys;
 pub mod mac;
+pub mod oid;
 pub mod rust;
 pub mod signer;
 pub mod test_util;
@@ -39,5 +40,7 @@ pub mod zeroize;
 
 pub use buggy;
 pub use generic_array;
+#[doc(hidden)]
+pub use spideroak_crypto_derive;
 pub use subtle;
 pub use typenum;
