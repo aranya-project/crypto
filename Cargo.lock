@@ -863,7 +863,6 @@ dependencies = [
  "generic-array 1.1.1",
  "getrandom 0.2.16",
  "hex",
- "lazy_static",
  "more-asserts",
  "p256",
  "p384",
