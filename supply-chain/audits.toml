@@ -12,6 +12,11 @@ description = """
 Does not implement cryptography.
 """
 
+[[audits.base64ct]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = ["safe-to-deploy", "crypto-safe"]
+delta = "1.6.0 -> 1.7.3"
+
 [[audits.getrandom]]
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
