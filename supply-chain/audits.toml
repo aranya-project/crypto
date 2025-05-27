@@ -17,6 +17,11 @@ who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = ["safe-to-deploy", "crypto-safe"]
 delta = "1.6.0 -> 1.7.3"
 
+[[audits.cpufeatures]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.16 -> 0.2.17"
+
 [[audits.der]]
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
