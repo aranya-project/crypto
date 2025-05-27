@@ -17,6 +17,11 @@ who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = ["safe-to-deploy", "crypto-safe"]
 delta = "1.6.0 -> 1.7.3"
 
+[[audits.der]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.7.9 -> 0.7.10"
+
 [[audits.getrandom]]
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
