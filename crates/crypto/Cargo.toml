@@ -19,7 +19,6 @@ workspace = true
 [features]
 default = [
 	"getrandom",
-	"test_util",
 ]
 
 # Enable allocations.
