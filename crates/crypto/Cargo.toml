@@ -151,6 +151,10 @@ spideroak-crypto-derive = { version = "0.2.0", path = "../crypto-derive" }
 # Other SpiderOak crates
 ##
 
+##
+# Other SpiderOak crates
+##
+
 aranya-bearssl-sys = { version = "0.1.0", optional = true }
 buggy = { version = "0.1.0", default-features = false }
 
