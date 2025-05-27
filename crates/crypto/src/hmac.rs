@@ -236,7 +236,7 @@ impl<H: Hash + BlockSize> Drop for HmacKey<H> {
 ///     typenum::{U32, U64},
 /// };
 ///
-/// #[derive(Clone)]
+/// #[derive(Clone, Debug)]
 /// pub struct Sha256;
 ///
 /// impl Hash for Sha256 {

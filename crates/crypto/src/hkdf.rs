@@ -156,7 +156,7 @@ impl<H> fmt::Debug for Hkdf<H> {
 ///     typenum::{U32, U64},
 /// };
 ///
-/// #[derive(Clone)]
+/// #[derive(Clone, Debug)]
 /// pub struct Sha256;
 ///
 /// impl Hash for Sha256 {
