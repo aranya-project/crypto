@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use core::marker::PhantomData;
+use core::{fmt, marker::PhantomData};
 
 use buggy::BugExt;
 use generic_array::GenericArray;
@@ -22,7 +22,7 @@ use crate::{
 pub type MaxOutput<D> = Prod<U255, D>;
 
 /// HKDF for some hash `H`.
-pub struct Hkdf<H>(PhantomData<H>);
+pub struct Hkdf<H>(PhantomData<fn() -> H>);
 
 impl<H: Hash + BlockSize> Hkdf<H> {
     /// The maximum nuumber of bytes that can be expanded by
@@ -138,6 +138,12 @@ impl<H: Hash + BlockSize> Hkdf<H> {
     }
 }
 
+impl<H> fmt::Debug for Hkdf<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Hkdf").finish()
+    }
+}
+
 /// Implements [`Hkdf`].
 ///
 /// # Example
@@ -150,7 +156,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
 ///     typenum::{U32, U64},
 /// };
 ///
-/// #[derive(Clone)]
+/// #[derive(Clone, Debug)]
 /// pub struct Sha256;
 ///
 /// impl Hash for Sha256 {
@@ -177,6 +183,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
 macro_rules! hkdf_impl {
     ($name:ident, $doc_name:expr, $hash:ident) => {
         #[doc = concat!($doc_name, ".")]
+        #[derive(Copy, Clone, Debug)]
         pub struct $name;
 
         impl $crate::kdf::Kdf for $name {

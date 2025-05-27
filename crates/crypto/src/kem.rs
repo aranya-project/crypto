@@ -1,12 +1,6 @@
 //! Key Encapsulation Mechanisms.
 
-use core::{
-    array::TryFromSliceError,
-    borrow::Borrow,
-    fmt::{self, Debug, Display},
-    marker::PhantomData,
-    result::Result,
-};
+use core::{array::TryFromSliceError, borrow::Borrow, fmt, marker::PhantomData, result::Result};
 
 #[doc(inline)]
 pub use crate::hpke::KemId;
@@ -38,7 +32,7 @@ pub enum KemError {
     PublicKey(PkError),
 }
 
-impl Display for KemError {
+impl fmt::Display for KemError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidDecapKeyFormat => write!(f, "invalid secret key data"),
@@ -207,7 +201,7 @@ pub enum EcdhError {
     Other(&'static str),
 }
 
-impl Display for EcdhError {
+impl fmt::Display for EcdhError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Other(msg) => write!(f, "{}", msg),
@@ -292,6 +286,12 @@ impl<const N: usize> TryFrom<&[u8]> for SharedSecret<N> {
     }
 }
 
+impl<const N: usize> fmt::Debug for SharedSecret<N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("SharedSecret").finish_non_exhaustive()
+    }
+}
+
 impl<const N: usize> ZeroizeOnDrop for SharedSecret<N> {}
 impl<const N: usize> Drop for SharedSecret<N> {
     fn drop(&mut self) {
@@ -316,7 +316,7 @@ pub enum DhKemError {
     Import(ImportError),
 }
 
-impl Display for DhKemError {
+impl fmt::Display for DhKemError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ecdh(err) => write!(f, "{}", err),
@@ -534,6 +534,12 @@ impl<E: Ecdh, F: Kdf> DhKem<E, F> {
         ];
         F::extract_and_expand_multi(out.as_bytes_mut(), &labeled_ikm, &[], &labeled_info)?;
         Ok(out)
+    }
+}
+
+impl<E, F> fmt::Debug for DhKem<E, F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DhKem").field("id", &self.id).finish()
     }
 }
 

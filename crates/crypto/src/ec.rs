@@ -2,7 +2,7 @@
 
 use core::{
     borrow::{Borrow, BorrowMut},
-    fmt::Debug,
+    fmt,
     ops::Shl,
 };
 
@@ -181,6 +181,18 @@ macro_rules! pk_impl {
                 }
             }
         }
+
+        impl<C: Curve> fmt::Debug for $name<C>
+        where
+            <C as Curve>::$size: ArrayLength + Shl<B1>,
+            Double<C::$size>: ArrayLength,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple(stringify!($name))
+                    .field(&self.to_hex())
+                    .finish()
+            }
+        }
     };
 }
 pk_impl!(Compressed, CompressedSize);
@@ -297,6 +309,12 @@ impl<C: Curve> Import<&[u8]> for Scalar<C> {
             want: C::ScalarSize::USIZE..C::ScalarSize::USIZE,
         })?;
         Ok(Self(v.clone()))
+    }
+}
+
+impl<C: Curve> fmt::Debug for Scalar<C> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Scalar").finish_non_exhaustive()
     }
 }
 

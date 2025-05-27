@@ -869,8 +869,8 @@ mod committing {
     /// [bellare]: https://eprint.iacr.org/2022/268
     #[doc(hidden)]
     pub struct CtrThenXorPrf<A, C> {
-        _aead: PhantomData<A>,
-        _cipher: PhantomData<C>,
+        _aead: PhantomData<fn() -> A>,
+        _cipher: PhantomData<fn() -> C>,
     }
 
     impl<A, C> CtrThenXorPrf<A, C>
@@ -974,6 +974,12 @@ mod committing {
         }
     }
 
+    impl<A, C> fmt::Debug for CtrThenXorPrf<A, C> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("CtrThenXorPrf").finish_non_exhaustive()
+        }
+    }
+
     /// An error occurred during the UNAE-then-Commit transform.
     #[derive(Debug, Eq, PartialEq)]
     pub enum UtcError {
@@ -1062,6 +1068,7 @@ mod committing {
     macro_rules! utc_aead {
         ($name:ident, $inner:ty, $cipher:ty, $doc:expr) => {
             #[doc = $doc]
+            #[derive(Debug)]
             pub struct $name {
                 key: <$inner as $crate::aead::Aead>::Key,
             }
@@ -1334,6 +1341,7 @@ mod committing {
     macro_rules! hte_aead {
         ($name:ident, $inner:ty, $hash:ty, $doc:expr) => {
             #[doc = $doc]
+            #[derive(Debug)]
             pub struct $name {
                 key: <$inner as $crate::aead::Aead>::Key,
             }

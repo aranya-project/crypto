@@ -17,6 +17,7 @@ repository = "https://github.com/aranya-project/crypto"
 rust-version = "1.85.0"
 
 [workspace.lints.rust]
+missing_debug_implementations = "warn"
 missing_docs = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
 unsafe_op_in_unsafe_fn = "warn"
