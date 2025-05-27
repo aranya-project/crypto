@@ -28,7 +28,6 @@ alloc = [
 	"der/alloc",
 	"ecdsa/alloc",
 	"rand?/alloc",
-	"rand_core/alloc",
 	"sha3-utils/alloc",
 	"zeroize/alloc",
 ]
@@ -154,7 +153,7 @@ der = { version = "0.7", default-features = false }
 ecdsa = { version = "0.16", default-features = false, features = ["signing", "verifying", "der"] }
 ed25519-dalek = { version = "2", default-features = false, features = ["fast", "zeroize"] }
 elliptic-curve = { version = "0.13", default-features = false, features = ["ecdh", "arithmetic", "sec1"] }
-generic-array = { version = "1.1.*", default-features = false, features = ["const-default", "zeroize"] }
+generic-array = { version = "1", default-features = false, features = ["const-default", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, optional = true }
 more-asserts = { version = "0.3", default-features = false, optional = true }
 p256 = { version = "0.13", default-features = false, features = ["ecdh", "ecdsa"] }
@@ -169,7 +168,7 @@ serde_json = { version = "1", default-features = false, optional = true }
 serde_repr = { version = "0.1", default-features = false, optional = true }
 sha2 = { version = "0.10", default-features = false }
 sha3-utils = { version = "0.3.0", default-features = false }
-spin = { version = "0.9", default-features = false, features = ["spin_mutex"], optional = true }
+spin = { version = "0.10", default-features = false, features = ["spin_mutex"], optional = true }
 subtle = { version = "2.5", default-features = false, features = ["core_hint_black_box"] }
 thiserror = { version = "2", default-features = false }
 typenum = { version = "1", default-features = false, features = ["const-generics"] }
