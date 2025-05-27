@@ -138,7 +138,6 @@ test_util = [
 # Use a system provided TRNG for the default CSPRNG.
 trng = [
 	"dep:aes",
-	"dep:lazy_static",
 	"dep:rand_chacha",
 	"dep:spin",
 ]
