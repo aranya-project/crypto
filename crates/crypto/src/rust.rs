@@ -48,7 +48,7 @@ use crate::{
         },
         Identified, Oid,
     },
-    signer::{Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
     zeroize::{is_zeroize_on_drop, Zeroize, ZeroizeOnDrop},
 };
 

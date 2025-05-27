@@ -1,6 +1,6 @@
 #![allow(clippy::arithmetic_side_effects)]
 
-use std::{fs::File, io::Write, ops::RangeBounds, str::FromStr};
+use std::{ops::RangeBounds, str::FromStr};
 
 use proc_macro2::{Literal, Span, TokenStream};
 use quote::{quote, ToTokens};
@@ -13,19 +13,6 @@ type Arc = u128;
 
 pub(crate) fn parse(input: TokenStream) -> syn::Result<TokenStream> {
     let oid = syn::parse2::<Oid>(input)?.into_token_stream();
-
-    // Undocumented.
-    if cfg!(crypto_derive_debug) {
-        let mut data = oid.to_string();
-        if let Ok(file) = syn::parse_file(&data) {
-            data = prettyplease::unparse(&file);
-        }
-        File::create("/tmp/oid.rs")
-            .expect("unable to create `/tmp/oid.rs`")
-            .write_all(data.as_bytes())
-            .expect("unable to write all data to `/tmp/oid.rs`");
-    }
-
     Ok(oid)
 }
 

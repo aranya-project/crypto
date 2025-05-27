@@ -764,7 +764,12 @@ where
     }
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2 + fmt::Debug> fmt::Debug for SendCtx<K, F, A> {
+impl<K, F, A> fmt::Debug for SendCtx<K, F, A>
+where
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead + fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SendCtx")
             .field("open", &self.seal)
@@ -850,7 +855,7 @@ impl<A: HpkeAead> SealCtx<A> {
     }
 }
 
-impl<A: Aead + IndCca2 + fmt::Debug> fmt::Debug for SealCtx<A> {
+impl<A: HpkeAead + fmt::Debug> fmt::Debug for SealCtx<A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SealCtx")
             .field("aead", &self.aead)
@@ -965,7 +970,12 @@ where
     }
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2 + fmt::Debug> fmt::Debug for RecvCtx<K, F, A> {
+impl<K, F, A> fmt::Debug for RecvCtx<K, F, A>
+where
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead + fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RecvCtx")
             .field("open", &self.open)
@@ -978,14 +988,14 @@ impl<K: Kem, F: Kdf, A: Aead + IndCca2 + fmt::Debug> fmt::Debug for RecvCtx<K, F
 /// a particular sender.
 ///
 /// Unlike [`RecvCtx`], it cannot export secrets.
-pub struct OpenCtx<A: Aead + IndCca2> {
+pub struct OpenCtx<A: HpkeAead> {
     aead: A,
     base_nonce: Nonce<A::NonceSize>,
     /// Incremented after each call to `open`.
     seq: Seq,
 }
 
-impl<A: Aead + IndCca2> OpenCtx<A> {
+impl<A: HpkeAead> OpenCtx<A> {
     /// The size in bytes of the overhead added to the plaintext.
     pub const OVERHEAD: usize = A::OVERHEAD;
 
@@ -1070,7 +1080,7 @@ impl<A: Aead + IndCca2> OpenCtx<A> {
     }
 }
 
-impl<A: Aead + IndCca2 + fmt::Debug> fmt::Debug for OpenCtx<A> {
+impl<A: HpkeAead + fmt::Debug> fmt::Debug for OpenCtx<A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("OpenCtx")
             .field("aead", &self.aead)
@@ -1222,7 +1232,12 @@ where
     }
 }
 
-impl<K: Kem, F: Kdf, A: Aead + IndCca2> fmt::Debug for ExportCtx<K, F, A> {
+impl<K, F, A> fmt::Debug for ExportCtx<K, F, A>
+where
+    K: HpkeKem,
+    F: HpkeKdf,
+    A: HpkeAead,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ExportCtx").finish_non_exhaustive()
     }

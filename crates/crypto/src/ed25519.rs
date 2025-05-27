@@ -21,7 +21,7 @@ use crate::{
     import::{try_import, ExportError, Import, ImportError},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{consts::ED25519, Identified, Oid},
-    signer::{self, PkError, Signer, SignerError, SignerId},
+    signer::{self, PkError, Signer, SignerError},
     zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
 };
 

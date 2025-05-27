@@ -25,7 +25,7 @@ use crate::{
     block::BlockSize,
     csprng::{Csprng, Random},
     ec::{Curve, Curve25519, Scalar, Secp256r1, Secp384r1, Secp521r1, Uncompressed},
-    hash::{Digest, Hash, HashId},
+    hash::{Digest, Hash},
     hkdf::hkdf_impl,
     hmac::hmac_impl,
     hpke::{AeadId, HpkeAead, KdfId, KemId},
@@ -40,7 +40,7 @@ use crate::{
         },
         Identified, Oid,
     },
-    signer::{PkError, Signature, Signer, SignerError, SignerId, SigningKey, VerifyingKey},
+    signer::{PkError, Signature, Signer, SignerError, SigningKey, VerifyingKey},
     zeroize::{is_zeroize_on_drop, Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
