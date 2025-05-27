@@ -146,9 +146,6 @@ trng = [
 # This workspace
 ##
 
-# Only pulled into non-dev builds if `test_util` is enabled. It
-# won't bloat release builds, though, since users of this crate
-# should only use this feature inside [dev-dependencies].
 spideroak-crypto-derive = { version = "0.1.0", path = "../crypto-derive" }
 
 ##
