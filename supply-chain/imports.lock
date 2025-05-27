@@ -298,11 +298,7 @@ who = "Pat Hickey <pat@moreproductive.org>"
 criteria = "safe-to-deploy"
 delta = "0.9.4 -> 0.9.8"
 
-[[audits.cargo-vet.audits.lazy_static]]
-who = "Nika Layzell <nika@thelayzells.com>"
-criteria = "safe-to-deploy"
-version = "1.4.0"
-notes = "I have read over the macros, and audited the unsafe code."
+[audits.cargo-vet.audits]
 
 [audits.fermyon.audits]
 
@@ -465,13 +461,6 @@ who = "Daniel Cheng <dcheng@chromium.org>"
 criteria = ["safe-to-deploy", "crypto-safe", "does-not-implement-crypto"]
 delta = "1.0.14 -> 1.0.15"
 notes = "Only minor rustdoc changes."
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.lazy_static]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = ["safe-to-deploy", "crypto-safe", "does-not-implement-crypto"]
-delta = "1.4.0 -> 1.5.0"
-notes = "Unsafe review notes: https://crrev.com/c/5650836"
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.nom]]
