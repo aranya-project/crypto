@@ -27,6 +27,11 @@ who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = ["safe-to-deploy", "crypto-safe"]
 delta = "0.2.15 -> 0.2.16"
 
+[[audits.p384]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = ["safe-to-deploy", "crypto-safe"]
+delta = "0.13.0 -> 0.13.1"
+
 [[trusted.aranya-bearssl-sys]]
 criteria = ["safe-to-deploy", "crypto-safe"]
 user-id = 293722 # aranya-project-bot
