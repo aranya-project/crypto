@@ -163,14 +163,20 @@ impl Oid {
                 break;
             }
         }
-        Ok(Self::from_bytes_unchecked(der))
+        // SAFETY: We just checked that `der` is a valid DER
+        // encoding of an OID.
+        let oid = unsafe { Self::from_bytes_unchecked(der) };
+        Ok(oid)
     }
 
     /// Converts the DER-encoded OID into an `Oid`.
-    const fn from_bytes_unchecked(der: &[u8]) -> &Self {
+    ///
+    /// # Safety
+    ///
+    /// `der` must be a valid DER encoding of an OID.
+    const unsafe fn from_bytes_unchecked(der: &[u8]) -> &Self {
         const_assert!(size_of::<&Oid>() == size_of::<&[u8]>());
         const_assert!(align_of::<&Oid>() == align_of::<&[u8]>());
-
         // SAFETY: `Oid` and `[u8]` have the same layout in
         // memory since `Oid` is newtype wrapper around `[u8]`.
         // NB: `Oid` is not `#[repr(transparent)]`, but it is
@@ -269,7 +275,7 @@ impl Oid {
     pub const fn arcs(&self) -> Arcs<'_> {
         Arcs {
             der: self.as_bytes(),
-            idx: 0,
+            state: State::new(),
         }
     }
 }
@@ -475,7 +481,9 @@ impl<const N: usize> OidBuf<N> {
     /// Returns a reference to the owned OID.
     #[inline]
     pub const fn as_oid(&self) -> &Oid {
-        Oid::from_bytes_unchecked(self.as_bytes())
+        // SAFETY: `self.as_bytes` is a valid DER encoding of an
+        // OID.
+        unsafe { Oid::from_bytes_unchecked(self.as_bytes()) }
     }
 
     /// Reports whether `self` starts with `other`.
@@ -603,8 +611,10 @@ impl<const N: usize> fmt::Display for OidBuf<N> {
 #[derive(Clone, Debug)]
 pub struct Arcs<'a> {
     der: &'a [u8],
-    // NB: This is the arc index, not an index into `der`.
-    idx: usize,
+    // - Set to `First` before parsing the first arc.
+    // - Set to `Second` after parsing the first arc.
+    // - Set to `Rest` after parsing the second arc.
+    state: State,
 }
 
 impl Arcs<'_> {
@@ -626,25 +636,10 @@ impl Arcs<'_> {
     /// ```
     pub const fn remaining(&self) -> usize {
         let mut n = 0usize;
-        if self.idx == 0 {
+        if self.state.remaining() == 2 {
             n = 1;
         }
         let mut der = self.der;
-
-        // TODO(eric): Figure out whether this is worth it.
-        while let Some((chunk, rest)) = der.split_first_chunk::<8>() {
-            const MASK: u64 = 0x8080808080808080;
-            let w = u64::from_le_bytes(
-                // SAFETY: `chunk` is exactly 8 bytes and has
-                // the same alignment as `*const [u8; 8]`.
-                unsafe { *(chunk.as_ptr().cast::<[u8; 8]>()) },
-            );
-            let ones = ((w & MASK).count_ones()) as usize;
-            // Cannot wrap, but avoids a lint.
-            n = n.wrapping_add(8usize.wrapping_sub(ones));
-
-            der = rest;
-        }
 
         while let Some((&v, rest)) = der.split_first() {
             if v & 0x80 == 0 {
@@ -662,29 +657,11 @@ impl Iterator for Arcs<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let (arc, rest) = parse_arc_der(self.der).ok()?;
-        let arc = match self.idx {
-            0 => {
-                if arc < 80 {
-                    arc / 40
-                } else {
-                    2
-                }
-            }
-            1 => {
-                if arc < 80 {
-                    arc % 40
-                } else {
-                    // Cannot wrap, but avoids a lint.
-                    arc.wrapping_sub(80)
-                }
-            }
-            _ => arc,
-        };
-        if self.idx > 0 {
-            // The first two arcs are encoded as a single VLQ.
+        let idx = self.state.next();
+        let arc = unpack_arc(arc, idx);
+        if !idx.is_first() {
             self.der = rest;
         }
-        self.idx = self.idx.saturating_add(1);
         Some(arc)
     }
 
@@ -700,6 +677,24 @@ impl Iterator for Arcs<'_> {
     }
 }
 
+impl DoubleEndedIterator for Arcs<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let (arc, rest) = parse_arc_der_from_back(self.der).ok()?;
+        if !rest.is_empty() {
+            // There is still data at the start of the buffer, so
+            // this is not the first or second arc.
+            self.der = rest;
+            return Some(arc);
+        }
+        let idx = self.state.next_back();
+        let arc = unpack_arc(arc, idx);
+        if self.state.exhausted() {
+            self.der = &[];
+        }
+        Some(arc)
+    }
+}
+
 impl ExactSizeIterator for Arcs<'_> {
     #[inline]
     fn len(&self) -> usize {
@@ -708,6 +703,79 @@ impl ExactSizeIterator for Arcs<'_> {
 }
 
 impl FusedIterator for Arcs<'_> {}
+
+/// Tracks which order the first two arcs are parsed in.
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct State(u8);
+
+impl State {
+    const fn new() -> Self {
+        Self(0b00)
+    }
+
+    fn next(&mut self) -> ArcIdx {
+        match self.0 & 0b11 {
+            // Haven't parsed any arcs.
+            0b00 => {
+                self.0 = 0b01;
+                ArcIdx::First
+            }
+            // Already parsed the first arc from the front.
+            0b01 => {
+                self.0 = 0b11;
+                ArcIdx::Second
+            }
+            // Already parsed the second arc from the back.
+            0b10 => {
+                self.0 = 0b11;
+                ArcIdx::First
+            }
+            // Parsed all arcs.
+            _ => ArcIdx::Rest,
+        }
+    }
+
+    fn next_back(&mut self) -> ArcIdx {
+        match self.0 & 0b11 {
+            // Haven't parsed any arcs.
+            0b00 => {
+                self.0 = 0b10;
+                ArcIdx::Second
+            }
+            // Already parsed the first arc from the front.
+            0b01 => {
+                self.0 = 0b11;
+                ArcIdx::Second
+            }
+            // Already parsed the second arc from the back.
+            0b10 => {
+                self.0 = 0b11;
+                ArcIdx::First
+            }
+            // Parsed all arcs.
+            _ => ArcIdx::Rest,
+        }
+    }
+
+    /// Have we parsed both the first and second arcs?
+    const fn exhausted(self) -> bool {
+        self.0 == 0b11
+    }
+
+    const fn remaining(self) -> usize {
+        match self.0 & 0b11 {
+            0b00 => 2,
+            0b01 | 0b10 => 1,
+            _ => 0,
+        }
+    }
+}
+
+impl fmt::Debug for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "State({:02b})", self.0)
+    }
+}
 
 /// An OID arc (segment, component, etc.).
 pub type Arc = u128;
@@ -753,9 +821,9 @@ const fn parse_arc_der(mut der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
         };
         arc |= (v as Arc) & 0x7f;
         if v & 0x80 == 0 {
-            // Too many digits.
             const MAX: usize = vlq_len(Arc::MAX);
             if i > MAX {
+                // Too many digits.
                 return Err(invalid_oid("arc out of range (must be in [0, 2^64))"));
             }
             return Ok((arc, rest));
@@ -763,6 +831,46 @@ const fn parse_arc_der(mut der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
         der = rest;
     }
     Err(invalid_oid("unexpected end of arc"))
+}
+
+/// Attempts to parse an [`Arc`] from the end of `der`, returning
+/// the arc and the remainder of `der`.
+pub const fn parse_arc_der_from_back(der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
+    // The last byte must not have a continuation bit set.
+    let [.., 0..128] = der else {
+        return Err(invalid_oid("unexpected end of arc"));
+    };
+
+    #[allow(clippy::arithmetic_side_effects)]
+    let mut i = der.len() - 1;
+    let (head, mut tail) = loop {
+        match der.split_at_checked(i) {
+            // Still have a condinuation bit set for `head`, so
+            // continue until we run into the preceeding arc.
+            Some(([.., 128..=255], [.., 0..128])) => i = i.saturating_sub(1),
+            Some((head @ ([] | [.., 0..128]), tail @ [.., 0..128])) => break (head, tail),
+            _ => return Err(invalid_oid("unexpected end of arc")),
+        }
+    };
+
+    if let [0x80, ..] = tail {
+        return Err(invalid_oid("arc not minimally encoded"));
+    }
+    const MAX: usize = vlq_len(Arc::MAX);
+    if i > MAX {
+        // Too many digits.
+        return Err(invalid_oid("arc out of range (must be in [0, 2^64))"));
+    }
+    let mut arc: Arc = 0;
+    while let Some((&v, rest)) = tail.split_first() {
+        arc = match arc.checked_shl(7) {
+            Some(arc) => arc,
+            None => return Err(invalid_oid("arc out of range (must be in [0, 2^128))")),
+        };
+        arc |= (v as Arc) & 0x7f;
+        tail = rest;
+    }
+    Ok((arc, head))
 }
 
 /// Combines the two root arcs.
@@ -780,6 +888,7 @@ const fn combine_roots(arc1: Arc, arc2: Arc) -> Result<Arc, InvalidOid> {
     }
 
     // The first two arcs are encoded as a single VLQ
+    //
     //    (arc1*40)+arc2
     //
     // `arc1*40` cannot overflow since `arc1` is in [0, 2].
@@ -790,6 +899,66 @@ const fn combine_roots(arc1: Arc, arc2: Arc) -> Result<Arc, InvalidOid> {
     match (arc1 * 40).checked_add(arc2) {
         Some(arc) => Ok(arc),
         None => Err(invalid_oid("second arc out of range")),
+    }
+}
+
+/// The index into a logical list of [`Arc`]s.
+#[derive(Copy, Clone, Debug)]
+enum ArcIdx {
+    /// `arcs[0]`
+    First,
+    /// `arcs[1]`
+    Second,
+    /// `arcs[2..]`
+    Rest,
+}
+
+impl ArcIdx {
+    const fn is_first(self) -> bool {
+        matches!(self, Self::First)
+    }
+}
+
+/// Unpacks the arc at `idx`.
+const fn unpack_arc(arc: Arc, idx: ArcIdx) -> Arc {
+    // The first two arcs are encoded into a single initial arc
+    //    arc = (arc1*40) + arc2
+    // which can either take form one
+    //    arc1 = [0, 1]
+    //    arc2 = [0, 39]
+    // or form two
+    //    arc1 = 2
+    //    arc2 = [0, 2^128)
+    //
+    // If the initial arc is less then 80 then it must be form
+    // one because
+    //      (arc1*40) + arc2
+    //    = ([0, 1] * 40) + [0, 39]
+    //    = [0, 40] + [0, 39]
+    //    = [0, 79]
+    //
+    // Otherwise, it must be form two because
+    //      (arc1*40) + arc2
+    //    = (2 * 40) + [0, 2^128)
+    //    = 80 + [0, 2^128)
+    //    = [80, (2^128)+80)
+    match idx {
+        ArcIdx::First => {
+            if arc < 80 {
+                arc / 40
+            } else {
+                2
+            }
+        }
+        ArcIdx::Second => {
+            if arc < 80 {
+                arc % 40
+            } else {
+                // Cannot wrap, but avoids a lint.
+                arc.wrapping_sub(80)
+            }
+        }
+        ArcIdx::Rest => arc,
     }
 }
 
@@ -984,8 +1153,24 @@ mod tests {
 
             let oid: OidBuf = OidBuf::try_parse(str).unwrap();
 
+            // Test `Iterator::next`.
             let got = oid.arcs().collect::<Vec<_>>();
-            assert_eq!(&got, arcs, "#{i} `{str}`");
+            assert_eq!(&got, arcs, "#{i}: `{str}`");
+
+            // Test `Iterator::fold`.
+            let got = oid.arcs().fold(Vec::new(), |mut v, arc| {
+                v.push(arc);
+                v
+            });
+            assert_eq!(&got, arcs, "#{i}: `{str}`");
+
+            // Test `DoubleEndedIterator::next_back`.
+            {
+                let mut want = arcs.to_vec();
+                want.reverse();
+                let got = oid.arcs().rev().collect::<Vec<_>>();
+                assert_eq!(got, want, "#{i}: `{str}`");
+            }
 
             let mut want = got.len();
             let mut arcs = oid.arcs();
