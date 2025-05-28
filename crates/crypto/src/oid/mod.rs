@@ -835,7 +835,7 @@ const fn parse_arc_der(mut der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
 
 /// Attempts to parse an [`Arc`] from the end of `der`, returning
 /// the arc and the remainder of `der`.
-pub const fn parse_arc_der_from_back(der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
+const fn parse_arc_der_from_back(der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
     // The last byte must not have a continuation bit set.
     let [.., 0..128] = der else {
         return Err(invalid_oid("unexpected end of arc"));

@@ -153,6 +153,8 @@ impl<H> fmt::Debug for Hkdf<H> {
 ///     block::BlockSize,
 ///     hash::{Digest, Hash},
 ///     hkdf_impl,
+///     hpke::KdfId,
+///     oid::consts::HKDF_WITH_SHA2_256,
 ///     typenum::{U32, U64},
 /// };
 ///
@@ -176,11 +178,22 @@ impl<H> fmt::Debug for Hkdf<H> {
 ///     type BlockSize = U64;
 /// }
 ///
-/// hkdf_impl!(HkdfSha256, "HMAC-SHA-256", Sha256);
+/// hkdf_impl!(
+///     HkdfSha256,
+///     "HMAC-SHA-256",
+///     Sha256,
+///     oid = HKDF_WITH_SHA2_256,
+///     kdf_id = KdfId::HkdfSha256,
+/// );
 /// ```
 #[macro_export]
 macro_rules! hkdf_impl {
-    ($name:ident, $doc_name:expr, $hash:ident $(, $kdf_id:expr)?) => {
+    (
+        $name:ident, $doc_name:expr, $hash:ident
+        $(, oid = $oid:ident )?
+        $(, kdf_id = $kdf_id:expr)?
+        $(,)?
+    ) => {
         #[doc = concat!($doc_name, ".")]
         #[derive(Copy, Clone, Debug)]
         pub struct $name;
@@ -212,6 +225,10 @@ macro_rules! hkdf_impl {
             }
         }
 
+        $(impl $crate::oid::Identified for $name {
+            const OID: &$crate::oid::Oid = $oid;
+        })?
+
         $(impl $crate::hpke::HpkeKdf for $name {
             const ID: $crate::hpke::KdfId = $kdf_id;
         })?
@@ -226,11 +243,33 @@ pub(crate) use hkdf_impl;
 mod tests {
     macro_rules! hkdf_tests {
         () => {
-            use crate::{hpke::KdfId, test_util::test_kdf};
+            use crate::{
+                hpke::KdfId,
+                oid::consts::{HKDF_WITH_SHA2_256, HKDF_WITH_SHA2_384, HKDF_WITH_SHA2_512},
+                test_util::test_kdf,
+            };
 
-            hkdf_impl!(HkdfSha256, "HKDF-SHA256", Sha256, KdfId::HkdfSha256);
-            hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384, KdfId::HkdfSha384);
-            hkdf_impl!(HkdfSha512, "HKDF-SHA512", Sha512, KdfId::HkdfSha512);
+            hkdf_impl!(
+                HkdfSha256,
+                "HKDF-SHA256",
+                Sha256,
+                oid = HKDF_WITH_SHA2_256,
+                kdf_id = KdfId::HkdfSha256,
+            );
+            hkdf_impl!(
+                HkdfSha384,
+                "HKDF-SHA384",
+                Sha384,
+                oid = HKDF_WITH_SHA2_384,
+                kdf_id = KdfId::HkdfSha384,
+            );
+            hkdf_impl!(
+                HkdfSha512,
+                "HKDF-SHA512",
+                Sha512,
+                oid = HKDF_WITH_SHA2_512,
+                kdf_id = KdfId::HkdfSha512,
+            );
 
             test_kdf!(hkdf_sha256, HkdfSha256, HkdfTest::HkdfSha256);
             test_kdf!(hkdf_sha384, HkdfSha384, HkdfTest::HkdfSha384);

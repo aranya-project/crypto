@@ -152,10 +152,19 @@ impl_oid! {
 const SPIDEROAK: &Oid = oid!("1.3.6.1.4.1.63062");
 const SPIDEROAK_AEAD: &Oid = extend_oid!(SPIDEROAK, 0);
 const SPIDEROAK_CMT_AEAD: &Oid = extend_oid!(SPIDEROAK_AEAD, 0);
+const SPIDEROAK_KEM: &Oid = extend_oid!(SPIDEROAK, 1);
 
 impl_oid! {
     UTC_AES_256_GCM, "id-utc-aes-256-gcm" => extend_oid!(SPIDEROAK_CMT_AEAD, 0),
     HTE_AES_256_GCM, "id-hte-aes-256-gcm" => extend_oid!(SPIDEROAK_CMT_AEAD, 1),
+
+    DHKEM_P256_HKDF_SHA256, "id-dhkem-p256-hkdf-sha256" => extend_oid!(SPIDEROAK_KEM, 0),
+    DHKEM_P384_HKDF_SHA384, "id-dhkem-p384-hkdf-sha384" => extend_oid!(SPIDEROAK_KEM, 1),
+    DHKEM_P521_HKDF_SHA512, "id-dhkem-p521-hkdf-sha512" => extend_oid!(SPIDEROAK_KEM, 2),
+    DHKEM_X25519_HKDF_SHA256, "id-dhkem-x25519-hkdf-sha256" => extend_oid!(SPIDEROAK_KEM, 3),
+    DHKEM_X448_HKDF_SHA512, "id-dhkem-x448-hkdf-sha512" => extend_oid!(SPIDEROAK_KEM, 4),
+    X25519_KYBER768_DRAFT00, "id-x25519-kyber768-draft00" => extend_oid!(SPIDEROAK_KEM, 5),
+    XWING_KEM, "id-mod-XWing-kem-2024" => extend_oid!(SPIDEROAK_KEM, 6),
 }
 
 const THAWTE: &Oid = oid!("1.3.101");
