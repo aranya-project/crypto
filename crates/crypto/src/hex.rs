@@ -179,7 +179,7 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Convert ASCII lowercase to uppercase.
-        let s = Self(self.0.clone().map(|c| c.wrapping_sub(32)));
+        let s = Self(self.0.clone().map(ct_hex_to_upper));
         fmt::Display::fmt(&s, f)
     }
 }
@@ -369,6 +369,13 @@ fn dec_nibble(c: u8) -> (u8, Choice) {
     (result as u8, ok)
 }
 
+/// Converts hexidecimal characters to uppercase.
+///
+/// The output is only defined on input [0-9a-z].
+fn ct_hex_to_upper(c: u8) -> u8 {
+    c ^ ((c & 0x40) >> 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,6 +429,13 @@ mod tests {
                 res.expect_err(&format!("#{i}: should not have decoded pair '{src:?}'"));
                 assert_eq!(&dst, &[0], "#{i}: {src:?}");
             }
+        }
+    }
+
+    #[test]
+    fn test_hex_to_upper_exhaustive() {
+        for &c in b"0123456789abcdef" {
+            assert_eq!(ct_hex_to_upper(c), c.to_ascii_uppercase());
         }
     }
 }
