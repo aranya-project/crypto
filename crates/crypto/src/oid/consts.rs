@@ -1,4 +1,4 @@
-//! Well-know OIDs.
+//! Well-known OIDs.
 
 use crate::{extend_oid, oid, oid::Oid};
 
