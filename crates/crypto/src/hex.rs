@@ -1,19 +1,13 @@
 //! Constant time hexadecimal encoding and decoding.
 
-use core::{
-    borrow::Borrow,
-    fmt,
-    ops::{Div, Rem, Shl},
-    result::Result,
-    str,
-};
+use core::{borrow::Borrow, fmt, ops::Shl, result::Result, str};
 
 use buggy::Bug;
 use generic_array::{functional::FunctionalSequence, ArrayLength, GenericArray};
 use subtle::{Choice, ConditionallySelectable};
 use typenum::{
-    consts::{U128, U133, U16, U2, U32, U33, U48, U49, U64, U65, U66, U67, U97},
-    Double, Integer, PartialQuot, Unsigned, B1, Z0,
+    consts::{U128, U133, U16, U32, U33, U48, U49, U64, U65, U66, U67, U97},
+    Double, Unsigned, B1,
 };
 
 /// Implemented by types that can encode themselves as hex.
@@ -57,8 +51,7 @@ hex_impl! {
 
 impl<N: ArrayLength> ToHex for GenericArray<u8, N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     type Output = HexString<N>;
 
@@ -69,8 +62,7 @@ where
 
 impl<N: ArrayLength> From<GenericArray<u8, N>> for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     fn from(v: GenericArray<u8, N>) -> HexString<N> {
         HexString::from_bytes(&v)
@@ -79,8 +71,7 @@ where
 
 impl<N: ArrayLength> From<&GenericArray<u8, N>> for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     fn from(v: &GenericArray<u8, N>) -> HexString<N> {
         HexString::from_bytes(v)
@@ -88,16 +79,11 @@ where
 }
 
 /// A hexadecimal string.
-#[derive(Clone)]
-pub struct HexString<N: ArrayLength>(GenericArray<u8, Double<N>>)
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength;
+pub struct HexString<N: Shl<B1, Output: ArrayLength>>(GenericArray<u8, Double<N>>);
 
-impl<N: ArrayLength> HexString<N>
+impl<N> HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     /// Returns a string slice containing the entire
     /// [`HexString`].
@@ -110,16 +96,14 @@ where
     ///
     /// # Panics
     ///
-    /// This function will panic if the length of
-    /// [`data.borrow()`][Borrow::borrow] is not exactly `2*N`.
-    pub fn from_bytes<T>(data: T) -> Self
+    /// This function will panic if the generic bounds are buggy.
+    /// The compiler should remove the panic.
+    pub fn from_bytes(data: &GenericArray<u8, N>) -> Self
     where
-        T: Borrow<GenericArray<u8, N>>,
-        N: ArrayLength + Shl<B1>,
-        Double<N>: ArrayLength,
+        N: ArrayLength,
     {
         let mut out = GenericArray::default();
-        ct_encode(&mut out, data.borrow()).expect("sizes should be correct");
+        ct_encode(&mut out, data).expect("sizes should be correct");
         Self(out)
     }
 
@@ -129,10 +113,9 @@ where
     ///
     /// This function will panic if the generic bounds are buggy.
     /// The compiler should remove the panic.
-    pub fn to_bytes(&self) -> GenericArray<u8, PartialQuot<N, U2>>
+    pub fn to_bytes(&self) -> GenericArray<u8, N>
     where
-        N: ArrayLength + Div<U2> + Rem<U2, Output = Z0> + Integer,
-        PartialQuot<N, U2>: ArrayLength,
+        N: ArrayLength,
     {
         let mut out = GenericArray::default();
         let n = ct_decode(&mut out, self.0.borrow())
@@ -142,18 +125,20 @@ where
     }
 }
 
-impl<N> Copy for HexString<N>
+impl<N> Copy for HexString<N> where N: Shl<B1, Output: ArrayLength<ArrayType<u8>: Copy>> {}
+
+impl<N> Clone for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-    <Double<N> as ArrayLength>::ArrayType<u8>: Copy,
+    N: Shl<B1, Output: ArrayLength<ArrayType<u8>: Copy>>,
 {
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
-impl<N: ArrayLength> Borrow<str> for HexString<N>
+impl<N> Borrow<str> for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     #[inline]
     fn borrow(&self) -> &str {
@@ -161,40 +146,36 @@ where
     }
 }
 
-impl<N: ArrayLength> fmt::Display for HexString<N>
+impl<N> fmt::Display for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
 
-impl<N: ArrayLength> fmt::Debug for HexString<N>
+impl<N> fmt::Debug for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-impl<N: ArrayLength> fmt::LowerHex for HexString<N>
+impl<N> fmt::LowerHex for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }
 
-impl<N: ArrayLength> fmt::UpperHex for HexString<N>
+impl<N> fmt::UpperHex for HexString<N>
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    N: Shl<B1, Output: ArrayLength>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Convert ASCII lowercase to uppercase.
