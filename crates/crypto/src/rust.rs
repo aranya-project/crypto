@@ -42,7 +42,8 @@ use crate::{
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{
         consts::{
-            AES_256_GCM, ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, HMAC_WITH_SHA2_256,
+            AES_256_GCM, DHKEM_P256_HKDF_SHA256, ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384,
+            HKDF_WITH_SHA2_256, HKDF_WITH_SHA2_384, HKDF_WITH_SHA2_512, HMAC_WITH_SHA2_256,
             HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512, HMAC_WITH_SHA2_512_256, SECP256R1, SECP384R1,
             SHA2_256, SHA2_384, SHA2_512, SHA2_512_256,
         },
@@ -428,6 +429,7 @@ dhkem_impl!(
     HkdfSha256,
     P256PrivateKey,
     P256PublicKey,
+    oid = DHKEM_P256_HKDF_SHA256,
 );
 
 /// An ASN.1 DER encoded ECDSA signature.
@@ -654,9 +656,27 @@ hash_impl!(Sha384, "SHA2-384", SHA2_384);
 hash_impl!(Sha512, "SHA2-512", SHA2_512);
 hash_impl!(Sha512_256, "SHA2-512-256", SHA2_512_256);
 
-hkdf_impl!(HkdfSha256, "HKDF-SHA2-256", Sha256, KdfId::HkdfSha256);
-hkdf_impl!(HkdfSha384, "HKDF-SHA2-384", Sha384, KdfId::HkdfSha384);
-hkdf_impl!(HkdfSha512, "HKDF-SHA2-512", Sha512, KdfId::HkdfSha512);
+hkdf_impl!(
+    HkdfSha256,
+    "HKDF-SHA2-256",
+    Sha256,
+    oid = HKDF_WITH_SHA2_256,
+    kdf_id = KdfId::HkdfSha256,
+);
+hkdf_impl!(
+    HkdfSha384,
+    "HKDF-SHA2-384",
+    Sha384,
+    oid = HKDF_WITH_SHA2_384,
+    kdf_id = KdfId::HkdfSha384,
+);
+hkdf_impl!(
+    HkdfSha512,
+    "HKDF-SHA2-512",
+    Sha512,
+    oid = HKDF_WITH_SHA2_512,
+    kdf_id = KdfId::HkdfSha512,
+);
 
 hmac_impl!(HmacSha256, "HMAC-SHA2-256", Sha256, HMAC_WITH_SHA2_256);
 hmac_impl!(HmacSha384, "HMAC-SHA2-384", Sha384, HMAC_WITH_SHA2_384);

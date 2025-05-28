@@ -565,7 +565,17 @@ type PubKeyData<T> = <<T as Ecdh>::PublicKey as PublicKey>::Data;
 /// ```
 #[macro_export]
 macro_rules! dhkem_impl {
-    ($name:ident, $doc:expr, $kem_id:expr, $ecdh:ty, $kdf:ty, $sk:ident, $pk:ident $(,)?) => {
+    (
+        $name:ident,
+        $doc:expr,
+        $kem_id:expr,
+        $ecdh:ty,
+        $kdf:ty,
+        $sk:ident,
+        $pk:ident
+        $(, oid = $oid:ident)?
+        $(,)?
+    ) => {
         #[doc = concat!($doc, ".")]
         #[derive(Debug)]
         pub struct $name;
@@ -632,6 +642,10 @@ macro_rules! dhkem_impl {
         impl $crate::hpke::HpkeKem for $name {
             const ID: $crate::hpke::KemId = Self::KEM_ID;
         }
+
+        $(impl $crate::oid::Identified for $name {
+            const OID: &'static $crate::oid::Oid = $oid;
+        })?
     };
 }
 pub(crate) use dhkem_impl;

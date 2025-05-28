@@ -34,9 +34,10 @@ use crate::{
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{
         consts::{
-            AES_256_GCM, ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512,
-            HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512, SECP256R1, SECP384R1,
-            SECP521R1, SHA2_256, SHA2_384, SHA2_512, X25519 as OID_X25519,
+            AES_256_GCM, DHKEM_P256_HKDF_SHA256, DHKEM_P521_HKDF_SHA512, ECDSA_WITH_SHA2_256,
+            ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512, HKDF_WITH_SHA2_256, HKDF_WITH_SHA2_384,
+            HKDF_WITH_SHA2_512, HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512,
+            SECP256R1, SECP384R1, SECP521R1, SHA2_256, SHA2_384, SHA2_512, X25519 as OID_X25519,
         },
         Identified, Oid,
     },
@@ -384,6 +385,7 @@ dhkem_impl!(
     HkdfSha256,
     P256PrivateKey,
     P256PublicKey,
+    oid = DHKEM_P256_HKDF_SHA256,
 );
 dhkem_impl!(
     DhKemP521HkdfSha512,
@@ -393,6 +395,7 @@ dhkem_impl!(
     HkdfSha512,
     P521PrivateKey,
     P521PublicKey,
+    oid = DHKEM_P521_HKDF_SHA512,
 );
 
 macro_rules! ecdh_impl {
@@ -1132,9 +1135,27 @@ hash_impl!(
     SHA2_512,
 );
 
-hkdf_impl!(HkdfSha256, "HKDF-SHA256", Sha256, KdfId::HkdfSha256);
-hkdf_impl!(HkdfSha384, "HKDF-SHA384", Sha384, KdfId::HkdfSha384);
-hkdf_impl!(HkdfSha512, "HKDF-SHA512", Sha512, KdfId::HkdfSha512);
+hkdf_impl!(
+    HkdfSha256,
+    "HKDF-SHA256",
+    Sha256,
+    oid = HKDF_WITH_SHA2_256,
+    kdf_id = KdfId::HkdfSha256,
+);
+hkdf_impl!(
+    HkdfSha384,
+    "HKDF-SHA384",
+    Sha384,
+    oid = HKDF_WITH_SHA2_384,
+    kdf_id = KdfId::HkdfSha384,
+);
+hkdf_impl!(
+    HkdfSha512,
+    "HKDF-SHA512",
+    Sha512,
+    oid = HKDF_WITH_SHA2_512,
+    kdf_id = KdfId::HkdfSha512,
+);
 
 hmac_impl!(HmacSha256, "HMAC-SHA256", Sha256, HMAC_WITH_SHA2_256);
 hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384, HMAC_WITH_SHA2_384);
