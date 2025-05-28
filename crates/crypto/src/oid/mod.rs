@@ -1672,7 +1672,7 @@ mod tests {
         }
 
         fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-            match &*self.data {
+            match self.data {
                 DummyData::Bytes(v) => visitor.visit_borrowed_bytes(&v),
                 DummyData::Str(_) => Err(<DummyError as de::Error>::custom(
                     "expected bytes, got string",
@@ -1681,7 +1681,7 @@ mod tests {
         }
 
         fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-            match &*self.data {
+            match self.data {
                 DummyData::Str(s) => visitor.visit_borrowed_str(&s),
                 DummyData::Bytes(_) => Err(<DummyError as de::Error>::custom(
                     "expected string, got bytes",
