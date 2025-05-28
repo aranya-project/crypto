@@ -308,7 +308,7 @@ mod tests {
 
     /// Test every single byte.
     #[test]
-    fn test_encode_exhaustive() {
+    fn test_encode_lower_exhaustive() {
         for i in 0..256 {
             const TABLE: &[u8] = b"0123456789abcdef";
             let want = [TABLE[i >> 4], TABLE[i & 0x0f]];
@@ -322,7 +322,7 @@ mod tests {
 
     /// Test every single byte.
     #[test]
-    fn test_encode_lower_exhaustive() {
+    fn test_encode_upper_exhaustive() {
         for i in 0..256 {
             const TABLE: &[u8] = b"0123456789ABCDEF";
             let want = [TABLE[i >> 4], TABLE[i & 0x0f]];
