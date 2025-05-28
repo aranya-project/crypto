@@ -352,8 +352,7 @@ pub(crate) mod trng {
 
     #[cfg(test)]
     mod tests {
-        use rand::RngCore;
-        use rand_core::OsRng;
+        use rand_core::{OsRng, RngCore};
 
         use super::{random_seed, thread_rng, ChaCha8Csprng, ThreadRng};
         use crate::{csprng::Csprng, kdf::Kdf};

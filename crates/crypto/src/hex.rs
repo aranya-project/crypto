@@ -1,261 +1,104 @@
 //! Constant time hexadecimal encoding and decoding.
 
-use core::{
-    borrow::Borrow,
-    fmt,
-    ops::{Div, Rem, Shl},
-    result::Result,
-    str,
-};
+use core::{fmt, result::Result, str};
 
-use buggy::Bug;
-use generic_array::{functional::FunctionalSequence, ArrayLength, GenericArray};
 use subtle::{Choice, ConditionallySelectable};
-use typenum::{
-    consts::{U128, U133, U16, U2, U32, U33, U48, U49, U64, U65, U66, U67, U97},
-    Double, Integer, PartialQuot, Unsigned, B1, Z0,
-};
 
-/// Implemented by types that can encode themselves as hex.
+/// Encodes `T` as hexadecimal in constant time.
+#[derive(Copy, Clone)]
+pub struct Hex<T>(T);
+
+impl<T> Hex<T> {
+    /// Creates a new `Bytes`.
+    pub const fn new(value: T) -> Self {
+        Self(value)
+    }
+}
+
+impl<T> fmt::Display for Hex<T>
+where
+    T: AsRef<[u8]>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::LowerHex::fmt(self, f)
+    }
+}
+
+impl<T> fmt::Debug for Hex<T>
+where
+    T: AsRef<[u8]>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::LowerHex::fmt(self, f)
+    }
+}
+
+impl<T> fmt::LowerHex for Hex<T>
+where
+    T: AsRef<[u8]>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        ct_write_lower(f, self.0.as_ref())
+    }
+}
+
+impl<T> fmt::UpperHex for Hex<T>
+where
+    T: AsRef<[u8]>,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        ct_write_upper(f, self.0.as_ref())
+    }
+}
+
+/// Implemented by types that can encode themselves as hex in
+/// constant time.
 pub trait ToHex {
     /// A hexadecimal string.
-    type Output: Borrow<str>;
+    type Output: AsRef<[u8]>;
 
     /// Encodes itself as a hexadecimal string.
-    fn to_hex(&self) -> Self::Output;
+    fn to_hex(self) -> Hex<Self::Output>;
 }
 
-macro_rules! hex_impl {
-    ($($len:ty),+ $(,)?) => {
-        $(
-            impl ToHex for [u8; <$len>::USIZE] {
-                type Output = HexString<$len>;
-
-                fn to_hex(&self) -> Self::Output {
-                    HexString::from(GenericArray::from(*self))
-                }
-            }
-        )+
-    };
-}
-pub(crate) use hex_impl;
-
-hex_impl! {
-    U16, // APQ
-    U32, // P-256, X25519, ...
-    U33, // X9.62 compressed P-256
-    U48, // P-384
-    U49, // X9.62 compressed P-384
-    U64,
-    U65, // X9.62 uncompressed P-256, Ed25519, ...
-    U66, // P-521
-    U67, // X9.62 compressed P-521
-    U97, // X9.62 uncompressed P-384
-    U128,
-    U133, // X9.62 uncompressed P-521
-}
-
-impl<N: ArrayLength> ToHex for GenericArray<u8, N>
+impl<T> ToHex for T
 where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
+    T: AsRef<[u8]>,
 {
-    type Output = HexString<N>;
+    type Output = T;
 
-    fn to_hex(&self) -> Self::Output {
-        HexString::from_bytes(self)
+    fn to_hex(self) -> Hex<Self::Output> {
+        Hex::new(self)
     }
 }
 
-impl<N: ArrayLength> From<GenericArray<u8, N>> for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    fn from(v: GenericArray<u8, N>) -> HexString<N> {
-        HexString::from_bytes(&v)
-    }
-}
-
-impl<N: ArrayLength> From<&GenericArray<u8, N>> for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    fn from(v: &GenericArray<u8, N>) -> HexString<N> {
-        HexString::from_bytes(v)
-    }
-}
-
-/// A hexadecimal string.
-#[derive(Clone)]
-pub struct HexString<N: ArrayLength>(GenericArray<u8, Double<N>>)
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength;
-
-impl<N: ArrayLength> HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    /// Returns a string slice containing the entire
-    /// [`HexString`].
-    pub fn as_str(&self) -> &str {
-        // SAFETY: `ct_encode` only generates valid UTF-8.
-        unsafe { str::from_utf8_unchecked(self.0.as_ref()) }
-    }
-
-    /// Creates a hexadecimal string from `data`.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the length of
-    /// [`data.borrow()`][Borrow::borrow] is not exactly `2*N`.
-    pub fn from_bytes<T>(data: T) -> Self
-    where
-        T: Borrow<GenericArray<u8, N>>,
-        N: ArrayLength + Shl<B1>,
-        Double<N>: ArrayLength,
-    {
-        let mut out = GenericArray::default();
-        ct_encode(&mut out, data.borrow()).expect("sizes should be correct");
-        Self(out)
-    }
-
-    /// Converts the hexadecimal string to raw bytes.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the generic bounds are buggy.
-    /// The compiler should remove the panic.
-    pub fn to_bytes(&self) -> GenericArray<u8, PartialQuot<N, U2>>
-    where
-        N: ArrayLength + Div<U2> + Rem<U2, Output = Z0> + Integer,
-        PartialQuot<N, U2>: ArrayLength,
-    {
-        let mut out = GenericArray::default();
-        let n = ct_decode(&mut out, self.0.borrow())
-            .expect("should be valid hexadecimal and sizes correct");
-        assert_eq!(n, out.len(), "sizes should be exact");
-        out
-    }
-}
-
-impl<N> Copy for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-    <Double<N> as ArrayLength>::ArrayType<u8>: Copy,
-{
-}
-
-impl<N: ArrayLength> Borrow<str> for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    #[inline]
-    fn borrow(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl<N: ArrayLength> fmt::Display for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl<N: ArrayLength> fmt::Debug for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
-    }
-}
-
-impl<N: ArrayLength> fmt::LowerHex for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
-    }
-}
-
-impl<N: ArrayLength> fmt::UpperHex for HexString<N>
-where
-    N: ArrayLength + Shl<B1>,
-    Double<N>: ArrayLength,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Convert ASCII lowercase to uppercase.
-        let s = Self(self.0.clone().map(|c| c.wrapping_sub(32)));
-        fmt::Display::fmt(&s, f)
-    }
-}
-
-/// The hexadecimal string could not be decoded.
-#[derive(Debug, Eq, PartialEq)]
-pub enum Error {
-    /// Either `dst` was too short or the length of `src` was not
-    /// a multiple of two.
-    InvalidLength,
-    /// The input was not a valid hexadecimal string.
-    InvalidEncoding,
-    /// An implmentation error.
-    Bug(Bug),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidLength => write!(f, "invalid `dst` length"),
-            Self::InvalidEncoding => write!(f, "invalid hexadecimal encoding"),
-            Self::Bug(bug) => write!(f, "implementation bug: {}", bug),
-        }
-    }
-}
-
-impl core::error::Error for Error {}
-
-impl From<Bug> for Error {
-    fn from(bug: Bug) -> Self {
-        Self::Bug(bug)
-    }
-}
+/// Returned by [`ct_encode`] when `dst` is not twice as long as
+/// `src`.
+#[derive(Clone, Debug, thiserror::Error)]
+#[error("invalid length")]
+pub struct InvalidLength(());
 
 /// Encodes `src` into `dst` as hexadecimal in constant time and
 /// returns the number of bytes written.
 ///
 /// `dst` must be at least twice as long as `src`.
-pub fn ct_encode(dst: &mut [u8], src: &[u8]) -> Result<(), Error> {
+pub fn ct_encode(dst: &mut [u8], src: &[u8]) -> Result<(), InvalidLength> {
     // The implementation is taken from
     // https://github.com/ericlagergren/subtle/blob/890d697da01053c79157a7fdfbed548317eeb0a6/hex/constant_time.go
 
     if dst.len() / 2 < src.len() {
-        return Err(Error::InvalidLength);
+        return Err(InvalidLength(()));
     }
     for (v, chunk) in src.iter().zip(dst.chunks_mut(2)) {
-        chunk[0] = enc_nibble(v >> 4);
-        chunk[1] = enc_nibble(v & 0x0f);
+        chunk[0] = enc_nibble_lower(v >> 4);
+        chunk[1] = enc_nibble_lower(v & 0x0f);
     }
     Ok(())
 }
 
-/// Encodes `src` to `dst` as hexadecimal in constant time and
-/// returns the number of bytes written.
-///
-/// `dst` must be at least twice as long as `src`.
-pub fn ct_write<W>(dst: &mut W, src: &[u8]) -> Result<(), fmt::Error>
+/// Encodes `src` to `dst` as lowercase hexadecimal in constant
+/// time and returns the number of bytes written.
+pub fn ct_write_lower<W>(dst: &mut W, src: &[u8]) -> Result<(), fmt::Error>
 where
     W: fmt::Write,
 {
@@ -263,51 +106,88 @@ where
     // https://github.com/ericlagergren/subtle/blob/890d697da01053c79157a7fdfbed548317eeb0a6/hex/constant_time.go
 
     for v in src {
-        dst.write_char(enc_nibble(v >> 4) as char)?;
-        dst.write_char(enc_nibble(v & 0x0f) as char)?;
+        dst.write_char(enc_nibble_lower(v >> 4) as char)?;
+        dst.write_char(enc_nibble_lower(v & 0x0f) as char)?;
     }
     Ok(())
 }
 
+/// Encodes `src` to `dst` as uppercase hexadecimal in constant
+/// time and returns the number of bytes written.
+pub fn ct_write_upper<W>(dst: &mut W, src: &[u8]) -> Result<(), fmt::Error>
+where
+    W: fmt::Write,
+{
+    // The implementation is taken from
+    // https://github.com/ericlagergren/subtle/blob/890d697da01053c79157a7fdfbed548317eeb0a6/hex/constant_time.go
+
+    for v in src {
+        dst.write_char(enc_nibble_upper(v >> 4) as char)?;
+        dst.write_char(enc_nibble_upper(v & 0x0f) as char)?;
+    }
+    Ok(())
+}
+
+/// Encodes a nibble as lowercase hexadecimal.
 #[inline(always)]
-const fn enc_nibble(c: u8) -> u8 {
+const fn enc_nibble_lower(c: u8) -> u8 {
     let c = c as u16;
     c.wrapping_add(87)
         .wrapping_add((c.wrapping_sub(10) >> 8) & !38) as u8
 }
+
+/// Encodes a nibble as uppercase hexadecimal.
+#[inline(always)]
+const fn enc_nibble_upper(c: u8) -> u8 {
+    let c = enc_nibble_lower(c);
+    c ^ ((c & 0x40) >> 1)
+}
+
+/// Returned by [`ct_decode`] when one of the following occur:
+///
+/// - `src` is not a multiple of two.
+/// - `dst` is not at least half as long as `src`.
+/// - `src` contains invalid hexadecimal characters.
+#[derive(Clone, Debug, thiserror::Error)]
+#[error("invalid hexadecimal encoding: {0}")]
+pub struct InvalidEncoding(&'static str);
 
 /// Decodes `src` into `dst` from hexadecimal in constant time
 /// and returns the number of bytes written.
 ///
 /// * The length of `src` must be a multiple of two.
 /// * `dst` must be half as long (or longer) as `src`.
-pub fn ct_decode(dst: &mut [u8], src: &[u8]) -> Result<usize, Error> {
+pub fn ct_decode(dst: &mut [u8], src: &[u8]) -> Result<usize, InvalidEncoding> {
     // The implementation is taken from
     // https://github.com/ericlagergren/subtle/blob/890d697da01053c79157a7fdfbed548317eeb0a6/hex/constant_time.go
 
     if src.len() % 2 != 0 {
-        return Err(Error::InvalidLength);
+        return Err(InvalidEncoding("`src` length not a multiple of two"));
     }
     if src.len() / 2 > dst.len() {
-        return Err(Error::InvalidLength);
+        return Err(InvalidEncoding(
+            "`dst` length not at least half as long as `src`",
+        ));
     }
 
     let mut valid = Choice::from(1u8);
-    for (chunk, v) in src.chunks_exact(2).zip(dst.iter_mut()) {
-        let (hi, hi_ok) = dec_nibble(chunk[0]);
-        let (lo, lo_ok) = dec_nibble(chunk[1]);
+    for (src, dst) in src.chunks_exact(2).zip(dst.iter_mut()) {
+        let (hi, hi_ok) = dec_nibble(src[0]);
+        let (lo, lo_ok) = dec_nibble(src[1]);
 
         valid &= hi_ok & lo_ok;
 
         let val = (hi << 4) | (lo & 0x0f);
         // Out of paranoia, do not update `dst` if `valid` is
         // false.
-        *v = u8::conditional_select(v, &val, valid);
+        *dst = u8::conditional_select(dst, &val, valid);
     }
     if bool::from(valid) {
         Ok(src.len() / 2)
     } else {
-        Err(Error::InvalidEncoding)
+        Err(InvalidEncoding(
+            "`src` contains invalid hexadecimal characters",
+        ))
     }
 }
 
@@ -411,11 +291,28 @@ mod tests {
 
     /// Test every single byte.
     #[test]
-    fn test_encode_exhaustive() {
+    fn test_encode_lower_exhaustive() {
         for i in 0..256 {
             const TABLE: &[u8] = b"0123456789abcdef";
             let want = [TABLE[i >> 4], TABLE[i & 0x0f]];
-            let got = [enc_nibble((i as u8) >> 4), enc_nibble((i as u8) & 0x0f)];
+            let got = [
+                enc_nibble_lower((i as u8) >> 4),
+                enc_nibble_lower((i as u8) & 0x0f),
+            ];
+            assert_eq!(want, got, "#{i}");
+        }
+    }
+
+    /// Test every single byte.
+    #[test]
+    fn test_encode_upper_exhaustive() {
+        for i in 0..256 {
+            const TABLE: &[u8] = b"0123456789ABCDEF";
+            let want = [TABLE[i >> 4], TABLE[i & 0x0f]];
+            let got = [
+                enc_nibble_upper((i as u8) >> 4),
+                enc_nibble_upper((i as u8) & 0x0f),
+            ];
             assert_eq!(want, got, "#{i}");
         }
     }
