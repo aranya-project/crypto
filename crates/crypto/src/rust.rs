@@ -33,7 +33,7 @@ use crate::{
     csprng::{Csprng, Random},
     ec::{Curve, Secp256r1, Secp384r1},
     hash::{Digest, Hash},
-    hex,
+    hex::{Hex, ToHex},
     hkdf::hkdf_impl,
     hmac::hmac_impl,
     hpke::{AeadId, HpkeAead, KdfId, KemId},
@@ -239,6 +239,14 @@ macro_rules! curve_impl {
                 Ok(Self(point))
             }
         }
+
+        impl ToHex for &$point {
+            type Output = EncodedPoint<$inner>;
+
+            fn to_hex(self) -> Hex<Self::Output> {
+                Hex::new(self.0)
+            }
+        }
     };
 }
 curve_impl!(
@@ -375,9 +383,9 @@ macro_rules! ecdh_impl {
 
         impl fmt::Debug for $pk {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}(", stringify!($pk))?;
-                hex::ct_write(f, self.export().borrow())?;
-                write!(f, ")")
+                f.debug_tuple(stringify!($pk))
+                    .field(&self.export().to_hex())
+                    .finish()
             }
         }
 
@@ -530,9 +538,9 @@ macro_rules! ecdsa_impl {
 
         impl fmt::Debug for $pk {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}(", stringify!($pk))?;
-                hex::ct_write(f, self.export().borrow())?;
-                write!(f, ")")
+                f.debug_struct(stringify!($pk))
+                    .field("point", &self.export().to_hex())
+                    .finish()
             }
         }
 
