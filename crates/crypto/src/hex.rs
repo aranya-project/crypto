@@ -2,7 +2,7 @@
 
 use core::{fmt, result::Result, str};
 
-use subtle::{Choice, ConditionallySelectable, CtOption};
+use subtle::{Choice, ConditionallySelectable};
 
 /// Encodes `T` as hexadecimal in constant time.
 #[derive(Copy, Clone)]
