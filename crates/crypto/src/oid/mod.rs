@@ -835,13 +835,13 @@ const fn parse_arc_der(mut der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
 
 /// Attempts to parse an [`Arc`] from the end of `der`, returning
 /// the arc and the remainder of `der`.
-#[inline(never)]
-pub fn parse_arc_der_from_back(der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
+pub const fn parse_arc_der_from_back(der: &[u8]) -> Result<(Arc, &[u8]), InvalidOid> {
     // The last byte must not have a continuation bit set.
     let [.., 0..128] = der else {
         return Err(invalid_oid("unexpected end of arc"));
     };
 
+    #[allow(clippy::arithmetic_side_effects)]
     let mut i = der.len() - 1;
     let (head, mut tail) = loop {
         match der.split_at_checked(i) {
