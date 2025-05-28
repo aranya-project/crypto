@@ -2,8 +2,7 @@
 
 use core::{fmt, result::Result, str};
 
-use generic_array::{ArrayLength, GenericArray};
-use subtle::{Choice, ConditionallySelectable};
+use subtle::{Choice, ConditionallySelectable, CtOption};
 
 /// Encodes `T` as hexadecimal in constant time.
 #[derive(Copy, Clone)]
@@ -62,27 +61,11 @@ pub trait ToHex {
     fn to_hex(self) -> Hex<Self::Output>;
 }
 
-impl<'a, const N: usize> ToHex for &'a [u8; N] {
-    type Output = &'a [u8; N];
-
-    fn to_hex(self) -> Hex<Self::Output> {
-        Hex::new(self)
-    }
-}
-
-impl<'a> ToHex for &'a [u8] {
-    type Output = &'a [u8];
-
-    fn to_hex(self) -> Hex<Self::Output> {
-        Hex::new(self)
-    }
-}
-
-impl<'a, N> ToHex for &'a GenericArray<u8, N>
+impl<T> ToHex for T
 where
-    N: ArrayLength,
+    T: AsRef<[u8]>,
 {
-    type Output = &'a GenericArray<u8, N>;
+    type Output = T;
 
     fn to_hex(self) -> Hex<Self::Output> {
         Hex::new(self)
@@ -188,16 +171,16 @@ pub fn ct_decode(dst: &mut [u8], src: &[u8]) -> Result<usize, InvalidEncoding> {
     }
 
     let mut valid = Choice::from(1u8);
-    for (chunk, v) in src.chunks_exact(2).zip(dst.iter_mut()) {
-        let (hi, hi_ok) = dec_nibble(chunk[0]);
-        let (lo, lo_ok) = dec_nibble(chunk[1]);
+    for (src, dst) in src.chunks_exact(2).zip(dst.iter_mut()) {
+        let (hi, hi_ok) = dec_nibble(src[0]);
+        let (lo, lo_ok) = dec_nibble(src[1]);
 
         valid &= hi_ok & lo_ok;
 
         let val = (hi << 4) | (lo & 0x0f);
         // Out of paranoia, do not update `dst` if `valid` is
         // false.
-        *v = u8::conditional_select(v, &val, valid);
+        *dst = u8::conditional_select(dst, &val, valid);
     }
     if bool::from(valid) {
         Ok(src.len() / 2)

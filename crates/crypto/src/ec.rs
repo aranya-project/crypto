@@ -11,7 +11,7 @@ use subtle::{Choice, ConstantTimeEq};
 use typenum::{Const, Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U67, U97};
 
 use crate::{
-    hex::{Hex, ToHex},
+    hex::ToHex,
     import::{Import, ImportError, InvalidSizeError},
     zeroize::{zeroize_flat_type, Zeroize, ZeroizeOnDrop},
 };
@@ -108,14 +108,6 @@ macro_rules! pk_impl {
             #[inline]
             fn borrow_mut(&mut self) -> &mut [u8] {
                 self.0.as_mut()
-            }
-        }
-
-        impl<C: Curve> ToHex for &$name<C> {
-            type Output = Self;
-
-            fn to_hex(self) -> Hex<Self::Output> {
-                Hex::new(self)
             }
         }
 
