@@ -11,7 +11,7 @@ use subtle::{Choice, ConstantTimeEq};
 use typenum::{Const, Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U67, U97};
 
 use crate::{
-    hex::{HexString, ToHex},
+    hex::{Hex, ToHex},
     import::{Import, ImportError, InvalidSizeError},
     zeroize::{zeroize_flat_type, Zeroize, ZeroizeOnDrop},
 };
@@ -111,15 +111,11 @@ macro_rules! pk_impl {
             }
         }
 
-        impl<C: Curve> ToHex for $name<C>
-        where
-            <C as Curve>::$size: ArrayLength + Shl<B1>,
-            Double<C::$size>: ArrayLength,
-        {
-            type Output = HexString<C::$size>;
+        impl<C: Curve> ToHex for &$name<C> {
+            type Output = Self;
 
-            fn to_hex(&self) -> Self::Output {
-                self.0.to_hex()
+            fn to_hex(self) -> Hex<Self::Output> {
+                Hex::new(self)
             }
         }
 
@@ -315,19 +311,6 @@ impl<C: Curve> Import<&[u8]> for Scalar<C> {
 impl<C: Curve> fmt::Debug for Scalar<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Scalar").finish_non_exhaustive()
-    }
-}
-
-#[cfg(test)]
-impl<C: Curve> ToHex for Scalar<C>
-where
-    <C as Curve>::ScalarSize: ArrayLength + Shl<B1>,
-    Double<C::ScalarSize>: ArrayLength,
-{
-    type Output = HexString<C::ScalarSize>;
-
-    fn to_hex(&self) -> Self::Output {
-        self.0.to_hex()
     }
 }
 
