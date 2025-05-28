@@ -1289,7 +1289,7 @@ mod tests {
             #[track_caller]
             fn test<T>(name: &str, i: usize, oid: T, want: DummyData)
             where
-                T: fmt::Debug + PartialEq + Serialize + de::DeserializeOwned + ?Sized,
+                T: fmt::Debug + PartialEq + Serialize + de::DeserializeOwned,
             {
                 let got = oid
                     .serialize(&mut DummySer {
@@ -1442,17 +1442,17 @@ mod tests {
             unimplemented!()
         }
 
-        fn serialize_newtype_struct<T: ?Sized>(
+        fn serialize_newtype_struct<T>(
             self,
             _name: &'static str,
             _value: &T,
         ) -> Result<Self::Ok, Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
-        fn serialize_newtype_variant<T: ?Sized>(
+        fn serialize_newtype_variant<T>(
             self,
             _name: &'static str,
             _variant_index: u32,
@@ -1460,7 +1460,7 @@ mod tests {
             _value: &T,
         ) -> Result<Self::Ok, Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1468,9 +1468,9 @@ mod tests {
         fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
             unimplemented!()
         }
-        fn serialize_some<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, Self::Error>
+        fn serialize_some<T>(self, _value: &T) -> Result<Self::Ok, Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1536,16 +1536,16 @@ mod tests {
         type Ok = DummyData;
         type Error = DummyError;
 
-        fn serialize_key<T: ?Sized>(&mut self, _key: &T) -> Result<(), Self::Error>
+        fn serialize_key<T>(&mut self, _key: &T) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
 
-        fn serialize_value<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
+        fn serialize_value<T>(&mut self, _value: &T) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1559,9 +1559,9 @@ mod tests {
         type Ok = DummyData;
         type Error = DummyError;
 
-        fn serialize_element<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
+        fn serialize_element<T>(&mut self, _value: &T) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1575,13 +1575,13 @@ mod tests {
         type Ok = DummyData;
         type Error = DummyError;
 
-        fn serialize_field<T: ?Sized>(
+        fn serialize_field<T>(
             &mut self,
             _field: &'static str,
             _value: &T,
         ) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1595,13 +1595,13 @@ mod tests {
         type Ok = DummyData;
         type Error = DummyError;
 
-        fn serialize_field<T: ?Sized>(
+        fn serialize_field<T>(
             &mut self,
             _field: &'static str,
             _value: &T,
         ) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1615,9 +1615,9 @@ mod tests {
         type Ok = DummyData;
         type Error = DummyError;
 
-        fn serialize_element<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
+        fn serialize_element<T>(&mut self, _value: &T) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1631,9 +1631,9 @@ mod tests {
         type Ok = DummyData;
         type Error = DummyError;
 
-        fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, _value: &T) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1647,9 +1647,9 @@ mod tests {
         type Ok = DummyData;
         type Error = DummyError;
 
-        fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, _value: &T) -> Result<(), Self::Error>
         where
-            T: Serialize,
+            T: Serialize + ?Sized,
         {
             unimplemented!()
         }
@@ -1673,7 +1673,7 @@ mod tests {
 
         fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
             match self.data {
-                DummyData::Bytes(v) => visitor.visit_borrowed_bytes(&v),
+                DummyData::Bytes(v) => visitor.visit_borrowed_bytes(v),
                 DummyData::Str(_) => Err(<DummyError as de::Error>::custom(
                     "expected bytes, got string",
                 )),
@@ -1682,7 +1682,7 @@ mod tests {
 
         fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
             match self.data {
-                DummyData::Str(s) => visitor.visit_borrowed_str(&s),
+                DummyData::Str(s) => visitor.visit_borrowed_str(s),
                 DummyData::Bytes(_) => Err(<DummyError as de::Error>::custom(
                     "expected string, got bytes",
                 )),
