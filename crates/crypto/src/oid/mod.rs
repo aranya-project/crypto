@@ -4,7 +4,7 @@
 
 pub mod consts;
 
-use core::{fmt, hash::Hash, iter::FusedIterator, ops::Deref, slice, str::FromStr};
+use core::{fmt, hash::Hash, hint, iter::FusedIterator, ops::Deref, slice, str::FromStr};
 
 #[cfg(feature = "serde")]
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
@@ -142,6 +142,18 @@ macro_rules! extend_oid {
 use zerocopy::{Immutable, IntoBytes, KnownLayout, Unaligned};
 
 /// A slice of a DER-encoded OID.
+///
+/// # Serde
+///
+/// The `serde` feature enables `Serialize` and `Deserialize`
+/// implementations.
+///
+/// If the `Serializer::is_human_readable` is true, `Oid` will
+/// serialize as a string (e.g., `"2.16.840"`).  Otherwise, `Oid`
+/// will serialize as DER.
+///
+/// However, serialization is not symmetric. `Oid` can only
+/// deserialize from DER. It cannot deserialize from a string.
 #[derive(
     Debug, Hash, Eq, PartialEq, Ord, PartialOrd, KnownLayout, Immutable, Unaligned, IntoBytes,
 )]
@@ -176,10 +188,14 @@ impl Oid {
     ///
     /// # Safety
     ///
-    /// `der` must be a valid DER encoding of an OID.
+    /// `der` must be a valid DER encoding of an OID. This means,
+    /// among other things, that it cannot be empty.
     const unsafe fn from_bytes_unchecked(der: &[u8]) -> &Self {
         const_assert!(size_of::<&Oid>() == size_of::<&[u8]>());
         const_assert!(align_of::<&Oid>() == align_of::<&[u8]>());
+
+        debug_assert!(!der.is_empty(), "DER encoded OID cannot be empty");
+
         // SAFETY: `Oid` and `[u8]` have the same layout in
         // memory since `Oid` is newtype wrapper around `[u8]`.
         // NB: `Oid` is not `#[repr(transparent)]`, but it is
@@ -208,6 +224,8 @@ impl Oid {
 
     /// Returns the size in bytes of the DER encoded object
     /// identifier.
+    ///
+    /// The resulting value is always non-zero.
     #[inline]
     #[allow(clippy::len_without_is_empty, reason = "OIDs are never empty")]
     pub const fn len(&self) -> usize {
@@ -215,6 +233,8 @@ impl Oid {
     }
 
     /// Returns the DER encoded object identifier.
+    ///
+    /// The resulting slice is always non-empty.
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
         &self.0
@@ -225,19 +245,26 @@ impl Oid {
     /// # Panics
     ///
     /// This method panics if `N` is less than `self.len()`.
-    #[allow(clippy::arithmetic_side_effects)]
     pub const fn to_oid_buf<const N: usize>(&self) -> OidBuf<N> {
-        assert!(N >= self.len());
+        self.try_to_oid_buf::<N>().unwrap()
+    }
 
+    /// Converts the OID into an `OidBuf`, or returns `None` if
+    /// `N` is less than `self.len()`.
+    pub const fn try_to_oid_buf<const N: usize>(&self) -> Option<OidBuf<N>> {
         let src = self.as_bytes();
-
+        if N < src.len() {
+            return None;
+        }
         let mut der = [0; N];
         let mut len = 0;
         while len < src.len() {
             der[len] = src[len];
-            len += 1;
+            // This cannot overflow since `len < src.len()` and
+            // `<[u8]>::len()` is in [0, isize::MAX].
+            len = len.wrapping_add(1)
         }
-        OidBuf { idx: len, buf: der }
+        Some(OidBuf { idx: len, buf: der })
     }
 
     /// Reports whether `self` starts with `other`.
@@ -363,11 +390,11 @@ impl Serialize for Oid {
     where
         S: Serializer,
     {
-        #[cfg(feature = "alloc")]
         if serializer.is_human_readable() {
-            return serializer.collect_str(self);
+            serializer.collect_str(self)
+        } else {
+            serializer.serialize_bytes(self.as_bytes())
         }
-        serializer.serialize_bytes(self.as_bytes())
     }
 }
 
@@ -379,10 +406,11 @@ impl<'de: 'a, 'a> Deserialize<'de> for &'a Oid {
         D: Deserializer<'de>,
     {
         if deserializer.is_human_readable() {
-            return Err(de::Error::custom("expected DER encoding of OID"));
+            Err(de::Error::custom("expected DER encoding of OID"))
+        } else {
+            let der = <&[u8]>::deserialize(deserializer)?;
+            Oid::try_from_bytes(der).map_err(de::Error::custom)
         }
-        let der = <&[u8]>::deserialize(deserializer)?;
-        Oid::try_from_bytes(der).map_err(de::Error::custom)
     }
 }
 
@@ -394,17 +422,39 @@ impl<'de: 'a, 'a> Deserialize<'de> for &'a Oid {
 const DEFAULT_MAX_ENCODED_SIZE: usize = 23;
 
 /// An owned OID.
+///
+/// `N` is the maximum size in bytes of the buffer and must be
+/// non-zero.
+///
+/// # Serde
+///
+/// The `serde` feature enables `Serialize` and `Deserialize`
+/// implementations.
+///
+/// If the `Serializer::is_human_readable` is true, `OidBuf` will
+/// serialize as a string (e.g., `"2.16.840"`). Otherwise,
+/// `OidBuf` will serialize as DER.
+///
+/// Unlike [`Oid`], `OidBuf` serialization *is* symmetric.
 #[derive(Copy, Clone, Hash, Eq, Ord, PartialOrd)]
 pub struct OidBuf<const N: usize = DEFAULT_MAX_ENCODED_SIZE> {
     /// Invariant: `idx` is a valid index into `buf`.
+    /// Invariant: `idx > 0` after the first call to `push`, and
+    ///            all constructors call `push` at least once
+    ///            (with the first two arcs).
     idx: usize,
     /// Invariant: `buf[..len]` is always valid DER.
+    /// Invariant: `N > 0`.
     buf: [u8; N],
 }
 
 impl<const N: usize> OidBuf<N> {
     /// The maximum size of the buffer.
     pub const MAX_ENCODED_SIZE: usize = N;
+
+    const fn assert_non_zero() {
+        assert!(N > 0, "`N` must be non-zero")
+    }
 
     const fn new(arc1: Arc, arc2: Arc) -> Result<Self, InvalidOid> {
         let oid = Self {
@@ -495,19 +545,29 @@ impl<const N: usize> OidBuf<N> {
 
     /// Returns the size in bytes of the DER encoded object
     /// identifier.
+    ///
+    /// The resulting value is always non-zero.
     #[inline]
     #[allow(clippy::len_without_is_empty, reason = "OIDs are never empty")]
     pub const fn len(&self) -> usize {
+        // SAFETY: `self.idx` is always in [1, self.buf.len()].
+        unsafe {
+            hint::assert_unchecked(self.idx > 0);
+            hint::assert_unchecked(self.idx <= self.buf.len());
+        }
+
         self.idx
     }
 
     /// Returns the DER encoded object identifier.
+    ///
+    /// The resulting slice is always non-empty.
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
         // SAFETY:
         // - The pointer is coming from a slice, so all
         //   invariants are upheld.
-        // - `self.len` is in [0, self.buf.len()).
+        // - `self.len` is in [1, self.buf.len()].
         unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.len()) }
     }
 
@@ -549,6 +609,10 @@ impl<const N: usize> OidBuf<N> {
     #[must_use = "This method returns the result of the operation \
                   without modifying the original"]
     const fn push(mut self, arc: Arc) -> Result<Self, InvalidOid> {
+        // Put the assertion here since this method is reachable
+        // from all constructors.
+        const { Self::assert_non_zero() };
+
         if self.idx >= self.buf.len() {
             return Err(invalid_oid("input too long"));
         }
@@ -661,9 +725,10 @@ impl<'de, const N: usize> Deserialize<'de> for OidBuf<N> {
         if deserializer.is_human_readable() {
             Self::try_parse(Deserialize::deserialize(deserializer)?).map_err(de::Error::custom)
         } else {
-            Oid::try_from_bytes(Deserialize::deserialize(deserializer)?)
-                .map(Oid::to_oid_buf)
-                .map_err(de::Error::custom)
+            let oid = Oid::try_from_bytes(Deserialize::deserialize(deserializer)?)
+                .map(Oid::try_to_oid_buf)
+                .map_err(de::Error::custom)?;
+            oid.ok_or_else(|| de::Error::custom("DER encoded OID is too long for the buffer"))
         }
     }
 }
@@ -1097,6 +1162,7 @@ mod tests {
 
     use super::*;
 
+    // (DER, valid, text, arcs)
     type Test = (&'static [u8], bool, &'static str, &'static [Arc]);
     static TESTS: &[Test] = &[
         (&[], false, "", &[]),
@@ -1277,6 +1343,7 @@ mod tests {
         }
     }
 
+    /// Test [`OidBuf`]'s serde impls.
     #[test]
     fn test_oidbuf_serde() {
         for (i, (_, valid, str, _)) in TESTS.iter().enumerate() {
@@ -1307,6 +1374,7 @@ mod tests {
         }
     }
 
+    /// Test [`Oid`]'s serde impls.
     #[test]
     fn test_oid_serde() {
         for (i, (_, valid, str, _)) in TESTS.iter().enumerate() {
