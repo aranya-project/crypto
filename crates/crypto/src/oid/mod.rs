@@ -246,6 +246,7 @@ impl Oid {
     ///
     /// This method panics if `N` is less than `self.len()`.
     pub const fn to_oid_buf<const N: usize>(&self) -> OidBuf<N> {
+        #[allow(clippy::unwrap_used, reason = "This is documented")]
         self.try_to_oid_buf::<N>().unwrap()
     }
 

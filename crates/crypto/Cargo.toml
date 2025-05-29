@@ -207,6 +207,7 @@ features = [
 	"committing-aead",
 	"ed25519_batch",
 	"rand_compat",
+	"serde",
 	"std",
 	"test_util",
 	"trng",
@@ -222,6 +223,7 @@ always_include_features = [
 	"getrandom",
 	"hazmat",
 	"rand_compat",
+	"serde",
 	"std",
 	"test_util",
 ]
