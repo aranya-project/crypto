@@ -4,7 +4,10 @@
 
 pub mod consts;
 
-use core::{fmt, hash::Hash, iter::FusedIterator, ops::Deref, slice, str::FromStr};
+use core::{fmt, hash::Hash, hint, iter::FusedIterator, ops::Deref, slice, str::FromStr};
+
+#[cfg(feature = "serde")]
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::util::const_assert;
 
@@ -139,6 +142,18 @@ macro_rules! extend_oid {
 use zerocopy::{Immutable, IntoBytes, KnownLayout, Unaligned};
 
 /// A slice of a DER-encoded OID.
+///
+/// # Serde
+///
+/// The `serde` feature enables `Serialize` and `Deserialize`
+/// implementations.
+///
+/// If the `Serializer::is_human_readable` is true, `Oid` will
+/// serialize as a string (e.g., `"2.16.840"`).  Otherwise, `Oid`
+/// will serialize as DER.
+///
+/// However, serialization is not symmetric. `Oid` can only
+/// deserialize from DER. It cannot deserialize from a string.
 #[derive(
     Debug, Hash, Eq, PartialEq, Ord, PartialOrd, KnownLayout, Immutable, Unaligned, IntoBytes,
 )]
@@ -173,10 +188,14 @@ impl Oid {
     ///
     /// # Safety
     ///
-    /// `der` must be a valid DER encoding of an OID.
+    /// `der` must be a valid DER encoding of an OID. This means,
+    /// among other things, that it cannot be empty.
     const unsafe fn from_bytes_unchecked(der: &[u8]) -> &Self {
         const_assert!(size_of::<&Oid>() == size_of::<&[u8]>());
         const_assert!(align_of::<&Oid>() == align_of::<&[u8]>());
+
+        debug_assert!(!der.is_empty(), "DER encoded OID cannot be empty");
+
         // SAFETY: `Oid` and `[u8]` have the same layout in
         // memory since `Oid` is newtype wrapper around `[u8]`.
         // NB: `Oid` is not `#[repr(transparent)]`, but it is
@@ -205,6 +224,8 @@ impl Oid {
 
     /// Returns the size in bytes of the DER encoded object
     /// identifier.
+    ///
+    /// The resulting value is always non-zero.
     #[inline]
     #[allow(clippy::len_without_is_empty, reason = "OIDs are never empty")]
     pub const fn len(&self) -> usize {
@@ -212,6 +233,8 @@ impl Oid {
     }
 
     /// Returns the DER encoded object identifier.
+    ///
+    /// The resulting slice is always non-empty.
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
         &self.0
@@ -222,19 +245,27 @@ impl Oid {
     /// # Panics
     ///
     /// This method panics if `N` is less than `self.len()`.
-    #[allow(clippy::arithmetic_side_effects)]
     pub const fn to_oid_buf<const N: usize>(&self) -> OidBuf<N> {
-        assert!(N >= self.len());
+        #[allow(clippy::unwrap_used, reason = "This is documented")]
+        self.try_to_oid_buf::<N>().unwrap()
+    }
 
+    /// Converts the OID into an `OidBuf`, or returns `None` if
+    /// `N` is less than `self.len()`.
+    pub const fn try_to_oid_buf<const N: usize>(&self) -> Option<OidBuf<N>> {
         let src = self.as_bytes();
-
+        if N < src.len() {
+            return None;
+        }
         let mut der = [0; N];
         let mut len = 0;
         while len < src.len() {
             der[len] = src[len];
-            len += 1;
+            // This cannot overflow since `len < src.len()` and
+            // `<[u8]>::len()` is in [0, isize::MAX].
+            len = len.wrapping_add(1)
         }
-        OidBuf { idx: len, buf: der }
+        Some(OidBuf { idx: len, buf: der })
     }
 
     /// Reports whether `self` starts with `other`.
@@ -353,6 +384,37 @@ impl fmt::Display for Oid {
     }
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl Serialize for Oid {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            serializer.collect_str(self)
+        } else {
+            serializer.serialize_bytes(self.as_bytes())
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de: 'a, 'a> Deserialize<'de> for &'a Oid {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            Err(de::Error::custom("expected DER encoding of OID"))
+        } else {
+            let der = <&[u8]>::deserialize(deserializer)?;
+            Oid::try_from_bytes(der).map_err(de::Error::custom)
+        }
+    }
+}
+
 /// The default maximum size in octets of a DER-encoded OID.
 ///
 /// It is large enough to encode [UUID] OIDs.
@@ -361,17 +423,39 @@ impl fmt::Display for Oid {
 const DEFAULT_MAX_ENCODED_SIZE: usize = 23;
 
 /// An owned OID.
+///
+/// `N` is the maximum size in bytes of the buffer and must be
+/// non-zero.
+///
+/// # Serde
+///
+/// The `serde` feature enables `Serialize` and `Deserialize`
+/// implementations.
+///
+/// If the `Serializer::is_human_readable` is true, `OidBuf` will
+/// serialize as a string (e.g., `"2.16.840"`). Otherwise,
+/// `OidBuf` will serialize as DER.
+///
+/// Unlike [`Oid`], `OidBuf` serialization *is* symmetric.
 #[derive(Copy, Clone, Hash, Eq, Ord, PartialOrd)]
 pub struct OidBuf<const N: usize = DEFAULT_MAX_ENCODED_SIZE> {
     /// Invariant: `idx` is a valid index into `buf`.
+    /// Invariant: `idx > 0` after the first call to `push`, and
+    ///            all constructors call `push` at least once
+    ///            (with the first two arcs).
     idx: usize,
     /// Invariant: `buf[..len]` is always valid DER.
+    /// Invariant: `N > 0`.
     buf: [u8; N],
 }
 
 impl<const N: usize> OidBuf<N> {
     /// The maximum size of the buffer.
     pub const MAX_ENCODED_SIZE: usize = N;
+
+    const fn assert_non_zero() {
+        assert!(N > 0, "`N` must be non-zero")
+    }
 
     const fn new(arc1: Arc, arc2: Arc) -> Result<Self, InvalidOid> {
         let oid = Self {
@@ -462,19 +546,29 @@ impl<const N: usize> OidBuf<N> {
 
     /// Returns the size in bytes of the DER encoded object
     /// identifier.
+    ///
+    /// The resulting value is always non-zero.
     #[inline]
     #[allow(clippy::len_without_is_empty, reason = "OIDs are never empty")]
     pub const fn len(&self) -> usize {
+        // SAFETY: `self.idx` is always in [1, self.buf.len()].
+        unsafe {
+            hint::assert_unchecked(self.idx > 0);
+            hint::assert_unchecked(self.idx <= self.buf.len());
+        }
+
         self.idx
     }
 
     /// Returns the DER encoded object identifier.
+    ///
+    /// The resulting slice is always non-empty.
     #[inline]
     pub const fn as_bytes(&self) -> &[u8] {
         // SAFETY:
         // - The pointer is coming from a slice, so all
         //   invariants are upheld.
-        // - `self.len` is in [0, self.buf.len()).
+        // - `self.len` is in [1, self.buf.len()].
         unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.len()) }
     }
 
@@ -516,6 +610,10 @@ impl<const N: usize> OidBuf<N> {
     #[must_use = "This method returns the result of the operation \
                   without modifying the original"]
     const fn push(mut self, arc: Arc) -> Result<Self, InvalidOid> {
+        // Put the assertion here since this method is reachable
+        // from all constructors.
+        const { Self::assert_non_zero() };
+
         if self.idx >= self.buf.len() {
             return Err(invalid_oid("input too long"));
         }
@@ -604,6 +702,35 @@ impl<const N: usize> fmt::Debug for OidBuf<N> {
 impl<const N: usize> fmt::Display for OidBuf<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_oid().fmt(f)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<const N: usize> Serialize for OidBuf<N> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_oid().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, const N: usize> Deserialize<'de> for OidBuf<N> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            Self::try_parse(Deserialize::deserialize(deserializer)?).map_err(de::Error::custom)
+        } else {
+            let oid = Oid::try_from_bytes(Deserialize::deserialize(deserializer)?)
+                .map(Oid::try_to_oid_buf)
+                .map_err(de::Error::custom)?;
+            oid.ok_or_else(|| de::Error::custom("DER encoded OID is too long for the buffer"))
+        }
     }
 }
 
@@ -1026,8 +1153,17 @@ pub const fn encoded_len(s: &str) -> Result<usize, InvalidOid> {
 
 #[cfg(test)]
 mod tests {
+    use serde::{
+        de::Visitor,
+        ser::{
+            self, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
+            SerializeTuple, SerializeTupleStruct, SerializeTupleVariant,
+        },
+    };
+
     use super::*;
 
+    // (DER, valid, text, arcs)
     type Test = (&'static [u8], bool, &'static str, &'static [Arc]);
     static TESTS: &[Test] = &[
         (&[], false, "", &[]),
@@ -1205,6 +1341,557 @@ mod tests {
         for (i, (a, b, want)) in TESTS.iter().enumerate() {
             let got = a.starts_with(b);
             assert_eq!(got, *want, "#{i}");
+        }
+    }
+
+    /// Test [`OidBuf`]'s serde impls.
+    #[test]
+    fn test_oidbuf_serde() {
+        for (i, (_, valid, str, _)) in TESTS.iter().enumerate() {
+            if !valid {
+                continue;
+            }
+
+            let oid: OidBuf = OidBuf::try_parse(str).unwrap_or_else(|err| panic!("#{i}: {err}"));
+
+            #[track_caller]
+            fn test<T>(name: &str, i: usize, oid: T, want: DummyData)
+            where
+                T: fmt::Debug + PartialEq + Serialize + de::DeserializeOwned,
+            {
+                let got = oid
+                    .serialize(&mut DummySer {
+                        is_human_readable: matches!(want, DummyData::Str(_)),
+                    })
+                    .unwrap_or_else(|err| panic!("#{i}: `{name}`: {err}"));
+                assert_eq!(got, want, "#{i}: `{name}`");
+
+                let got = T::deserialize(DummyDe { data: &want })
+                    .unwrap_or_else(|err| panic!("#{i}: `{name}`: {err}"));
+                assert_eq!(got, oid, "#{i}: `{name}`")
+            }
+            test("str", i, oid, DummyData::Str(str.to_string()));
+            test("bytes", i, oid, DummyData::Bytes(oid.as_bytes().to_vec()));
+        }
+    }
+
+    /// Test [`Oid`]'s serde impls.
+    #[test]
+    fn test_oid_serde() {
+        for (i, (_, valid, str, _)) in TESTS.iter().enumerate() {
+            if !valid {
+                continue;
+            }
+
+            let oid: OidBuf = OidBuf::try_parse(str).unwrap_or_else(|err| panic!("#{i}: {err}"));
+
+            let want = DummyData::Str(oid.to_string());
+            let got = oid
+                .serialize(&mut DummySer {
+                    is_human_readable: true,
+                })
+                .unwrap_or_else(|err| panic!("#{i}: {err}"));
+            assert_eq!(got, want, "#{i}");
+
+            <&Oid>::deserialize(DummyDe { data: &want })
+                .expect_err("should not be able to deserialize str");
+
+            let want = DummyData::Bytes(oid.as_bytes().to_vec());
+            let got = oid
+                .serialize(&mut DummySer {
+                    is_human_readable: false,
+                })
+                .unwrap_or_else(|err| panic!("#{i}: {err}"));
+            assert_eq!(got, want, "#{i}");
+
+            let got = <&Oid>::deserialize(DummyDe { data: &want })
+                .unwrap_or_else(|err| panic!("#{i}: {err}"));
+            assert_eq!(got, oid, "#{i}")
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum DummyData {
+        Bytes(Vec<u8>),
+        Str(String),
+    }
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("{0}")]
+    struct DummyError(String);
+
+    impl ser::Error for DummyError {
+        fn custom<T: fmt::Display>(msg: T) -> Self {
+            Self(msg.to_string())
+        }
+    }
+    impl de::Error for DummyError {
+        fn custom<T: fmt::Display>(msg: T) -> Self {
+            Self(msg.to_string())
+        }
+    }
+
+    #[derive(Debug)]
+    struct DummySer {
+        is_human_readable: bool,
+    }
+
+    impl Serializer for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        type SerializeSeq = Self;
+        type SerializeTuple = Self;
+        type SerializeTupleStruct = Self;
+        type SerializeTupleVariant = Self;
+        type SerializeMap = Self;
+        type SerializeStruct = Self;
+        type SerializeStructVariant = Self;
+
+        fn is_human_readable(&self) -> bool {
+            self.is_human_readable
+        }
+
+        fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
+            Ok(DummyData::Bytes(v.to_vec()))
+        }
+
+        fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
+            Ok(DummyData::Str(v.to_string()))
+        }
+
+        fn serialize_bool(self, _v: bool) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_char(self, _v: char) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_i8(self, _v: i8) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_i16(self, _v: i16) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_i32(self, _v: i32) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_i64(self, _v: i64) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_i128(self, _v: i128) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_u8(self, _v: u8) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_u16(self, _v: u16) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_u32(self, _v: u32) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_u64(self, _v: u64) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_u128(self, _v: u128) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_f32(self, _v: f32) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_f64(self, _v: f64) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_newtype_struct<T>(
+            self,
+            _name: &'static str,
+            _value: &T,
+        ) -> Result<Self::Ok, Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+        fn serialize_newtype_variant<T>(
+            self,
+            _name: &'static str,
+            _variant_index: u32,
+            _variant: &'static str,
+            _value: &T,
+        ) -> Result<Self::Ok, Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_some<T>(self, _value: &T) -> Result<Self::Ok, Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn serialize_struct(
+            self,
+            _name: &'static str,
+            _len: usize,
+        ) -> Result<Self::SerializeStruct, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_struct_variant(
+            self,
+            _name: &'static str,
+            _variant_index: u32,
+            _variant: &'static str,
+            _len: usize,
+        ) -> Result<Self::SerializeStructVariant, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_tuple_struct(
+            self,
+            _name: &'static str,
+            _len: usize,
+        ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_tuple_variant(
+            self,
+            _name: &'static str,
+            _variant_index: u32,
+            _variant: &'static str,
+            _len: usize,
+        ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+            unimplemented!()
+        }
+
+        fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+        fn serialize_unit_variant(
+            self,
+            _name: &'static str,
+            _variant_index: u32,
+            _variant: &'static str,
+        ) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    impl SerializeMap for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        fn serialize_key<T>(&mut self, _key: &T) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn serialize_value<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    impl SerializeSeq for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        fn serialize_element<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    impl SerializeStruct for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        fn serialize_field<T>(
+            &mut self,
+            _field: &'static str,
+            _value: &T,
+        ) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    impl SerializeStructVariant for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        fn serialize_field<T>(
+            &mut self,
+            _field: &'static str,
+            _value: &T,
+        ) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    impl SerializeTuple for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        fn serialize_element<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    impl SerializeTupleStruct for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        fn serialize_field<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    impl SerializeTupleVariant for &mut DummySer {
+        type Ok = DummyData;
+        type Error = DummyError;
+
+        fn serialize_field<T>(&mut self, _value: &T) -> Result<(), Self::Error>
+        where
+            T: Serialize + ?Sized,
+        {
+            unimplemented!()
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            unimplemented!()
+        }
+    }
+
+    #[derive(Debug)]
+    struct DummyDe<'de> {
+        data: &'de DummyData,
+    }
+
+    impl<'de> Deserializer<'de> for DummyDe<'de> {
+        type Error = DummyError;
+
+        fn is_human_readable(&self) -> bool {
+            matches!(self.data, DummyData::Str(_))
+        }
+
+        fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+            match self.data {
+                DummyData::Bytes(v) => visitor.visit_borrowed_bytes(v),
+                DummyData::Str(_) => Err(<DummyError as de::Error>::custom(
+                    "expected bytes, got string",
+                )),
+            }
+        }
+
+        fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+            match self.data {
+                DummyData::Str(s) => visitor.visit_borrowed_str(s),
+                DummyData::Bytes(_) => Err(<DummyError as de::Error>::custom(
+                    "expected string, got bytes",
+                )),
+            }
+        }
+
+        fn deserialize_any<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_byte_buf<V: Visitor<'de>>(
+            self,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_string<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_bool<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_char<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_i8<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_i16<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_i32<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_i64<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_i128<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_u8<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_u16<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_u32<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_u64<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_u128<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_f32<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_f64<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_option<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_unit<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_unit_struct<V: Visitor<'de>>(
+            self,
+            _name: &'static str,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_newtype_struct<V: Visitor<'de>>(
+            self,
+            _name: &'static str,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_seq<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_tuple<V: Visitor<'de>>(
+            self,
+            _len: usize,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_tuple_struct<V: Visitor<'de>>(
+            self,
+            _name: &'static str,
+            _len: usize,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_map<V: Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+        fn deserialize_struct<V: Visitor<'de>>(
+            self,
+            _name: &'static str,
+            _fields: &'static [&'static str],
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_enum<V: Visitor<'de>>(
+            self,
+            _name: &'static str,
+            _variants: &'static [&'static str],
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_identifier<V: Visitor<'de>>(
+            self,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
+        }
+
+        fn deserialize_ignored_any<V: Visitor<'de>>(
+            self,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error> {
+            unimplemented!()
         }
     }
 }

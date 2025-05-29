@@ -85,6 +85,9 @@ rand_compat = [
 	"dep:rand",
 ]
 
+# Enable serde.
+serde = ["dep:serde"]
+
 # Use std.
 std = [
 	"alloc",
@@ -124,9 +127,11 @@ std = [
 # Include testing utilities.
 test_util = [
 	"alloc",
+	"serde",
+
+	"serde?/derive",
 
 	"dep:more-asserts",
-	"dep:serde",
 	"dep:serde_json",
 	"dep:serde_repr",
 	"dep:wycheproof",
@@ -174,8 +179,8 @@ rand = { version = "0.8", default-features = false, optional = true }
 rand_chacha = { version = "0.3", default-features = false, optional = true }
 # `rand_core` is required by the `rust` backend.
 rand_core = { version = "0.6", default-features = false }
-# The "serde*" crates are only used by `test_util`.
-serde = { version = "1", default-features = false, features = ["derive"], optional = true }
+serde = { version = "1", default-features = false, optional = true }
+# The following "serde*" crates are only used by `test_util`.
 serde_json = { version = "1", default-features = false, optional = true }
 serde_repr = { version = "0.1", default-features = false, optional = true }
 sha2 = { version = "0.10", default-features = false }
@@ -194,7 +199,7 @@ zeroize = { version = "1", default-features = false }
 [dev-dependencies]
 # A little bit of a hack: always certain features for tests and
 # examples.
-spideroak-crypto = { path = ".", features = ["alloc", "test_util"] }
+spideroak-crypto = { path = ".", features = ["alloc", "serde", "test_util"] }
 
 [package.metadata.docs.rs]
 features = [
@@ -202,6 +207,7 @@ features = [
 	"committing-aead",
 	"ed25519_batch",
 	"rand_compat",
+	"serde",
 	"std",
 	"test_util",
 	"trng",
@@ -217,6 +223,7 @@ always_include_features = [
 	"getrandom",
 	"hazmat",
 	"rand_compat",
+	"serde",
 	"std",
 	"test_util",
 ]
