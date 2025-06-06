@@ -133,7 +133,7 @@ test_util = [
 	"alloc",
 	"serde",
 
-	"serde?/derive",
+	"dep:serde_derive",
 
 	"dep:more-asserts",
 	"dep:serde_json",
@@ -185,6 +185,7 @@ rand_chacha = { version = "0.3", default-features = false, optional = true }
 rand_core = { version = "0.6", default-features = false }
 serde = { version = "1", default-features = false, optional = true }
 # The following "serde*" crates are only used by `test_util`.
+serde_derive = { version = "1", default-features = false, optional = true }
 serde_json = { version = "1", default-features = false, optional = true }
 serde_repr = { version = "0.1", default-features = false, optional = true }
 sha2 = { version = "0.10", default-features = false }
@@ -196,7 +197,7 @@ typenum = { version = "1", default-features = false, features = ["const-generics
 # Only pulled into non-dev builds if `test_util` is enabled. It
 # won't bloat release builds, though, since users of this crate
 # should only use this feature inside [dev-dependencies].
-wycheproof = { version = "0.6", optional = true }
+wycheproof = { version = "0.6", default-features = false, optional = true, features = ["aead", "ecdh", "ecdsa", "eddsa", "hkdf", "mac"] }
 zerocopy = { version = "0.8", default-features = false, features = ["derive"] }
 zeroize = { version = "1", default-features = false }
 

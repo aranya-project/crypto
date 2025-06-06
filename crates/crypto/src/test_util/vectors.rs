@@ -41,7 +41,6 @@ pub mod hpke {
     use alloc::{boxed::Box, vec::Vec};
     use core::{result::Result, str::FromStr};
 
-    use serde::{self, Deserialize};
     use serde_json;
     use wycheproof::{ByteString, WycheproofError};
 
@@ -117,7 +116,7 @@ pub mod hpke {
         HpkeDhKemX448HkdfSha512HkdfSha512ExportOnly,
     }
 
-    #[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+    #[derive(Clone, Debug, Eq, PartialEq, serde_derive::Deserialize)]
     pub(crate) struct TestSet {
         pub test_groups: Vec<TestGroup>,
     }
@@ -141,7 +140,7 @@ pub mod hpke {
         AuthPsk = 0x03,
     }
 
-    #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+    #[derive(Debug, Clone, Eq, PartialEq, serde_derive::Deserialize)]
     #[serde(deny_unknown_fields)]
     #[allow(non_snake_case)]
     pub(crate) struct TestGroup {
@@ -173,7 +172,7 @@ pub mod hpke {
         pub exports: Vec<ExportTest>,
     }
 
-    #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+    #[derive(Debug, Clone, Eq, PartialEq, serde_derive::Deserialize)]
     #[serde(deny_unknown_fields)]
     pub(crate) struct Test {
         pub aad: ByteString,
@@ -182,7 +181,7 @@ pub mod hpke {
         pub pt: ByteString,
     }
 
-    #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+    #[derive(Debug, Clone, Eq, PartialEq, serde_derive::Deserialize)]
     #[serde(deny_unknown_fields)]
     pub(crate) struct ExportTest {
         pub exporter_context: ByteString,
