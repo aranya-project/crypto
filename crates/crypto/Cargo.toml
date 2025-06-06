@@ -86,7 +86,11 @@ rand_compat = [
 ]
 
 # Enable serde.
-serde = ["dep:serde"]
+serde = [
+	"dep:serde",
+
+	"generic-array/serde",
+]
 
 # Use std.
 std = [
@@ -184,7 +188,7 @@ serde = { version = "1", default-features = false, optional = true }
 serde_json = { version = "1", default-features = false, optional = true }
 serde_repr = { version = "0.1", default-features = false, optional = true }
 sha2 = { version = "0.10", default-features = false }
-sha3-utils = { version = "0.3.0", default-features = false }
+sha3-utils = { version = "0.5.0", default-features = false }
 spin = { version = "0.10", default-features = false, features = ["spin_mutex"], optional = true }
 subtle = { version = "2.5", default-features = false, features = ["core_hint_black_box"] }
 thiserror = { version = "2", default-features = false }
