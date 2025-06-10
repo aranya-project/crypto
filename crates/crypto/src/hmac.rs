@@ -69,13 +69,12 @@ impl<H: Hash + BlockSize> Hmac<H> {
     /// Computes the single-shot tag from `data` using `key`.
     pub fn mac_multi<I>(key: &HmacKey<H>, data: I) -> Tag<H::DigestSize>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>,
+        I: IntoIterator<Item: AsRef<[u8]>>,
     {
         let mut h = Self::new(key);
-        for s in data {
+        data.into_iter().for_each(|s| {
             h.update(s.as_ref());
-        }
+        });
         h.tag()
     }
 }

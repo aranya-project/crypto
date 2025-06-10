@@ -93,9 +93,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
         info: I,
     ) -> Result<(), KdfError>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>,
-        I::IntoIter: Clone,
+        I: IntoIterator<Item: AsRef<[u8]>, IntoIter: Clone>,
     {
         // Section 2.3
         //
@@ -125,9 +123,9 @@ impl<H: Hash + BlockSize> Hkdf<H> {
             if let Some(prev) = prev {
                 expander.update(prev.as_bytes());
             }
-            for s in info.clone() {
+            info.clone().for_each(|s| {
                 expander.update(s.as_ref());
-            }
+            });
             let next = i.checked_add(1).assume("i + 1 must not wrap")?;
             expander.update(&[next as u8]);
             let tag = expander.tag();

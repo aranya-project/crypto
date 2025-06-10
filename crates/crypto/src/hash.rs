@@ -181,8 +181,7 @@ impl<N: ArrayLength> ConstantTimeEq for Digest<N> {
 pub fn tuple_hash<H, I>(s: I) -> Digest<H::DigestSize>
 where
     H: Hash,
-    I: IntoIterator,
-    I::Item: AsRef<[u8]>,
+    I: IntoIterator<Item: AsRef<[u8]>>,
 {
     // TupleHash(X, L, S)
     // 1. z = "".
@@ -191,11 +190,11 @@ where
     //        z = z || encode_string(X[i]).
     // 4. newX = z || right_encode(L).
     let mut h = H::new();
-    for v in s {
+    s.into_iter().for_each(|v| {
         for part in &encode_string(v.as_ref()) {
             h.update(part);
         }
-    }
+    });
     h.update(right_encode_bytes(H::DIGEST_SIZE).as_bytes());
     h.digest()
 }
