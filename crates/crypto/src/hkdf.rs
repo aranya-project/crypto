@@ -17,41 +17,6 @@ use crate::{
     keys::SecretKeyBytes,
 };
 
-/// TODO
-pub fn test123(key: &[u8], prk: &Prk<typenum::U32>) -> Result<[u8; 16], KdfError> {
-    use core::hint::black_box;
-
-    use crate::{hash::Digest, hmac::Hmac};
-
-    #[derive(Clone, Debug)]
-    struct Noop(Digest<typenum::U32>);
-    impl Hash for Noop {
-        type DigestSize = typenum::U32;
-        fn new() -> Self {
-            Self(Digest::default())
-        }
-        //#[inline(never)]
-        fn update(&mut self, data: &[u8]) {
-            black_box(data);
-        }
-        //#[inline(never)]
-        fn digest(self) -> Digest<Self::DigestSize> {
-            self.0
-        }
-    }
-    impl BlockSize for Noop {
-        type BlockSize = typenum::U0;
-    }
-
-    let key = HmacKey::new(key);
-    let _expander = Hmac::<Noop>::new(&key);
-
-    let mut out = [0u8; 16];
-    //Hkdf::<crate::rust::Sha256>::expand_multi(black_box(&mut out), prk, [b"test123"])?;
-    Hkdf::<Noop>::expand_multi(black_box(&mut out), prk, [b"test123"])?;
-    Ok(out)
-}
-
 /// The size in octets of the maximum expanded output of HKDF.
 pub type MaxOutput<D> = Prod<U255, D>;
 
