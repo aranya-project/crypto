@@ -15,19 +15,20 @@
 // We use the same variable names used in the HPKE RFC.
 #![allow(non_snake_case)]
 
-use core::{fmt, marker::PhantomData, num::NonZeroU16, result::Result};
+use core::{fmt, iter, marker::PhantomData, num::NonZeroU16, result::Result};
 
 use buggy::{bug, Bug, BugExt};
 use generic_array::ArrayLength;
 use subtle::{Choice, ConstantTimeEq};
+use typenum::Unsigned as _;
 
 use crate::{
     aead::{Aead, IndCca2, KeyData, Nonce, OpenError, SealError},
     csprng::Csprng,
-    import::{ExportError, Import, ImportError},
-    kdf::{Context, Expand, Kdf, KdfError, Prk},
+    import::{ExportError, Import as _, ImportError},
+    kdf::{Expand, Kdf, KdfError, Prk},
     kem::{Kem, KemError},
-    keys::RawSecretBytes,
+    keys::RawSecretBytes as _,
     AlgId,
 };
 
@@ -458,11 +459,11 @@ where
     ///
     /// The `info` parameter provides contextual binding.
     #[allow(clippy::type_complexity)]
-    pub fn setup_send<R: Csprng>(
+    pub fn setup_send<'a, R: Csprng>(
         rng: &mut R,
         mode: Mode<'_, &K::DecapKey>,
         pkR: &K::EncapKey,
-        info: &[u8],
+        info: impl IntoIterator<Item = &'a [u8]>,
     ) -> Result<(K::Encap, SendCtx<K, F, A>), HpkeError> {
         let (shared_secret, enc) = match mode {
             Mode::Auth(skS) | Mode::AuthPsk(skS, _) => K::auth_encap::<R>(rng, pkR, skS)?,
@@ -490,10 +491,10 @@ where
     /// - it must be cryptographically secure
     /// - it must never be reused
     #[allow(clippy::type_complexity)]
-    pub fn setup_send_deterministically(
+    pub fn setup_send_deterministically<'a>(
         mode: Mode<'_, &K::DecapKey>,
         pkR: &K::EncapKey,
-        info: &[u8],
+        info: impl IntoIterator<Item = &'a [u8]>,
         skE: K::DecapKey,
     ) -> Result<(K::Encap, SendCtx<K, F, A>), HpkeError> {
         let (shared_secret, enc) = match mode {
@@ -511,11 +512,11 @@ where
     ///
     /// The `mode` and `info` parameters must be the same
     /// parameters used by the sender.
-    pub fn setup_recv(
+    pub fn setup_recv<'a>(
         mode: Mode<'_, &K::EncapKey>,
         enc: &K::Encap,
         skR: &K::DecapKey,
-        info: &[u8],
+        info: impl IntoIterator<Item = &'a [u8]>,
     ) -> Result<RecvCtx<K, F, A>, HpkeError> {
         let shared_secret = match mode {
             Mode::Auth(pkS) | Mode::AuthPsk(pkS, _) => K::auth_decap(enc, skR, pkS)?,
@@ -525,7 +526,7 @@ where
         Ok(ctx.into_recv_ctx())
     }
 
-    /// The "HPKE" suite ID.
+    /// The "HPKE" `suite_id`.
     ///
     /// ```text
     /// suite_id = concat(
@@ -536,7 +537,7 @@ where
     /// )
     /// ```
     #[rustfmt::skip]
-    const HPKE_SUITE_ID: [u8; 10] = [
+    const HPKE_SUITE_ID: &[u8] = &[
         b'H',
         b'P',
         b'K',
@@ -546,35 +547,43 @@ where
         i2osp!(A::ID)[0], i2osp!(A::ID)[1],
     ];
 
-    fn key_schedule<T>(
+    /// The "HPKE-v1" domain separator for `LabeledExtract` and
+    /// `LabeledExpand`.
+    const DOMAIN: &[u8] = b"HPKE-v1";
+
+    fn key_schedule<'a, T>(
         mode: Mode<'_, T>,
         shared_secret: &K::Secret,
-        info: &[u8],
+        info: impl IntoIterator<Item = &'a [u8]>,
     ) -> Result<Schedule<K, F, A>, HpkeError> {
         let Psk { psk, psk_id } = mode.psk();
 
         //  psk_id_hash = LabeledExtract("", "psk_id_hash", psk_id)
-        let psk_id_hash = Self::labeled_extract(b"", "psk_id_hash", psk_id);
+        let psk_id_hash = Self::labeled_extract(b"", b"psk_id_hash", iter::once(psk_id).copied());
 
         //  info_hash = LabeledExtract("", "info_hash", info)
-        let info_hash = Self::labeled_extract(b"", "info_hash", info);
+        let info_hash = Self::labeled_extract(b"", b"info_hash", info);
 
         //  key_schedule_context = concat(mode, psk_id_hash, info_hash)
         let ks_ctx = [&[mode.id()], psk_id_hash.as_bytes(), info_hash.as_bytes()];
 
         //  secret = LabeledExtract(shared_secret, "secret", psk)
-        let secret = Self::labeled_extract(shared_secret.raw_secret_bytes(), "secret", psk);
+        let secret = Self::labeled_extract(
+            shared_secret.raw_secret_bytes(),
+            b"secret",
+            iter::once(psk).copied(),
+        );
 
         // key = LabeledExpand(secret, "key", key_schedule_context, Nk)
-        let key = Self::labeled_expand(&secret, "key", &ks_ctx)?;
+        let key = Self::labeled_expand(&secret, b"key", ks_ctx)?;
 
         // base_nonce = LabeledExpand(secret, "base_nonce",
         //                      key_schedule_context, Nn)
-        let base_nonce = Self::labeled_expand(&secret, "base_nonce", &ks_ctx)?;
+        let base_nonce = Self::labeled_expand(&secret, b"base_nonce", ks_ctx)?;
 
         // exporter_secret = LabeledExpand(secret, "exp",
         //                           key_schedule_context, Nh)
-        let exporter_secret = Self::labeled_expand(&secret, "exp", &ks_ctx)?;
+        let exporter_secret = Self::labeled_expand(&secret, b"exp", ks_ctx)?;
 
         Ok(Schedule {
             key,
@@ -584,45 +593,71 @@ where
         })
     }
 
-    const HPKE_CTX: Context = Context {
-        domain: "HPKE-v1",
-        suite_ids: &Self::HPKE_SUITE_ID,
-    };
-
     /// Performs `LabeledExtract`.
-    fn labeled_extract(salt: &[u8], label: &'static str, ikm: &[u8]) -> Prk<F::PrkSize> {
+    fn labeled_extract<'a>(
+        salt: &[u8],
+        label: &'static [u8],
+        ikm: impl IntoIterator<Item = &'a [u8]>,
+    ) -> Prk<F::PrkSize> {
         // def LabeledExtract(salt, label, ikm):
         //     labeled_ikm = concat("HPKE-v1", suite_id, label, ikm)
         //     return Extract(salt, labeled_ikm)
-        Self::HPKE_CTX.labeled_extract::<F>(salt, label, ikm)
+        let labeled_ikm = iter::once(Self::DOMAIN)
+            .chain(iter::once(Self::HPKE_SUITE_ID))
+            .chain(iter::once(label))
+            .chain(ikm);
+        F::extract_multi(labeled_ikm, salt)
     }
 
     /// Performs `LabeledExpand`.
-    fn labeled_expand<T: Expand>(
+    fn labeled_expand<'a, T: Expand>(
         prk: &Prk<F::PrkSize>,
-        label: &'static str,
-        info: &[&[u8]],
+        label: &'static [u8],
+        info: impl IntoIterator<Item = &'a [u8], IntoIter: Clone>,
     ) -> Result<T, KdfError> {
         // def LabeledExpand(prk, label, info, L):
         //     labeled_info = concat(I2OSP(L, 2), "HPKE-v1", suite_id,
         //                 label, info)
         //     return Expand(prk, labeled_info, L)
-        let key = Self::HPKE_CTX.labeled_expand::<F, T>(prk, label, info)?;
-        Ok(key)
+        let size = T::Size::U16.to_be_bytes();
+        let labeled_info = iter::once(size.as_slice())
+            .chain(iter::once(Self::DOMAIN))
+            .chain(iter::once(Self::HPKE_SUITE_ID))
+            .chain(iter::once(label))
+            .chain(
+                // `.map(|v| v)` shortens the lifetime from `'a`
+                // to `'1`.
+                #[allow(clippy::map_identity)]
+                info.into_iter().map(|v| v),
+            );
+        T::expand_multi::<F, _>(prk, labeled_info)
     }
 
     /// Performs `LabeledExpand`.
-    fn labeled_expand_into(
+    fn labeled_expand_into<'a>(
         out: &mut [u8],
         prk: &Prk<F::PrkSize>,
-        label: &'static str,
-        info: &[&[u8]],
+        label: &'static [u8],
+        info: impl IntoIterator<Item = &'a [u8], IntoIter: Clone>,
     ) -> Result<(), KdfError> {
         // def LabeledExpand(prk, label, info, L):
         //     labeled_info = concat(I2OSP(L, 2), "HPKE-v1", suite_id,
         //                 label, info)
         //     return Expand(prk, labeled_info, L)
-        Self::HPKE_CTX.labeled_expand_into::<F>(out, prk, label, info)
+        let size = u16::try_from(out.len())
+            .map_err(|_| KdfError::OutputTooLong)?
+            .to_be_bytes();
+        let labeled_info = iter::once(size.as_slice())
+            .chain(iter::once(Self::DOMAIN))
+            .chain(iter::once(Self::HPKE_SUITE_ID))
+            .chain(iter::once(label))
+            .chain(
+                // `.map(|v| v)` shortens the lifetime from `'a`
+                // to `'1`.
+                #[allow(clippy::map_identity)]
+                info.into_iter().map(|v| v),
+            );
+        F::expand_multi(out, prk, labeled_info)
     }
 }
 
@@ -782,6 +817,7 @@ where
 /// a particular recipient.
 ///
 /// Unlike [`SendCtx`], it cannot export secrets.
+#[doc(hidden)]
 pub struct SealCtx<A: HpkeAead> {
     aead: A,
     base_nonce: Nonce<A::NonceSize>,
@@ -988,6 +1024,7 @@ where
 /// a particular sender.
 ///
 /// Unlike [`RecvCtx`], it cannot export secrets.
+#[doc(hidden)]
 pub struct OpenCtx<A: HpkeAead> {
     aead: A,
     base_nonce: Nonce<A::NonceSize>,
@@ -1220,7 +1257,7 @@ where
         // def Context.Export(exporter_context, L):
         //   return LabeledExpand(self.exporter_secret, "sec",
         //                        exporter_context, L)
-        Hpke::<K, F, A>::labeled_expand(&self.exporter_secret, "sec", &[context])
+        Hpke::<K, F, A>::labeled_expand(&self.exporter_secret, b"sec", [context])
     }
 
     /// Exports a secret from the context, writing it to `out`.
@@ -1228,7 +1265,7 @@ where
         // def Context.Export(exporter_context, L):
         //   return LabeledExpand(self.exporter_secret, "sec",
         //                        exporter_context, L)
-        Hpke::<K, F, A>::labeled_expand_into(out, &self.exporter_secret, "sec", &[context])
+        Hpke::<K, F, A>::labeled_expand_into(out, &self.exporter_secret, b"sec", [context])
     }
 }
 

@@ -495,40 +495,59 @@ impl<E: Ecdh, F: Kdf> DhKem<E, F> {
         pkSm: Option<&PubKeyData<E>>,
         id: KemId,
     ) -> Result<Prk<F::PrkSize>, KdfError> {
+        // def LabeledExtract(salt, label, ikm):
+        //   ...
+        // def LabeledExpand(prk, label, info, L):
+        //   ...
+        //
         // def ExtractAndExpand(dh, kem_context):
         //   eae_prk = LabeledExtract("", "eae_prk", dh)
         //   shared_secret = LabeledExpand(eae_prk, "shared_secret",
         //                                 kem_context, Nsecret)
         //   return shared_secret
         let mut out = Prk::<F::PrkSize>::default();
+
+        // NB: `labeled_ikm` and `labeled_info` are slices
+        // instead of arrays to cut down on stack usage.
+        // Additionally, `labeled_info` needs to be `Clone`, and
+        // it's significantly cheaper to clone `slice::Iter` that
+        // it is to clone `array::IntoIter`.
+
         //  labeled_ikm = concat("HPKE-v1", suite_id, label, ikm)
-        let labeled_ikm = [
-            "HPKE-v1".as_bytes(),
+        let labeled_ikm: &[&[u8]] = &[
+            b"HPKE-v1",
             // suite_id = concat("KEM", I2OSP(kem_id, 2))
-            "KEM".as_bytes(),
+            b"KEM",
             &id.to_be_bytes(),
             // label
-            "eae_prk".as_bytes(),
+            b"eae_prk",
             // ikm
             dh.0.borrow(),
             dh.1.as_ref().map_or(&[], |v| v.borrow()),
         ];
+
         //  labeled_info = concat(I2OSP(L, 2), "HPKE-v1", suite_id,
         //                 label, info)
-        let labeled_info = [
+        let labeled_info: &[&[u8]] = &[
             &(F::PRK_SIZE as u16).to_be_bytes()[..],
-            "HPKE-v1".as_bytes(),
+            b"HPKE-v1",
             // suite_id = concat("KEM", I2OSP(kem_id, 2))
-            "KEM".as_bytes(),
+            b"KEM",
             &id.to_be_bytes(),
             // label
-            "shared_secret".as_bytes(),
+            b"shared_secret",
             // kem_context
             enc.borrow(),
             pkRm.borrow(),
             pkSm.map_or(&[], |v| v.borrow()),
         ];
-        F::extract_and_expand_multi(out.as_bytes_mut(), &labeled_ikm, &[], &labeled_info)?;
+
+        F::extract_and_expand_multi(
+            out.as_bytes_mut(),
+            labeled_ikm.iter().copied(),
+            &[],
+            labeled_info.iter().copied(),
+        )?;
         Ok(out)
     }
 }

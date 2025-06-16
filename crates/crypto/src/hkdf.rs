@@ -6,17 +6,51 @@
 
 use core::{fmt, marker::PhantomData};
 
-use buggy::BugExt;
 use generic_array::GenericArray;
 use typenum::{Prod, U255};
 
 use crate::{
     block::BlockSize,
     hash::Hash,
-    hmac::{Hmac, HmacKey, Tag},
+    hmac::{Hmac, HmacKey},
     kdf::{KdfError, Prk},
     keys::SecretKeyBytes,
 };
+
+/// TODO
+pub fn test123(key: &[u8], prk: &Prk<typenum::U32>) -> Result<[u8; 16], KdfError> {
+    use core::hint::black_box;
+
+    use crate::{hash::Digest, hmac::Hmac};
+
+    #[derive(Clone, Debug)]
+    struct Noop(Digest<typenum::U32>);
+    impl Hash for Noop {
+        type DigestSize = typenum::U32;
+        fn new() -> Self {
+            Self(Digest::default())
+        }
+        //#[inline(never)]
+        fn update(&mut self, data: &[u8]) {
+            black_box(data);
+        }
+        //#[inline(never)]
+        fn digest(self) -> Digest<Self::DigestSize> {
+            self.0
+        }
+    }
+    impl BlockSize for Noop {
+        type BlockSize = typenum::U0;
+    }
+
+    let key = HmacKey::new(key);
+    let _expander = Hmac::<Noop>::new(&key);
+
+    let mut out = [0u8; 16];
+    //Hkdf::<crate::rust::Sha256>::expand_multi(black_box(&mut out), prk, [b"test123"])?;
+    Hkdf::<Noop>::expand_multi(black_box(&mut out), prk, [b"test123"])?;
+    Ok(out)
+}
 
 /// The size in octets of the maximum expanded output of HKDF.
 pub type MaxOutput<D> = Prod<U255, D>;
@@ -26,7 +60,8 @@ pub struct Hkdf<H>(PhantomData<fn() -> H>);
 
 impl<H: Hash + BlockSize> Hkdf<H> {
     /// The maximum nuumber of bytes that can be expanded by
-    /// [`Self::expand`] and [`Self::expand_multi`].
+    /// [`expand`][Self::expand] and
+    /// [`expand_multi`][Self::expand_multi].
     pub const MAX_OUTPUT: usize = 255 * H::DIGEST_SIZE;
 
     /// The size in bytes of a [`Prk`] returned by this HKDF.
@@ -117,21 +152,45 @@ impl<H: Hash + BlockSize> Hkdf<H> {
         let expander = Hmac::<H>::new(&key);
         let info = info.into_iter();
 
-        let mut prev: Option<Tag<H::DigestSize>> = None;
-        for (i, chunk) in out.chunks_mut(H::DIGEST_SIZE).enumerate() {
+        // Invariant: n is in [0, 255].
+        let mut n = 0u8;
+        let mut chunks = out.chunks_exact_mut(H::DIGEST_SIZE);
+
+        let mut prev = None;
+        for chunk in chunks.by_ref() {
+            // This cannot wrap because we've checked that there
+            // is at most 255 chunks.
+            n = n.wrapping_add(1);
+
             let mut expander = expander.clone();
             if let Some(prev) = prev {
-                expander.update(prev.as_bytes());
+                expander.update(prev);
             }
             info.clone().for_each(|s| {
                 expander.update(s.as_ref());
             });
-            let next = i.checked_add(1).assume("i + 1 must not wrap")?;
-            expander.update(&[next as u8]);
+            expander.update(&[n]);
+            let tag = expander.tag();
+            chunk.copy_from_slice(tag.as_bytes());
+            prev = Some(chunk);
+        }
+
+        let chunk = chunks.into_remainder();
+        if !chunk.is_empty() {
+            let mut expander = expander.clone();
+            if let Some(prev) = prev {
+                expander.update(prev);
+            }
+            info.clone().for_each(|s| {
+                expander.update(s.as_ref());
+            });
+            // This cannot wrap; see the comment in the previous
+            // loop.
+            expander.update(&[n.wrapping_add(1)]);
             let tag = expander.tag();
             chunk.copy_from_slice(&tag.as_bytes()[..chunk.len()]);
-            prev = Some(tag);
         }
+
         Ok(())
     }
 }
@@ -201,22 +260,20 @@ macro_rules! hkdf_impl {
 
             type PrkSize = <$hash as $crate::hash::Hash>::DigestSize;
 
-            fn extract_multi<I>(ikm: I, salt: &[u8]) -> $crate::kdf::Prk<Self::PrkSize>
+            fn extract_multi<'a, I>(ikm: I, salt: &[u8]) -> $crate::kdf::Prk<Self::PrkSize>
             where
-                I: ::core::iter::IntoIterator,
-                I::Item: ::core::convert::AsRef<[u8]>,
+                I: ::core::iter::IntoIterator<Item = &'a [u8]>,
             {
                 $crate::hkdf::Hkdf::<$hash>::extract_multi(ikm, salt)
             }
 
-            fn expand_multi<I>(
+            fn expand_multi<'a, I>(
                 out: &mut [u8],
                 prk: &$crate::kdf::Prk<Self::PrkSize>,
                 info: I,
             ) -> Result<(), $crate::kdf::KdfError>
             where
-                I: ::core::iter::IntoIterator,
-                I::Item: ::core::convert::AsRef<[u8]>,
+                I: ::core::iter::IntoIterator<Item = &'a [u8]>,
                 I::IntoIter: ::core::clone::Clone,
             {
                 $crate::hkdf::Hkdf::<$hash>::expand_multi(out, prk, info)
@@ -230,8 +287,6 @@ macro_rules! hkdf_impl {
         $(impl $crate::hpke::HpkeKdf for $name {
             const ID: $crate::hpke::KdfId = $kdf_id;
         })?
-
-        // TODO(eric): OID
     };
 }
 pub(crate) use hkdf_impl;

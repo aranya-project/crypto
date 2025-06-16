@@ -466,13 +466,18 @@ where
             let skE = K::DecapKey::import(&g.skEm[..]).unwrap_or_else(|_| panic!("group={i}"));
             let pkR = K::EncapKey::import(&g.pkRm[..]).unwrap_or_else(|_| panic!("group={i}"));
             let mode = g.get_mode(i, &g.skSm[..]);
-            Hpke::<K, F, A>::setup_send_deterministically(mode.as_ref(), &pkR, &g.info, skE)
-                .unwrap_or_else(|_| panic!("group={i}"))
+            Hpke::<K, F, A>::setup_send_deterministically(
+                mode.as_ref(),
+                &pkR,
+                [g.info.as_slice()],
+                skE,
+            )
+            .unwrap_or_else(|_| panic!("group={i}"))
         };
         let mut recv = {
             let skR = K::DecapKey::import(&g.skRm[..]).unwrap_or_else(|_| panic!("group={i}"));
             let mode = g.get_mode(i, &g.pkSm[..]);
-            Hpke::<K, F, A>::setup_recv(mode.as_ref(), &enc, &skR, &g.info)
+            Hpke::<K, F, A>::setup_recv(mode.as_ref(), &enc, &skR, [g.info.as_slice()])
                 .unwrap_or_else(|_| panic!("group={i}"))
         };
 
