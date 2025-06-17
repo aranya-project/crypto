@@ -52,12 +52,14 @@ impl<H: Hash + BlockSize> Hmac<H> {
     }
 
     /// Writes `data` to the HMAC.
+    #[inline]
     pub fn update(&mut self, data: &[u8]) {
         // Step 5: H((K_0 ^ ipad) || text)
         self.ipad.update(data)
     }
 
     /// Returns the authentication tag.
+    #[inline]
     pub fn tag(mut self) -> Tag<H::DigestSize> {
         let d = self.ipad.digest();
         // Step 8: (K_0 ^ opad) || H((K_0 ^ ipad) || text)

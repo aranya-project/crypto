@@ -3,6 +3,7 @@
 extern crate alloc;
 
 use alloc::vec;
+use core::slice;
 
 use generic_array::GenericArray;
 use typenum::U64;
@@ -132,9 +133,13 @@ pub fn test_round_trip<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>
     let skR = K::DecapKey::random(rng);
     let pkR = skR.public().expect("encap key should be valid");
 
-    let (enc, mut send) = Hpke::<K, F, A>::setup_send(rng, Mode::Base, &pkR, INFO)
+    let (enc, mut send) = Hpke::<K, F, A>::setup_send(rng, Mode::Base, &pkR, [INFO])
         .expect("unable to create send context");
-    let mut recv = Hpke::<K, F, A>::setup_recv(Mode::Base, &enc, &skR, INFO)
+
+    // Flatten out `INFO` to make sure that the iterator works
+    // correctly.
+    let info = INFO.iter().map(slice::from_ref);
+    let mut recv = Hpke::<K, F, A>::setup_recv(Mode::Base, &enc, &skR, info)
         .expect("unable to create recv context");
 
     let ciphertext = {
@@ -162,9 +167,9 @@ pub fn test_export<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng
     let skR = K::DecapKey::random(rng);
     let pkR = skR.public().expect("encap key should be valid");
 
-    let (enc, send) = Hpke::<K, F, A>::setup_send(rng, Mode::Base, &pkR, INFO)
+    let (enc, send) = Hpke::<K, F, A>::setup_send(rng, Mode::Base, &pkR, [INFO])
         .expect("unable to create send context");
-    let recv = Hpke::<K, F, A>::setup_recv(Mode::Base, &enc, &skR, INFO)
+    let recv = Hpke::<K, F, A>::setup_recv(Mode::Base, &enc, &skR, [INFO])
         .expect("unable to create recv context");
 
     #[derive(Debug, Default, Eq, PartialEq)]

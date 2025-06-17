@@ -96,78 +96,94 @@ pub trait Kdf {
     /// (IKM) and an optional salt.
     ///
     /// It handles IKM and salts of an arbitrary length.
+    #[inline]
     fn extract(ikm: &[u8], salt: &[u8]) -> Prk<Self::PrkSize> {
-        Self::extract_multi(&[ikm], salt)
+        Self::extract_multi([ikm], salt)
     }
 
     /// Identical to [`Kdf::extract`], but accepts the `ikm`
     /// parameter as multiple parts.
-    fn extract_multi<I>(ikm: I, salt: &[u8]) -> Prk<Self::PrkSize>
+    ///
+    /// # Note for Implementors
+    ///
+    /// If possible, try to use [`Iterator::for_each`] (or
+    /// similar) instead of a `for` loop.
+    fn extract_multi<'a, I>(ikm: I, salt: &[u8]) -> Prk<Self::PrkSize>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>;
+        I: IntoIterator<Item = &'a [u8]>;
 
     /// A Pseudo Random Function (PRF) that expands the PRK with
     /// an optional info parameter into a key.
     ///
     /// It handles `info` parameters of an arbitrary length and
-    /// outputs up to [`Self::MAX_OUTPUT`] bytes.
+    /// outputs up to [`MAX_OUTPUT`][Self::MAX_OUTPUT] bytes.
     ///
     /// It returns an error if the output is too large.
+    #[inline]
     fn expand(out: &mut [u8], prk: &Prk<Self::PrkSize>, info: &[u8]) -> Result<(), KdfError> {
-        Self::expand_multi(out, prk, &[info])
+        Self::expand_multi(out, prk, [info])
     }
 
     /// Identical to [`Kdf::expand`], but accepts the `info`
     /// parameter as multiple parts.
-    fn expand_multi<I>(out: &mut [u8], prk: &Prk<Self::PrkSize>, info: I) -> Result<(), KdfError>
+    ///
+    /// `I::IntoIter` must implement [`Clone`] to support KDFs
+    /// that require multiple passes over `info`, like HKDF.
+    ///
+    /// # Note for Implementors
+    ///
+    /// If possible, try to use [`Iterator::for_each`] (or
+    /// similar) instead of a `for` loop.
+    fn expand_multi<'a, I>(
+        out: &mut [u8],
+        prk: &Prk<Self::PrkSize>,
+        info: I,
+    ) -> Result<(), KdfError>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>,
-        I::IntoIter: Clone;
+        I: IntoIterator<Item = &'a [u8], IntoIter: Clone>;
 
     /// Performs both the extract and expand steps.
     ///
     /// It handles `ikm`, `salt`, and `info` parameters of an
-    /// arbitrary length and outputs up to [`Self::MAX_OUTPUT`]
-    /// bytes.
+    /// arbitrary length and outputs up to
+    /// [`MAX_OUTPUT`][Self::MAX_OUTPUT] bytes.
     ///
     /// It returns an error if the output is too large.
     ///
     /// While this function is provided by default,
     /// implementations of [`Kdf`] are encouraged to provide
     /// optimized "single-shot" implementations.
+    #[inline]
     fn extract_and_expand(
         out: &mut [u8],
         ikm: &[u8],
         salt: &[u8],
         info: &[u8],
     ) -> Result<(), KdfError> {
-        if out.len() > Self::MAX_OUTPUT {
-            Err(KdfError::OutputTooLong)
-        } else {
-            let prk = Self::extract_multi(&[ikm], salt);
-            Self::expand_multi(out, &prk, &[info])
-        }
+        Self::extract_and_expand_multi(out, [ikm], salt, [info])
     }
 
     /// Performs both the extract and expand steps.
     ///
     /// It handles `ikm`, `salt`, and `info` parameters of an
-    /// arbitrary length and outputs up to [`Self::MAX_OUTPUT`]
-    /// bytes.
+    /// arbitrary length and outputs up to
+    /// [`MAX_OUTPUT`][Self::MAX_OUTPUT] bytes.
     ///
     /// It returns an error if the output is too large.
     ///
     /// While this function is provided by default,
     /// implementations of [`Kdf`] are encouraged to provide
     /// optimized "single-shot" implementations.
-    fn extract_and_expand_multi(
+    fn extract_and_expand_multi<'a, Ikm, Info>(
         out: &mut [u8],
-        ikm: &[&[u8]],
+        ikm: Ikm,
         salt: &[u8],
-        info: &[&[u8]],
-    ) -> Result<(), KdfError> {
+        info: Info,
+    ) -> Result<(), KdfError>
+    where
+        Ikm: IntoIterator<Item = &'a [u8]>,
+        Info: IntoIterator<Item = &'a [u8], IntoIter: Clone>,
+    {
         if out.len() > Self::MAX_OUTPUT {
             Err(KdfError::OutputTooLong)
         } else {
@@ -275,8 +291,7 @@ pub trait Expand: Sized {
     fn expand_multi<'a, K, I>(prk: &Prk<K::PrkSize>, info: I) -> Result<Self, KdfError>
     where
         K: Kdf,
-        I: IntoIterator<Item = &'a [u8]>,
-        I::IntoIter: Clone;
+        I: IntoIterator<Item = &'a [u8], IntoIter: Clone>;
 }
 
 impl<N: ArrayLength> Expand for GenericArray<u8, N>
@@ -313,88 +328,5 @@ where
         let mut out = [0u8; N];
         K::expand_multi(&mut out, prk, info)?;
         Ok(out)
-    }
-}
-
-/// Context for labeled key derivation per RFC 9180.
-#[derive(Debug)]
-pub struct Context {
-    /// A domain separation string.
-    pub domain: &'static str,
-    /// Suite identifiers.
-    pub suite_ids: &'static [u8],
-}
-
-impl Context {
-    /// Performs `LabeledExtract` per RFC 9180.
-    pub fn labeled_extract<K: Kdf>(
-        &self,
-        salt: &[u8],
-        label: &'static str,
-        ikm: &[u8],
-    ) -> Prk<K::PrkSize> {
-        // def LabeledExtract(salt, label, ikm):
-        //     labeled_ikm = concat(domain, suite_ids, label, ikm)
-        //     return Extract(salt, labeled_ikm)
-        let labeled_ikm = [
-            self.domain.as_bytes(),
-            self.suite_ids,
-            label.as_bytes(),
-            ikm,
-        ];
-        K::extract_multi(labeled_ikm, salt)
-    }
-
-    /// Performs `LabeledExpand` per RFC 9180.
-    pub fn labeled_expand<K, T>(
-        &self,
-        prk: &Prk<K::PrkSize>,
-        label: &'static str,
-        info: &[&[u8]],
-    ) -> Result<T, KdfError>
-    where
-        K: Kdf,
-        T: Expand,
-    {
-        // def LabeledExpand(prk, label, info):
-        //     labeled_info = concat(I2OSP(L, 2), domain, suite_ids,
-        //                   label, info)
-        //     return Expand(prk, labeled_info)
-        let size = T::Size::U16.to_be_bytes();
-        let labeled_info = [
-            &size,
-            self.domain.as_bytes(),
-            self.suite_ids,
-            label.as_bytes(),
-        ]
-        .into_iter()
-        .chain(info.iter().copied());
-        T::expand_multi::<K, _>(prk, labeled_info)
-    }
-
-    /// Performs `LabeledExpand` per RFC 9180.
-    pub fn labeled_expand_into<K: Kdf>(
-        &self,
-        out: &mut [u8],
-        prk: &Prk<K::PrkSize>,
-        label: &'static str,
-        info: &[&[u8]],
-    ) -> Result<(), KdfError> {
-        // def LabeledExpand(prk, label, info):
-        //     labeled_info = concat(I2OSP(L, 2), domain, suite_ids,
-        //                   label, info)
-        //     return Expand(prk, labeled_info)
-        let size = u16::try_from(out.len())
-            .map_err(|_| KdfError::OutputTooLong)?
-            .to_be_bytes();
-        let labeled_info = [
-            &size,
-            self.domain.as_bytes(),
-            self.suite_ids,
-            label.as_bytes(),
-        ]
-        .into_iter()
-        .chain(info.iter().copied());
-        K::expand_multi(out, prk, labeled_info)
     }
 }
