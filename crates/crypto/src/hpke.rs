@@ -602,9 +602,8 @@ where
         // def LabeledExtract(salt, label, ikm):
         //     labeled_ikm = concat("HPKE-v1", suite_id, label, ikm)
         //     return Extract(salt, labeled_ikm)
-        let labeled_ikm = iter::once(Self::DOMAIN)
-            .chain(iter::once(Self::HPKE_SUITE_ID))
-            .chain(iter::once(label))
+        let labeled_ikm = [Self::DOMAIN, Self::HPKE_SUITE_ID, label]
+            .into_iter()
             .chain(ikm);
         F::extract_multi(labeled_ikm, salt)
     }
