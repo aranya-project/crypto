@@ -1,5 +1,8 @@
 //! Cryptographically Secure Random Number Generators.
 
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, rc::Rc, sync::Arc};
+
 use generic_array::{ArrayLength, GenericArray};
 #[cfg(all(feature = "getrandom", not(target_os = "vxworks")))]
 pub use getrandom;
@@ -42,7 +45,34 @@ pub trait Csprng {
 
 impl<R: Csprng + ?Sized> Csprng for &R {
     fn fill_bytes(&self, dst: &mut [u8]) {
-        (**self).fill_bytes(dst)
+        R::fill_bytes(self, dst)
+    }
+}
+
+impl<R: Csprng + ?Sized> Csprng for &mut R {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<R: Csprng + ?Sized> Csprng for Box<R> {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<R: Csprng + ?Sized> Csprng for Rc<R> {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<R: Csprng + ?Sized> Csprng for Arc<R> {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
     }
 }
 
