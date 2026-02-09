@@ -7,7 +7,6 @@
 
 use core::{
     borrow::Borrow,
-    cmp,
     ffi::c_void,
     fmt,
     mem::size_of,
@@ -1195,21 +1194,23 @@ impl HmacDrbg {
 }
 
 impl Csprng for HmacDrbg {
-    fn fill_bytes(&self, mut dst: &mut [u8]) {
+    fn fill_bytes(&self, dst: &mut [u8]) {
         // Max number of bytes that can be requested from
         // a `HMAC_DRBG` per request.
         const MAX: usize = 1 << 16;
 
-        while !dst.is_empty() {
-            let n = cmp::min(dst.len(), MAX);
-            {
-                let mut ctx = self.0.lock();
-                // SAFETY: FFI call, no invariants
-                unsafe {
-                    br_hmac_drbg_generate(ctx.deref_mut(), dst.as_mut_ptr() as *mut c_void, n);
-                }
+        if dst.is_empty() {
+            return;
+        }
+
+        let mut ctx = self.0.lock();
+        let ctx = ctx.deref_mut();
+
+        for chunk in dst.chunks_mut(MAX) {
+            // SAFETY: FFI call, no invariants
+            unsafe {
+                br_hmac_drbg_generate(ctx, chunk.as_mut_ptr().cast::<c_void>(), chunk.len());
             }
-            dst = &mut dst[n..];
         }
     }
 }
