@@ -128,7 +128,7 @@ impl<N: ArrayLength> ConstantTimeEq for SecretKeyBytes<N> {
 }
 
 impl<N: ArrayLength> Random for SecretKeyBytes<N> {
-    fn random<R: Csprng>(rng: &mut R) -> Self {
+    fn random<R: Csprng>(rng: R) -> Self {
         Self(Random::random(rng))
     }
 }
@@ -249,7 +249,7 @@ macro_rules! raw_key {
         }
 
         impl<N: $crate::generic_array::ArrayLength> $crate::csprng::Random for $name<N> {
-            fn random<R: $crate::csprng::Csprng>(rng: &mut R) -> Self {
+            fn random<R: $crate::csprng::Csprng>(rng: R) -> Self {
                 let sk = <$crate::keys::SecretKeyBytes<N> as $crate::csprng::Random>::random(rng);
                 Self(sk)
             }

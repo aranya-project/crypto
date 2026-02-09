@@ -28,9 +28,9 @@ use crate::csprng::Csprng;
 /// # use spideroak_crypto::csprng::Csprng;
 /// use spideroak_crypto::default::Rng;
 ///
-/// fn foo<R: Csprng>(_rng: &mut R) {}
+/// fn foo<R: Csprng>(_rng: R) {}
 ///
-/// foo(&mut Rng);
+/// foo(Rng);
 /// ```
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Rng;
@@ -47,7 +47,7 @@ impl Rng {
 }
 
 impl Csprng for Rng {
-    fn fill_bytes(&mut self, dst: &mut [u8]) {
+    fn fill_bytes(&self, dst: &mut [u8]) {
         cfg_if! {
             if #[cfg(feature = "trng")] {
                 crate::csprng::trng::thread_rng().fill_bytes(dst)

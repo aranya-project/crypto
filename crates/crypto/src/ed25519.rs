@@ -81,7 +81,7 @@ impl SecretKey for SigningKey {
 }
 
 impl Random for SigningKey {
-    fn random<R: Csprng>(rng: &mut R) -> Self {
+    fn random<R: Csprng>(rng: R) -> Self {
         let mut sk = dalek::SecretKey::default();
         rng.fill_bytes(&mut sk);
         Self(dalek::SigningKey::from_bytes(&sk))

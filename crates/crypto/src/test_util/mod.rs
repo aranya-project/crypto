@@ -269,7 +269,7 @@ where
     T: Signer + ?Sized,
     T::SigningKey: Random,
 {
-    fn random<R: Csprng>(rng: &mut R) -> Self {
+    fn random<R: Csprng>(rng: R) -> Self {
         Self(<T::SigningKey as Random>::random(rng))
     }
 }
