@@ -2,7 +2,6 @@
 CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = 1
 CARGO_MAKE_WORKSPACE_SKIP_MEMBERS = "canaries/*"
 RUSTDOCFLAGS = { value = "", condition = { env_not_set = ["RUSTDOCFLAGS"] } }
-NIGHTLY = { script = ["cat rust-nightly.txt"], condition = { env_not_set = ["NIGHTLY"] } }
 
 RUSTFLAGS = { value = "-Dwarnings", condition = { env_true = ["CARGO_MAKE_CI"] } }
 
@@ -16,6 +15,13 @@ skip_rust_env_info = true
 [tasks.default]
 description = "List tasks"
 script = "cargo make --quiet --list-all-steps --hide-uninteresting"
+
+# Check
+[tasks.check]
+category = "check"
+description = "Check code"
+command = "cargo"
+args = ["check", "${@}"]
 
 
 # Build
@@ -48,21 +54,23 @@ run_task = { name = [
 
 [tasks.cargo-audit]
 category = "security"
-install_crate = { crate_name = "cargo-audit", version = "0.21.0", binary = "cargo-audit", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-audit", version = "0.22.0", binary = "cargo-audit", test_arg = "-V" }
 command = "cargo"
 args = ["audit"]
 
 [tasks.cargo-deny]
 category = "security"
-install_crate = { crate_name = "cargo-deny", version = "0.16.3", binary = "cargo-deny", test_arg = "-V" }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-deny", version = "0.18.9", binary = "cargo-deny", test_arg = "-V" }
 command = "cargo"
 args = ["deny", "check"]
 
 [tasks.cargo-vet]
 category = "security"
-install_crate = { crate_name = "cargo-vet", version = "0.10.0", binary = "cargo-vet", test_arg = "-V" }
 command = "cargo"
 args = ["vet", "check"]
+dependencies = ["install-cargo-vet"]
 
 
 # Correctness
@@ -82,24 +90,20 @@ dependencies = ["check-fmt-rust", "check-fmt-toml"]
 description = "Check file formatting"
 
 [tasks.fmt]
-dependencies = ["fmt-rust", "fmt-toml"]
+dependencies = ["fmt-rust", "fmt-toml", "fmt-cargo-vet"]
 description = "Format files"
 
 [tasks.check-fmt-rust]
 category = "correctness"
 description = "Check rust code formatting"
-toolchain = "${NIGHTLY}"
-command = "cargo"
-args = ["fmt", "--all", "--", "--check"]
-dependencies = ["install-nightly"]
+command = "scripts/cargo-fmt.sh"
+args = ["--all", "--", "--check"]
 
 [tasks.fmt-rust]
 category = "correctness"
 description = "Format rust code"
-toolchain = "${NIGHTLY}"
-command = "cargo"
-args = ["fmt", "--all"]
-dependencies = ["install-nightly"]
+command = "scripts/cargo-fmt.sh"
+args = ["--all"]
 
 [tasks.check-fmt-toml]
 category = "correctness"
@@ -113,9 +117,17 @@ description = "Format toml"
 script = "git ls-files -z '*.toml' | xargs -0 taplo fmt"
 dependencies = ["install-taplo"]
 
+[tasks.fmt-cargo-vet]
+category = "correctness"
+description = "Format cargo vet files"
+command = "cargo"
+args = ["vet", "fmt"]
+dependencies = ["install-cargo-vet"]
+
 [tasks.install-taplo]
 private = true
-install_crate = { crate_name = "taplo-cli", version = "0.9.0", binary = "taplo", test_arg = ["-V"] }
+toolchain = "stable"
+install_crate = { crate_name = "taplo-cli", version = "0.10.0", binary = "taplo", test_arg = ["-V"] }
 
 [tasks.check-features]
 category = "correctness"
@@ -161,20 +173,20 @@ private = true
 script = "rustup target add aarch64-unknown-none"
 
 [tasks.machete]
+toolchain = "stable"
 command = "cargo"
 args = ["machete"]
-install_crate = { crate_name = "cargo-machete", version = "0.6.2", binary = "cargo-machete", test_arg = "--version" }
+install_crate = { crate_name = "cargo-machete", version = "0.9.1", binary = "cargo-machete", test_arg = "--version" }
 
 
 # Docs
-[tasks.gen-docs-nightly]
+[tasks.gen-docs]
 category = "docs"
-description = "Generate docs with rust nightly"
-toolchain = "${NIGHTLY}"
-env = { RUSTDOCFLAGS = "--cfg docsrs ${RUSTDOCFLAGS}" }
+description = "Generate docs"
+env.RUSTC_BOOTSTRAP = "1"
+env.RUSTDOCFLAGS = "--cfg docsrs ${RUSTDOCFLAGS}"
 command = "cargo"
 args = ["doc", "--all-features"]
-dependencies = ["install-nightly"]
 
 [tasks.zip-docs]
 category = "docs"
@@ -183,11 +195,10 @@ script = "zip -qr docs.zip target/doc"
 
 
 # Misc
-[tasks.install-nightly]
-description = "Install nightly rust"
-# First check if the toolchain is installed, because that is much faster.
-# Don't do this if you want to keep a rolling channel up-to-date.
-script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY} --profile minimal -c rustfmt"
+[tasks.install-cargo-vet]
+private = true
+toolchain = "stable"
+install_crate = { crate_name = "cargo-vet", version = "0.10.1", binary = "cargo-vet", test_arg = "-V" }
 
 [tasks.git-unchanged]
 description = "Verify files are unchanged"
@@ -202,4 +213,5 @@ fi
 
 [tasks.install-cargo-all-features]
 private = true
-install_crate = { crate_name = "cargo-all-features", version = "1.10.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
+toolchain = "stable"
+install_crate = { crate_name = "cargo-all-features", version = "1.12.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
