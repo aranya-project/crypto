@@ -25,22 +25,6 @@ pub trait Csprng {
     /// If the underlying CSPRNG encounters a fatal error, it
     /// must immediately panic or abort the program.
     fn fill_bytes(&self, dst: &mut [u8]);
-
-    /// Returns a fixed-number of cryptographically secure,
-    /// pseudorandom bytes.
-    ///
-    /// # Notes
-    ///
-    /// Once (if) `const_generic_exprs` is stabilized, `T` will
-    /// become `const N: usize`.
-    fn bytes<T: AsMut<[u8]> + Default>(&self) -> T
-    where
-        Self: Sized,
-    {
-        let mut b = T::default();
-        self.fill_bytes(b.as_mut());
-        b
-    }
 }
 
 impl<R: Csprng + ?Sized> Csprng for &R {
