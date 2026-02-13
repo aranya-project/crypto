@@ -334,7 +334,7 @@ macro_rules! ecdh_impl {
 
         impl Random for $sk {
             #[inline]
-            fn random<R: Csprng>(rng: &mut R) -> Self {
+            fn random<R: Csprng>(rng: R) -> Self {
                 let sk = NonZeroScalar::random(&mut RngWrapper(rng));
                 Self(sk)
             }
@@ -483,7 +483,7 @@ macro_rules! ecdsa_impl {
 
         impl Random for $sk {
             #[inline]
-            fn random<R: Csprng>(rng: &mut R) -> Self {
+            fn random<R: Csprng>(rng: R) -> Self {
                 let sk = ecdsa::SigningKey::random(&mut RngWrapper(rng));
                 Self(sk)
             }
@@ -688,11 +688,11 @@ hmac_impl!(
 );
 
 /// Translates [`Csprng`] to [`RngCore`].
-struct RngWrapper<'a, R>(&'a mut R);
+struct RngWrapper<R>(R);
 
-impl<R> CryptoRng for RngWrapper<'_, R> {}
+impl<R> CryptoRng for RngWrapper<R> {}
 
-impl<R: Csprng> RngCore for RngWrapper<'_, R> {
+impl<R: Csprng> RngCore for RngWrapper<R> {
     fn next_u32(&mut self) -> u32 {
         impls::next_u32_via_fill(self)
     }

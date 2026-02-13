@@ -460,7 +460,7 @@ where
     /// The `info` parameter provides contextual binding.
     #[allow(clippy::type_complexity)]
     pub fn setup_send<'a, R: Csprng>(
-        rng: &mut R,
+        rng: R,
         mode: Mode<'_, &K::DecapKey>,
         pkR: &K::EncapKey,
         info: impl IntoIterator<Item = &'a [u8]>,

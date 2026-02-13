@@ -125,7 +125,7 @@ pub use test_hpke;
 
 /// Tests the full encryption-decryption cycle.
 #[allow(non_snake_case)]
-pub fn test_round_trip<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng: &mut R) {
+pub fn test_round_trip<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng: &R) {
     const GOLDEN: &[u8] = b"some plaintext";
     const AD: &[u8] = b"some additional data";
     const INFO: &[u8] = b"some contextual binding";
@@ -161,7 +161,7 @@ pub fn test_round_trip<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>
 /// [`crate::hpke::RecvCtx::export`] is the same as
 /// [`crate::hpke::RecvCtx::export_into`].
 #[allow(non_snake_case)]
-pub fn test_export<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng: &mut R) {
+pub fn test_export<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng: &R) {
     const INFO: &[u8] = b"some contextual binding";
 
     let skR = K::DecapKey::random(rng);

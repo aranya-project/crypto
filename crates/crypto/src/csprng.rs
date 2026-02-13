@@ -1,5 +1,8 @@
 //! Cryptographically Secure Random Number Generators.
 
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, rc::Rc, sync::Arc};
+
 use generic_array::{ArrayLength, GenericArray};
 #[cfg(all(feature = "getrandom", not(target_os = "vxworks")))]
 pub use getrandom;
@@ -21,52 +24,64 @@ pub trait Csprng {
     ///
     /// If the underlying CSPRNG encounters a fatal error, it
     /// must immediately panic or abort the program.
-    fn fill_bytes(&mut self, dst: &mut [u8]);
+    fn fill_bytes(&self, dst: &mut [u8]);
+}
 
-    /// Returns a fixed-number of cryptographically secure,
-    /// pseudorandom bytes.
-    ///
-    /// # Notes
-    ///
-    /// Once (if) `const_generic_exprs` is stabilized, `T` will
-    /// become `const N: usize`.
-    fn bytes<T: AsMut<[u8]> + Default>(&mut self) -> T
-    where
-        Self: Sized,
-    {
-        let mut b = T::default();
-        self.fill_bytes(b.as_mut());
-        b
+impl<R: Csprng + ?Sized> Csprng for &R {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
     }
 }
 
 impl<R: Csprng + ?Sized> Csprng for &mut R {
-    fn fill_bytes(&mut self, dst: &mut [u8]) {
-        (**self).fill_bytes(dst)
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<R: Csprng + ?Sized> Csprng for Box<R> {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<R: Csprng + ?Sized> Csprng for Rc<R> {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<R: Csprng + ?Sized> Csprng for Arc<R> {
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        R::fill_bytes(self, dst)
     }
 }
 
 #[cfg(feature = "getrandom")]
 #[cfg_attr(docsrs, doc(cfg(feature = "getrandom")))]
 impl Csprng for rand_core::OsRng {
-    fn fill_bytes(&mut self, dst: &mut [u8]) {
-        rand_core::RngCore::fill_bytes(self, dst)
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        rand_core::RngCore::fill_bytes(&mut { *self }, dst)
     }
 }
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl Csprng for rand::rngs::ThreadRng {
-    fn fill_bytes(&mut self, dst: &mut [u8]) {
-        rand_core::RngCore::fill_bytes(self, dst)
+    fn fill_bytes(&self, dst: &mut [u8]) {
+        // NB: Clones an `Rc`
+        rand_core::RngCore::fill_bytes(&mut self.clone(), dst)
     }
 }
 
 #[cfg(feature = "rand_compat")]
-impl rand_core::CryptoRng for &mut dyn Csprng {}
+impl rand_core::CryptoRng for &dyn Csprng {}
 
 #[cfg(feature = "rand_compat")]
-impl rand_core::RngCore for &mut dyn Csprng {
+impl rand_core::RngCore for &dyn Csprng {
     fn next_u32(&mut self) -> u32 {
         rand_core::impls::next_u32_via_fill(self)
     }
@@ -88,11 +103,11 @@ impl rand_core::RngCore for &mut dyn Csprng {
 /// Implemented by types that can generate random instances.
 pub trait Random {
     /// Generates a random instance of itself.
-    fn random<R: Csprng>(rng: &mut R) -> Self;
+    fn random<R: Csprng>(rng: R) -> Self;
 }
 
 impl<N: ArrayLength> Random for GenericArray<u8, N> {
-    fn random<R: Csprng>(rng: &mut R) -> Self {
+    fn random<R: Csprng>(rng: R) -> Self {
         let mut v = Self::default();
         rng.fill_bytes(&mut v);
         v
@@ -100,7 +115,7 @@ impl<N: ArrayLength> Random for GenericArray<u8, N> {
 }
 
 impl<const N: usize> Random for [u8; N] {
-    fn random<R: Csprng>(rng: &mut R) -> Self {
+    fn random<R: Csprng>(rng: R) -> Self {
         let mut v = [0u8; N];
         rng.fill_bytes(&mut v);
         v
@@ -111,7 +126,7 @@ macro_rules! rand_int_impl {
     ($($name:ty)* $(,)?) => {
         $(
             impl $crate::csprng::Random for $name {
-                fn random<R: $crate::csprng::Csprng>(rng: &mut R) -> Self {
+                fn random<R: $crate::csprng::Csprng>(rng: R) -> Self {
                     let mut v = [0u8; ::core::mem::size_of::<$name>()];
                     rng.fill_bytes(&mut v);
                     <$name>::from_le_bytes(v)
@@ -156,7 +171,7 @@ pub(crate) mod trng {
     }
 
     impl Csprng for ThreadRng {
-        fn fill_bytes(&mut self, dst: &mut [u8]) {
+        fn fill_bytes(&self, dst: &mut [u8]) {
             self.0.fill_bytes_and_reseed(dst);
         }
     }
@@ -186,7 +201,7 @@ pub(crate) mod trng {
 
         impl ThreadRng {
             #[inline(always)]
-            pub(super) fn fill_bytes_and_reseed(&mut self, dst: &mut [u8]) {
+            pub(super) fn fill_bytes_and_reseed(&self, dst: &mut [u8]) {
                 // SAFETY:
                 //
                 // - `ThreadRng` is `!Sync`, so `self` can't be
@@ -224,7 +239,7 @@ pub(crate) mod trng {
 
         impl ThreadRng {
             #[inline(always)]
-            pub(super) fn fill_bytes_and_reseed(&mut self, dst: &mut [u8]) {
+            pub(super) fn fill_bytes_and_reseed(&self, dst: &mut [u8]) {
                 with_rng(|rng| rng.fill_bytes_and_reseed(dst))
             }
         }
@@ -362,12 +377,6 @@ pub(crate) mod trng {
             OsRng.next_u32()
         }
 
-        impl AsMut<ThreadRng> for ThreadRng {
-            fn as_mut(&mut self) -> &mut Self {
-                self
-            }
-        }
-
         /// Test with BearSSL's HKDF.
         #[test]
         #[cfg(feature = "bearssl")]
@@ -428,20 +437,20 @@ pub(crate) mod trng {
         /// Sanity check that two [`ThreadRng`]s are different.
         #[test]
         fn test_thread_rng() {
-            fn get_bytes(rng: &mut ThreadRng) -> [u8; 32] {
+            fn get_bytes(rng: &ThreadRng) -> [u8; 32] {
                 let mut b = [0; 32];
                 rng.fill_bytes(&mut b);
                 b
             }
-            let mut rng = thread_rng();
-            assert_ne!(get_bytes(&mut rng), get_bytes(&mut rng));
-            assert_ne!(get_bytes(&mut thread_rng()), get_bytes(&mut thread_rng()));
-            assert_ne!(get_bytes(&mut thread_rng()), [0; 32]);
+            let rng = thread_rng();
+            assert_ne!(get_bytes(&rng), get_bytes(&rng));
+            assert_ne!(get_bytes(&thread_rng()), get_bytes(&thread_rng()));
+            assert_ne!(get_bytes(&thread_rng()), [0; 32]);
 
             let rng = thread_rng();
-            let mut a = rng.clone();
-            let mut b = thread_rng();
-            assert_ne!(get_bytes(&mut a), get_bytes(&mut b));
+            let a = rng.clone();
+            let b = thread_rng();
+            assert_ne!(get_bytes(&a), get_bytes(&b));
         }
     }
 }

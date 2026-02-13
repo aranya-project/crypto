@@ -119,7 +119,7 @@ macro_rules! test_signer {
 pub use test_signer;
 
 /// The base positive test.
-pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
+pub fn test_default<T: Signer, R: Csprng>(rng: &R) {
     const MSG: &[u8] = b"hello, world!";
     let sk = T::SigningKey::random(rng);
     let sig = sk.sign(MSG).expect("unable to create signature");
@@ -132,7 +132,7 @@ pub fn test_default<T: Signer, R: Csprng>(rng: &mut R) {
 /// Test `Signer::SigningKey::ct_eq`.
 ///
 /// It also tests `Signer::SigningKey::import`.
-pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
+pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &R) {
     let sk1 = T::SigningKey::random(rng);
     let sk2 = T::SigningKey::random(rng);
 
@@ -159,7 +159,7 @@ pub fn test_sk_ct_eq<T: Signer, R: Csprng>(rng: &mut R) {
 /// Test `Signer::VerifyingKey::eq`.
 ///
 /// It also tests `Signer::VerifyingKey::import`.
-pub fn test_pk_eq<T: Signer, R: Csprng>(rng: &mut R) {
+pub fn test_pk_eq<T: Signer, R: Csprng>(rng: &R) {
     let pk1 = T::SigningKey::random(rng)
         .public()
         .expect("signing key should be valid");
@@ -181,13 +181,13 @@ pub fn test_pk_eq<T: Signer, R: Csprng>(rng: &mut R) {
 }
 
 /// [`SigningKey::public`] should always return the same key.
-pub fn test_public<T: Signer, R: Csprng>(rng: &mut R) {
+pub fn test_public<T: Signer, R: Csprng>(rng: &R) {
     let sk = T::SigningKey::random(rng);
     assert_eq!(sk.public(), sk.public());
 }
 
 /// Simple positive test for [`Signer::verify_batch`].
-pub fn test_batch_simple_good<T: Signer, R: Csprng>(rng: &mut R) {
+pub fn test_batch_simple_good<T: Signer, R: Csprng>(rng: &R) {
     const MSGS: &[&[u8]] = &[
         b"hello",
         b"world",
@@ -211,7 +211,7 @@ pub fn test_batch_simple_good<T: Signer, R: Csprng>(rng: &mut R) {
 }
 
 /// Simple negative test for [`Signer::verify_batch`].
-pub fn test_batch_simple_bad<T: Signer, R: Csprng>(rng: &mut R) {
+pub fn test_batch_simple_bad<T: Signer, R: Csprng>(rng: &R) {
     let msgs: &mut [&[u8]] = &mut [
         b"hello",
         b"world",

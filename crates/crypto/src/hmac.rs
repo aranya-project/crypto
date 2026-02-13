@@ -192,7 +192,7 @@ impl<H: Hash + BlockSize> SecretKey for HmacKey<H> {
 }
 
 impl<H: Hash + BlockSize> Random for HmacKey<H> {
-    fn random<R: Csprng>(rng: &mut R) -> Self {
+    fn random<R: Csprng>(rng: R) -> Self {
         Self(Block::<H>::random(rng))
     }
 }

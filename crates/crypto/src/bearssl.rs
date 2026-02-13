@@ -6,7 +6,14 @@
 #![cfg(feature = "bearssl")]
 
 use core::{
-    borrow::Borrow, cmp, ffi::c_void, fmt, mem::size_of, ops::Range, pin::Pin, ptr, result::Result,
+    borrow::Borrow,
+    ffi::c_void,
+    fmt,
+    mem::size_of,
+    ops::{DerefMut as _, Range},
+    pin::Pin,
+    ptr,
+    result::Result,
     slice,
 };
 
@@ -472,10 +479,10 @@ macro_rules! ecdh_impl {
         }
 
         impl Random for $sk {
-            fn random<R: Csprng>(rng: &mut R) -> Self {
+            fn random<R: Csprng>(rng: R) -> Self {
                 // We don't know what `rng` is, so construct our
                 // own.
-                let mut rng = RngWrapper::new(rng);
+                let mut rng = RngWrapper::new(&rng);
 
                 // Check that `$curve::SCALAR_SIZE` is correct.
                 #[cfg(debug_assertions)]
@@ -772,10 +779,10 @@ macro_rules! ecdsa_impl {
 
         impl Random for $sk {
             #[inline]
-            fn random<R: Csprng>(rng: &mut R) -> Self {
+            fn random<R: Csprng>(rng: R) -> Self {
                 // We don't know what `rng` is, so construct our
                 // own.
-                let mut rng = RngWrapper::new(rng);
+                let mut rng = RngWrapper::new(&rng);
 
                 // Check that `$curve::SCALAR_SIZE` is correct.
                 #[cfg(debug_assertions)]
@@ -1160,26 +1167,26 @@ hmac_impl!(HmacSha384, "HMAC-SHA384", Sha384, HMAC_WITH_SHA2_384);
 hmac_impl!(HmacSha512, "HMAC-SHA512", Sha512, HMAC_WITH_SHA2_512);
 
 /// A `HMAC_DRBG`-based CSPRNG.
-pub struct HmacDrbg(br_hmac_drbg_context);
+pub struct HmacDrbg(spin::Mutex<br_hmac_drbg_context>);
 
 impl HmacDrbg {
     /// Creates a CSPRNG from a cryptographically secure seed.
     pub fn new(seed: [u8; 64]) -> Self {
-        let mut ctx = br_hmac_drbg_context::default();
+        let mut this = Self(spin::Mutex::default());
         // SAFETY: FFI call, no invariants
         unsafe {
             br_hmac_drbg_init(
-                ptr::addr_of_mut!(ctx),
+                this.0.get_mut(),
                 ptr::addr_of!(br_sha256_vtable),
                 seed.as_ptr() as *const c_void,
                 seed.len(),
             );
         }
-        Self(ctx)
+        this
     }
 
     /// Creates a CSPRNG seeded with entropy from `rng`.
-    pub fn from_rng<R: Csprng>(rng: &mut R) -> Self {
+    pub fn from_rng<R: Csprng>(rng: R) -> Self {
         let mut seed = [0u8; 64];
         rng.fill_bytes(&mut seed);
         HmacDrbg::new(seed)
@@ -1187,22 +1194,23 @@ impl HmacDrbg {
 }
 
 impl Csprng for HmacDrbg {
-    fn fill_bytes(&mut self, mut dst: &mut [u8]) {
+    fn fill_bytes(&self, dst: &mut [u8]) {
         // Max number of bytes that can be requested from
         // a `HMAC_DRBG` per request.
         const MAX: usize = 1 << 16;
 
-        while !dst.is_empty() {
-            let n = cmp::min(dst.len(), MAX);
+        if dst.is_empty() {
+            return;
+        }
+
+        let mut ctx = self.0.lock();
+        let ctx = ctx.deref_mut();
+
+        for chunk in dst.chunks_mut(MAX) {
             // SAFETY: FFI call, no invariants
             unsafe {
-                br_hmac_drbg_generate(
-                    ptr::addr_of_mut!(self.0),
-                    dst.as_mut_ptr() as *mut c_void,
-                    n,
-                );
+                br_hmac_drbg_generate(ctx, chunk.as_mut_ptr().cast::<c_void>(), chunk.len());
             }
-            dst = &mut dst[n..];
         }
     }
 }
@@ -1274,11 +1282,11 @@ struct RngWrapper<'a> {
     // NB: field order matters! Do not change the ordering. See
     // the comment in `rng_wrapper_generate`.
     vtable: *const br_prng_class,
-    rng: &'a mut dyn Csprng,
+    rng: &'a dyn Csprng,
 }
 
 impl<'a> RngWrapper<'a> {
-    fn new(rng: &'a mut dyn Csprng) -> Self {
+    fn new(rng: &'a dyn Csprng) -> Self {
         let vtable = ptr::addr_of!(RNG_WRAPPER_VTABLE);
         RngWrapper { vtable, rng }
     }
