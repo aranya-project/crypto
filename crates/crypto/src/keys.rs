@@ -120,6 +120,21 @@ impl<N: ArrayLength> SecretKeyBytes<N> {
     }
 }
 
+impl<N: ArrayLength> ZeroizeOnDrop for SecretKeyBytes<N> {}
+impl<N: ArrayLength> Drop for SecretKeyBytes<N> {
+    #[inline]
+    fn drop(&mut self) {
+        // SAFETY:
+        // - The type does not contain references to outside or
+        //   dynamically sized data.
+        // - `GenericArray<u8, N>` does not have a `Drop` impl,
+        //   nor do any of the values stored inside of it.
+        // - All zeros is a valud bit pattern for
+        //   `GenericArray<u8, N>`.
+        unsafe { zeroize::zeroize_flat_type(&mut self.0) }
+    }
+}
+
 impl<N: ArrayLength> ConstantTimeEq for SecretKeyBytes<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
@@ -196,6 +211,12 @@ macro_rules! raw_key {
         #[derive(::core::clone::Clone)]
         #[repr(transparent)]
         $vis struct $name<N: $crate::generic_array::ArrayLength>($crate::keys::SecretKeyBytes<N>);
+
+        impl<N: ::generic_array::ArrayLength> $crate::zeroize::ZeroizeOnDrop for $name<N> {}
+        impl<N: ::generic_array::ArrayLength> ::core::ops::Drop for $name<N> {
+            #[inline]
+            fn drop(&mut self) {}
+        }
 
         impl<N: ::generic_array::ArrayLength> $name<N> {
             /// Creates a new raw key.
