@@ -1350,6 +1350,15 @@ mod tests {
         }
     }
 
+    mod hash_tests {
+        use super::*;
+        use crate::test_util::test_hash;
+
+        test_hash!(sha256, Sha256);
+        test_hash!(sha384, Sha384);
+        test_hash!(sha512, Sha512);
+    }
+
     mod ecdh_tests {
         use super::*;
         use crate::test_util::vectors::{test_ecdh, EcdhTest};
