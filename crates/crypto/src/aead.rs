@@ -1122,7 +1122,7 @@ mod committing {
                         &self.key,
                         &nonce.try_into()?,
                     )?;
-                    let key = $crate::import::Import::<_>::import(key_bytes.as_bytes())
+                    let key = $crate::import::import(key_bytes.as_bytes())
                         .map_err($crate::aead::UtcError::Import)?;
                     <$inner as $crate::aead::Aead>::new(&key).seal(
                         dst,
@@ -1155,7 +1155,7 @@ mod committing {
                         &self.key,
                         &nonce.try_into()?,
                     )?;
-                    let key = $crate::import::Import::<_>::import(key_bytes.as_bytes())
+                    let key = $crate::import::import(key_bytes.as_bytes())
                         .map_err($crate::aead::UtcError::Import)?;
                     <$inner as $crate::aead::Aead>::new(&key).seal_in_place(
                         nonce,
@@ -1193,7 +1193,7 @@ mod committing {
                     )) {
                         Err($crate::aead::OpenError::Authentication)
                     } else {
-                        let key = $crate::import::Import::<_>::import(key_bytes.as_bytes())
+                        let key = $crate::import::import(key_bytes.as_bytes())
                             .map_err($crate::aead::UtcError::Import)?;
                         <$inner as $crate::aead::Aead>::new(&key).open(
                             dst,
@@ -1232,7 +1232,7 @@ mod committing {
                     )) {
                         Err($crate::aead::OpenError::Authentication)
                     } else {
-                        let key = $crate::import::Import::<_>::import(key_bytes.as_bytes())
+                        let key = $crate::import::import(key_bytes.as_bytes())
                             .map_err($crate::aead::UtcError::Import)?;
                         <$inner as $crate::aead::Aead>::new(&key).open_in_place(
                             nonce,

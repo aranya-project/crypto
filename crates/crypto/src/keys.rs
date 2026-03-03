@@ -303,7 +303,7 @@ macro_rules! raw_key {
         impl<N: $crate::generic_array::ArrayLength> $crate::import::Import<&[u8]> for $name<N> {
             #[inline]
             fn import(data: &[u8]) -> ::core::result::Result<Self, $crate::import::ImportError> {
-                let bytes = $crate::import::Import::<_>::import(data)?;
+                let bytes = $crate::import::import(data)?;
                 let sk = $crate::keys::SecretKeyBytes::new(bytes);
                 ::core::result::Result::Ok(Self(sk))
             }
