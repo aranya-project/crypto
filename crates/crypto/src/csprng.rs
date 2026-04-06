@@ -140,17 +140,12 @@ rand_int_impl!(i8 i16 i32 i64 i128 isize);
 
 #[cfg(feature = "trng")]
 pub(crate) mod trng {
-    use core::{
-        iter::{IntoIterator, Iterator},
-        mem::MaybeUninit,
-        ptr,
-        sync::atomic::{self, Ordering},
-    };
+    use core::iter::{IntoIterator, Iterator};
 
     use cfg_if::cfg_if;
     use rand_chacha::ChaCha8Rng;
     use rand_core::{RngCore, SeedableRng};
-    use zeroize::ZeroizeOnDrop;
+    use zeroize::{zeroize_flat_type, ZeroizeOnDrop};
 
     use crate::{csprng::Csprng, kdf::Kdf};
 
@@ -316,28 +311,10 @@ pub(crate) mod trng {
     impl Drop for ChaCha8Csprng {
         fn drop(&mut self) {
             // Wipe the inner CSPRNG state.
-            let size = size_of_val(&self.rng);
-            let ptr = ptr::addr_of_mut!(self.rng).cast::<MaybeUninit<u8>>();
-            for i in 0..size {
-                // SAFETY: this is safe because:
-                // - `ptr` points inside the allocated object
-                //   because it's bounded to [0, size), which is
-                //   as large as the object.
-                // - The computed offset cannot overflow `isize`
-                //   (unless the size of the object is larger
-                //   than `isize`, which is impossible).
-                // - The offset cannot wrap.
-                let ptr = unsafe { ptr.add(i) };
-                // SAFETY: this is safe because:
-                // - `ptr` is valid for writes (see above).
-                // - `ptr` is is `MaybeUninit<u8>`, which has an
-                //   alignment of 1, which is suitably aligned
-                //   for all types.
-                unsafe {
-                    ptr.write_volatile(MaybeUninit::zeroed());
-                }
+            // SAFETY: `ChaCha8Rng` is "flat". It only holds integers and has no `Drop`.
+            unsafe {
+                zeroize_flat_type(&raw mut self.rng);
             }
-            atomic::compiler_fence(Ordering::SeqCst);
         }
     }
 
