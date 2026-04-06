@@ -50,7 +50,7 @@ use crate::{
         Identified, Oid,
     },
     signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
-    zeroize::{Zeroize, ZeroizeOnDrop},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// AES-256-GCM.
@@ -300,7 +300,7 @@ macro_rules! ecdh_impl {
         $point:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
-        #[derive(Clone)]
+        #[derive(Clone, ZeroizeOnDrop)]
         pub struct $sk(NonZeroScalar<$curve>);
 
         impl DecapKey for $sk {
@@ -349,13 +349,6 @@ macro_rules! ecdh_impl {
                 let sk = Option::from(NonZeroScalar::from_repr(bytes.into()))
                     .ok_or(ImportError::InvalidSyntax)?;
                 Ok(Self(sk))
-            }
-        }
-
-        impl ZeroizeOnDrop for $sk {}
-        impl Drop for $sk {
-            fn drop(&mut self) {
-                self.0.zeroize();
             }
         }
 

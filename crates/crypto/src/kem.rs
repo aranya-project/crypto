@@ -9,7 +9,7 @@ use crate::{
     kdf::{Kdf, KdfError, Prk},
     keys::{PublicKey, RawSecretBytes, SecretKey},
     signer::PkError,
-    zeroize::{zeroize_flat_type, ZeroizeOnDrop},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// An error from a [`Kem`].
@@ -247,6 +247,7 @@ pub trait Ecdh {
 }
 
 /// An ECDH shared secret.
+#[derive(ZeroizeOnDrop)]
 pub struct SharedSecret<const N: usize>([u8; N]);
 
 impl<const N: usize> SharedSecret<N> {
@@ -285,19 +286,6 @@ impl<const N: usize> TryFrom<&[u8]> for SharedSecret<N> {
 impl<const N: usize> fmt::Debug for SharedSecret<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("SharedSecret").finish_non_exhaustive()
-    }
-}
-
-impl<const N: usize> ZeroizeOnDrop for SharedSecret<N> {}
-impl<const N: usize> Drop for SharedSecret<N> {
-    fn drop(&mut self) {
-        // SAFETY:
-        // - `self.0` does not contain references or dynamically
-        //   sized data.
-        // - `self.0` does not have a `Drop` impl.
-        // - `self.0` is not used after this function returns.
-        // - The bit pattern of all zeros is valid for `self.0`.
-        unsafe { zeroize_flat_type(&mut self.0) }
     }
 }
 
