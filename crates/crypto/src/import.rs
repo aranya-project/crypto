@@ -8,6 +8,7 @@ use core::{
 
 use buggy::Bug;
 use generic_array::{ArrayLength, GenericArray};
+use zeroize::Zeroize;
 
 use crate::signer::PkError;
 
@@ -122,7 +123,7 @@ impl<'a, const N: usize> Import<&'a [u8]> for &'a [u8; N] {
 
 impl<const N: usize> Import<&[u8]> for [u8; N] {
     fn import(data: &[u8]) -> Result<Self, ImportError> {
-        let data: &[u8; N] = Import::<_>::import(data)?;
+        let data: &[u8; N] = import(data)?;
         Ok(*data)
     }
 }
@@ -147,7 +148,7 @@ impl<'a, N: ArrayLength> Import<&'a [u8]> for &'a GenericArray<u8, N> {
 
 impl<N: ArrayLength> Import<&[u8]> for GenericArray<u8, N> {
     fn import(data: &[u8]) -> Result<Self, ImportError> {
-        let data: &GenericArray<u8, N> = Import::<_>::import(data)?;
+        let data: &GenericArray<u8, N> = import(data)?;
         Ok(data.clone())
     }
 }
@@ -159,10 +160,36 @@ impl<N: ArrayLength> Import<GenericArray<u8, N>> for GenericArray<u8, N> {
     }
 }
 
+impl<T, D> Import<D> for crate::zeroize::Zeroizing<T>
+where
+    T: Zeroize + Import<D>,
+{
+    #[inline]
+    fn import(data: D) -> Result<Self, ImportError> {
+        T::import(data).map(Self::new)
+    }
+}
+
+impl<T, D> Import<D> for zeroize::Zeroizing<T>
+where
+    T: Zeroize + Import<D>,
+{
+    #[inline]
+    fn import(data: D) -> Result<Self, ImportError> {
+        T::import(data).map(Self::new)
+    }
+}
+
 /// Implemented by types that can be imported from its encoding.
 pub trait Import<T>: Sized {
     /// Creates itself from its encoding.
     fn import(data: T) -> Result<Self, ImportError>;
+}
+
+/// Create an importable type from its encoding.
+#[inline]
+pub fn import<T: Import<D>, D>(data: D) -> Result<T, ImportError> {
+    T::import(data)
 }
 
 /// An error that occurs while exporting secret key material.

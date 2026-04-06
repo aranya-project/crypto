@@ -12,7 +12,7 @@ use typenum::{Const, Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U
 
 use crate::{
     hex::ToHex,
-    import::{Import, ImportError, InvalidSizeError},
+    import::{import, Import, ImportError, InvalidSizeError},
     zeroize::{zeroize_flat_type, Zeroize, ZeroizeOnDrop},
 };
 
@@ -152,7 +152,7 @@ macro_rules! pk_impl {
 
         impl<C: Curve> Import<&[u8]> for $name<C> {
             fn import(data: &[u8]) -> Result<Self, ImportError> {
-                Ok(Self(Import::<_>::import(data)?))
+                Ok(Self(import(data)?))
             }
         }
 
