@@ -275,7 +275,11 @@ impl<C: Curve> TryFrom<&[u8]> for Scalar<C> {
     type Error = InvalidSizeError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-        data.try_into()
+        let v: &GenericArray<u8, _> = data.try_into().map_err(|_| InvalidSizeError {
+            got: data.len(),
+            want: C::ScalarSize::USIZE..C::ScalarSize::USIZE,
+        })?;
+        Ok(Self(v.clone()))
     }
 }
 
@@ -292,11 +296,7 @@ where
 
 impl<C: Curve> Import<&[u8]> for Scalar<C> {
     fn import(data: &[u8]) -> Result<Self, ImportError> {
-        let v: &GenericArray<u8, _> = data.try_into().map_err(|_| InvalidSizeError {
-            got: data.len(),
-            want: C::ScalarSize::USIZE..C::ScalarSize::USIZE,
-        })?;
-        Ok(Self(v.clone()))
+        Self::try_from(data).map_err(ImportError::from)
     }
 }
 
