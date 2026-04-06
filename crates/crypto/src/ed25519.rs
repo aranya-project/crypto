@@ -22,7 +22,7 @@ use crate::{
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{consts::ED25519, Identified, Oid},
     signer::{self, PkError, Signer, SignerError},
-    zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// EdDSA using Ed25519.
@@ -57,7 +57,7 @@ impl Identified for Ed25519 {
 }
 
 /// An Ed25519 signing key.
-#[derive(Clone)]
+#[derive(Clone, ZeroizeOnDrop)]
 pub struct SigningKey(dalek::SigningKey);
 
 impl signer::SigningKey<Ed25519> for SigningKey {
@@ -115,13 +115,6 @@ impl Import<&[u8]> for SigningKey {
 impl fmt::Debug for SigningKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SigningKey").finish_non_exhaustive()
-    }
-}
-
-impl ZeroizeOnDrop for SigningKey {}
-impl Drop for SigningKey {
-    fn drop(&mut self) {
-        is_zeroize_on_drop(&self.0);
     }
 }
 

@@ -50,7 +50,7 @@ use crate::{
         Identified, Oid,
     },
     signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
-    zeroize::{is_zeroize_on_drop, Zeroize, ZeroizeOnDrop},
+    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 /// AES-256-GCM.
@@ -268,6 +268,7 @@ curve_impl!(
 );
 
 /// An ECDH shared secret.
+#[derive(ZeroizeOnDrop)]
 pub struct SharedSecret<C>(ecdh::SharedSecret<C>)
 where
     C: CurveArithmetic;
@@ -287,16 +288,6 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SharedSecret").finish_non_exhaustive()
-    }
-}
-
-impl<C> ZeroizeOnDrop for SharedSecret<C> where C: CurveArithmetic {}
-impl<C> Drop for SharedSecret<C>
-where
-    C: CurveArithmetic,
-{
-    fn drop(&mut self) {
-        is_zeroize_on_drop(&self.0);
     }
 }
 
@@ -455,7 +446,7 @@ macro_rules! ecdsa_impl {
         $sig_oid:expr $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
-        #[derive(Clone)]
+        #[derive(Clone, ZeroizeOnDrop)]
         pub struct $sk(ecdsa::SigningKey<$curve>);
 
         impl SigningKey<$curve> for $sk {
@@ -506,14 +497,6 @@ macro_rules! ecdsa_impl {
                 let sk =
                     ecdsa::SigningKey::from_slice(data).map_err(|_| ImportError::InvalidSyntax)?;
                 Ok(Self(sk))
-            }
-        }
-
-        impl ZeroizeOnDrop for $sk {}
-        impl Drop for $sk {
-            #[inline]
-            fn drop(&mut self) {
-                is_zeroize_on_drop(&self.0);
             }
         }
 

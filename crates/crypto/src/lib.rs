@@ -39,7 +39,6 @@ pub mod rust;
 pub mod signer;
 pub mod test_util;
 mod util;
-pub mod zeroize;
 
 pub use buggy;
 pub use generic_array;
@@ -47,3 +46,4 @@ pub use generic_array;
 pub use spideroak_crypto_derive;
 pub use subtle;
 pub use typenum;
+pub use zeroize;

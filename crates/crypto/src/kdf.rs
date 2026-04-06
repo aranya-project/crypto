@@ -14,7 +14,7 @@ use typenum::{
 
 use crate::{
     keys::{RawSecretBytes, SecretKeyBytes},
-    zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
+    zeroize::ZeroizeOnDrop,
 };
 
 /// An error from a [`Kdf`].
@@ -194,7 +194,7 @@ pub trait Kdf {
 }
 
 /// A pseudorandom key.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, ZeroizeOnDrop)]
 #[repr(transparent)]
 pub struct Prk<N: ArrayLength>(SecretKeyBytes<N>);
 
@@ -267,13 +267,6 @@ where
 impl<N: ArrayLength> fmt::Debug for Prk<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Prk").finish_non_exhaustive()
-    }
-}
-
-impl<N: ArrayLength> ZeroizeOnDrop for Prk<N> {}
-impl<N: ArrayLength> Drop for Prk<N> {
-    fn drop(&mut self) {
-        is_zeroize_on_drop(&self.0);
     }
 }
 
