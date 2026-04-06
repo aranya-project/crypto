@@ -2,6 +2,8 @@
 
 use core::{array::TryFromSliceError, borrow::Borrow, fmt, marker::PhantomData, result::Result};
 
+use zeroize::ZeroizeOnDrop;
+
 use crate::{
     csprng::{Csprng, Random},
     hpke::KemId,
@@ -9,7 +11,6 @@ use crate::{
     kdf::{Kdf, KdfError, Prk},
     keys::{PublicKey, RawSecretBytes, SecretKey},
     signer::PkError,
-    zeroize::ZeroizeOnDrop,
 };
 
 /// An error from a [`Kem`].

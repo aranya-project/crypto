@@ -150,8 +150,9 @@ pub(crate) mod trng {
     use cfg_if::cfg_if;
     use rand_chacha::ChaCha8Rng;
     use rand_core::{RngCore, SeedableRng};
+    use zeroize::ZeroizeOnDrop;
 
-    use crate::{csprng::Csprng, kdf::Kdf, zeroize::ZeroizeOnDrop};
+    use crate::{csprng::Csprng, kdf::Kdf};
 
     cfg_if! {
         if #[cfg(feature = "bearssl")] {

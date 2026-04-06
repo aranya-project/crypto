@@ -22,6 +22,7 @@ pub use aranya_bearssl_sys;
 use aranya_bearssl_sys::*;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess};
 use typenum::{Unsigned, U, U12, U16, U32};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::{
     aead::{
@@ -49,7 +50,6 @@ use crate::{
         Identified, Oid,
     },
     signer::{PkError, Signature, Signer, SignerError, SigningKey, VerifyingKey},
-    zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
 /// Reports in constant time whether `x == 0`.

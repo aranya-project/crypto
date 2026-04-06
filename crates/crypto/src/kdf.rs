@@ -11,11 +11,9 @@ use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
     Const, Unsigned, U32, U64, U65536,
 };
+use zeroize::ZeroizeOnDrop;
 
-use crate::{
-    keys::{RawSecretBytes, SecretKeyBytes},
-    zeroize::ZeroizeOnDrop,
-};
+use crate::keys::{RawSecretBytes, SecretKeyBytes};
 
 /// An error from a [`Kdf`].
 #[derive(Debug, Eq, PartialEq)]

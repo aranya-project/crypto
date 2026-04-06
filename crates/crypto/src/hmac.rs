@@ -8,6 +8,7 @@ use core::{cmp, fmt};
 
 use generic_array::{ArrayLength, GenericArray, LengthError};
 use subtle::{Choice, ConstantTimeEq};
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::{
     block::{Block, BlockSize},
@@ -15,7 +16,6 @@ use crate::{
     hash::{Digest, Hash},
     import::{ExportError, Import, ImportError},
     keys::{SecretKey, SecretKeyBytes},
-    zeroize::{ZeroizeOnDrop, Zeroizing},
 };
 
 /// HMAC per [FIPS PUB 198-1] for some hash `H`.

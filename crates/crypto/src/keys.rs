@@ -5,12 +5,12 @@ use core::{borrow::Borrow, fmt, iter::IntoIterator, mem, result::Result};
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{generic_const_mappings::Const, IsLess, U65536};
+use zeroize::ZeroizeOnDrop;
 
 use crate::{
     csprng::{Csprng, Random},
     import::{ExportError, Import},
     kdf::{Expand, Kdf, KdfError, Prk},
-    zeroize::ZeroizeOnDrop,
 };
 
 /// A fixed-length secret key.

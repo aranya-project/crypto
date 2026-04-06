@@ -9,11 +9,11 @@ use core::{
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{Const, Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U67, U97};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
     hex::ToHex,
     import::{Import, ImportError, InvalidSizeError},
-    zeroize::{Zeroize, ZeroizeOnDrop},
 };
 
 // TODO(eric): validate the input for `Uncompressed`,

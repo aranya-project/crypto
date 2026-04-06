@@ -23,6 +23,7 @@ use rand_core::{impls, CryptoRng, RngCore};
 use sha2::digest::OutputSizeUser;
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{Unsigned, U12, U16};
+use zeroize::ZeroizeOnDrop;
 
 use crate::{
     aead::{
@@ -50,7 +51,6 @@ use crate::{
         Identified, Oid,
     },
     signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
-    zeroize::ZeroizeOnDrop,
 };
 
 /// AES-256-GCM.

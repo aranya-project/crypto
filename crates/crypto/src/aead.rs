@@ -20,13 +20,13 @@ use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
     Unsigned, U16, U65536,
 };
+use zeroize::Zeroize;
 
 use crate::{
     csprng::{Csprng, Random},
     kdf::{Expand, Kdf, KdfError, Prk},
     keys::{raw_key, SecretKey, SecretKeyBytes},
     util::const_assert,
-    zeroize::Zeroize,
 };
 
 // Some of the bounds for `Aead` are at least 32 bits, prevent

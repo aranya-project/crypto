@@ -14,6 +14,7 @@ use core::fmt;
 use ed25519_dalek as dalek;
 use subtle::{Choice, ConstantTimeEq};
 use typenum::U32;
+use zeroize::ZeroizeOnDrop;
 
 use crate::{
     csprng::{Csprng, Random},
@@ -22,7 +23,6 @@ use crate::{
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{consts::ED25519, Identified, Oid},
     signer::{self, PkError, Signer, SignerError},
-    zeroize::ZeroizeOnDrop,
 };
 
 /// EdDSA using Ed25519.
