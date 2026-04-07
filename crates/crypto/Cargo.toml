@@ -200,7 +200,7 @@ typenum = { version = "1", default-features = false, features = ["const-generics
 # should only use this feature inside [dev-dependencies].
 wycheproof = { version = "0.6", default-features = false, optional = true, features = ["aead", "ecdh", "ecdsa", "eddsa", "hkdf", "mac"] }
 zerocopy = { version = "0.8", default-features = false, features = ["derive"] }
-zeroize = { version = "1", default-features = false }
+zeroize = { version = "1", default-features = false, features = ["zeroize_derive"] }
 
 [dev-dependencies]
 # A little bit of a hack: always certain features for tests and

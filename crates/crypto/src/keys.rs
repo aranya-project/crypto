@@ -5,12 +5,12 @@ use core::{borrow::Borrow, fmt, iter::IntoIterator, mem, result::Result};
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{generic_const_mappings::Const, IsLess, U65536};
+use zeroize::ZeroizeOnDrop;
 
 use crate::{
     csprng::{Csprng, Random},
     import::{ExportError, Import},
     kdf::{Expand, Kdf, KdfError, Prk},
-    zeroize::{zeroize_flat_type, ZeroizeOnDrop},
 };
 
 /// A fixed-length secret key.
@@ -48,28 +48,13 @@ impl RawSecretBytes for [u8] {
 }
 
 /// A fixed-length byte encoding of a [`SecretKey`]'s data.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, ZeroizeOnDrop)]
 #[repr(transparent)]
 pub struct SecretKeyBytes<N: ArrayLength>(GenericArray<u8, N>);
 
 impl<N: ArrayLength> fmt::Debug for SecretKeyBytes<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SecretKeyBytes").finish_non_exhaustive()
-    }
-}
-
-impl<N: ArrayLength> ZeroizeOnDrop for SecretKeyBytes<N> {}
-impl<N: ArrayLength> Drop for SecretKeyBytes<N> {
-    fn drop(&mut self) {
-        // SAFETY:
-        // - `self.0` does not contain references or dynamically
-        //   sized data.
-        // - `self.0` does not have a `Drop` impl.
-        // - `self.0` is not used after this function returns.
-        // - The bit pattern of all zeros is valid for `self.0`.
-        unsafe {
-            zeroize_flat_type(&mut self.0);
-        }
     }
 }
 
@@ -193,7 +178,7 @@ macro_rules! raw_key {
         $($tail:tt)*
     ) => {
         $(#[$meta])*
-        #[derive(::core::clone::Clone)]
+        #[derive(::core::clone::Clone, $crate::zeroize::ZeroizeOnDrop)]
         #[repr(transparent)]
         $vis struct $name<N: $crate::generic_array::ArrayLength>($crate::keys::SecretKeyBytes<N>);
 
@@ -312,23 +297,6 @@ macro_rules! raw_key {
         impl<N: ::generic_array::ArrayLength> ::core::fmt::Debug for $name<N> {
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 f.debug_struct(stringify!($name)).finish_non_exhaustive()
-            }
-        }
-
-        impl<N: $crate::generic_array::ArrayLength> $crate::zeroize::ZeroizeOnDrop for $name<N> {}
-        impl<N: $crate::generic_array::ArrayLength> Drop for $name<N> {
-            fn drop(&mut self) {
-                // SAFETY:
-                // - `self.0` does not contain references or
-                //   dynamically sized data.
-                // - `self.0` does not have a `Drop` impl.
-                // - `self.0` is not used after this function
-                //   returns.
-                // - The bit pattern of all zeros is valid for
-                //   `self.0`.
-                unsafe {
-                    $crate::zeroize::zeroize_flat_type(&mut self.0);
-                }
             }
         }
 

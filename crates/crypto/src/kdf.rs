@@ -11,11 +11,9 @@ use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
     Const, Unsigned, U32, U64, U65536,
 };
+use zeroize::ZeroizeOnDrop;
 
-use crate::{
-    keys::{RawSecretBytes, SecretKeyBytes},
-    zeroize::{is_zeroize_on_drop, ZeroizeOnDrop},
-};
+use crate::keys::{RawSecretBytes, SecretKeyBytes};
 
 /// An error from a [`Kdf`].
 #[derive(Debug, Eq, PartialEq)]
@@ -194,7 +192,7 @@ pub trait Kdf {
 }
 
 /// A pseudorandom key.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, ZeroizeOnDrop)]
 #[repr(transparent)]
 pub struct Prk<N: ArrayLength>(SecretKeyBytes<N>);
 
@@ -267,13 +265,6 @@ where
 impl<N: ArrayLength> fmt::Debug for Prk<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Prk").finish_non_exhaustive()
-    }
-}
-
-impl<N: ArrayLength> ZeroizeOnDrop for Prk<N> {}
-impl<N: ArrayLength> Drop for Prk<N> {
-    fn drop(&mut self) {
-        is_zeroize_on_drop(&self.0);
     }
 }
 

@@ -8,6 +8,7 @@ use core::{cmp, fmt};
 
 use generic_array::{ArrayLength, GenericArray, LengthError};
 use subtle::{Choice, ConstantTimeEq};
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::{
     block::{Block, BlockSize},
@@ -15,7 +16,6 @@ use crate::{
     hash::{Digest, Hash},
     import::{ExportError, Import, ImportError},
     keys::{SecretKey, SecretKeyBytes},
-    zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
 /// HMAC per [FIPS PUB 198-1] for some hash `H`.
@@ -152,6 +152,7 @@ impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
 
 /// An [`Hmac`] key.
 #[repr(transparent)]
+#[derive(ZeroizeOnDrop)]
 pub struct HmacKey<H: Hash + BlockSize>(Block<H>);
 
 impl<H: Hash + BlockSize> HmacKey<H> {
@@ -214,14 +215,6 @@ impl<H: Hash + BlockSize> ConstantTimeEq for HmacKey<H> {
 impl<H: Hash + BlockSize> fmt::Debug for HmacKey<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("HmacKey").finish_non_exhaustive()
-    }
-}
-
-impl<H: Hash + BlockSize> ZeroizeOnDrop for HmacKey<H> {}
-impl<H: Hash + BlockSize> Drop for HmacKey<H> {
-    #[inline]
-    fn drop(&mut self) {
-        self.0.zeroize();
     }
 }
 

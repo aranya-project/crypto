@@ -244,6 +244,7 @@ impl<T: Identified> Identified for SignerWithDefaults<T> {
 }
 
 /// A [`SigningKey`] that uses the default trait methods.
+#[derive(ZeroizeOnDrop)]
 pub struct SigningKeyWithDefaults<T: Signer + ?Sized>(T::SigningKey);
 
 impl<T: Signer + ?Sized> SigningKey<SignerWithDefaults<T>> for SigningKeyWithDefaults<T> {
@@ -301,8 +302,6 @@ impl<T: Signer + ?Sized> fmt::Debug for SigningKeyWithDefaults<T> {
             .finish_non_exhaustive()
     }
 }
-
-impl<T: Signer + ?Sized> ZeroizeOnDrop for SigningKeyWithDefaults<T> {}
 
 /// A [`VerifyingKey`] that uses the default trait methods.
 pub struct VerifyingKeyWithDefaults<T: Signer + ?Sized>(T::VerifyingKey);

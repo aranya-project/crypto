@@ -22,6 +22,7 @@ pub use aranya_bearssl_sys;
 use aranya_bearssl_sys::*;
 use subtle::{Choice, ConstantTimeEq, ConstantTimeLess};
 use typenum::{Unsigned, U, U12, U16, U32};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::{
     aead::{
@@ -49,7 +50,6 @@ use crate::{
         Identified, Oid,
     },
     signer::{PkError, Signature, Signer, SignerError, SigningKey, VerifyingKey},
-    zeroize::{is_zeroize_on_drop, Zeroize, ZeroizeOnDrop, Zeroizing},
 };
 
 /// Reports in constant time whether `x == 0`.
@@ -413,7 +413,7 @@ macro_rules! ecdh_impl {
         $id:ident $(,)?
     ) => {
         #[doc = concat!($doc, " ECDH private key.")]
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, ZeroizeOnDrop)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -556,14 +556,6 @@ macro_rules! ecdh_impl {
             }
         }
 
-        impl ZeroizeOnDrop for $sk {}
-        impl Drop for $sk {
-            #[inline]
-            fn drop(&mut self) {
-                is_zeroize_on_drop(&self.kbuf);
-            }
-        }
-
         // We use Pin<&T> because `br_ec_private_key` holds
         // a pointer to `kbuf`.
         impl From<Pin<&$sk>> for br_ec_private_key {
@@ -687,7 +679,7 @@ macro_rules! ecdsa_impl {
         $sig_oid:expr $(,)?
     ) => {
         #[doc = concat!($doc, " ECDSA private key.")]
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, ZeroizeOnDrop)]
         pub struct $sk {
             /// The secret data.
             ///
@@ -858,14 +850,6 @@ macro_rules! ecdsa_impl {
                 }
 
                 Ok(Self { kbuf })
-            }
-        }
-
-        impl ZeroizeOnDrop for $sk {}
-        impl Drop for $sk {
-            #[inline]
-            fn drop(&mut self) {
-                is_zeroize_on_drop(&self.kbuf);
             }
         }
 
