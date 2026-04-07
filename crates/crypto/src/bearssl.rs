@@ -20,7 +20,7 @@ use core::{
 pub use aranya_bearssl_sys;
 #[allow(clippy::wildcard_imports)]
 use aranya_bearssl_sys::*;
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, ConstantTimeLess};
+use subtle::{Choice, ConstantTimeEq, ConstantTimeLess};
 use typenum::{Unsigned, U, U12, U16, U32};
 
 use crate::{
@@ -67,18 +67,19 @@ fn ct_eq_zero(x: &[u8]) -> Choice {
 fn ct_be_lt(x: &[u8], y: &[u8]) -> Choice {
     assert_eq!(x.len(), y.len());
 
-    let mut done = Choice::from(0u8);
-    let mut lt = 0u8;
+    // Nonconstant impl:
+    // `zip(x, y).find(|(x, y)| x != y).map_or(false, |(x, y)| x < y)`
+
+    let mut lt = Choice::from(0u8);
+    let mut eq = Choice::from(1u8);
     for (x, y) in x.iter().zip(y) {
-        // done = 1 if x != y
-        //        0 if x == y
-        done |= x.ct_ne(y);
-        // lt = 1 if done == 1 && x < y
-        //      0 if done == 1 && x >= y
-        //      0 if done == 0 (x == y)
-        lt |= u8::conditional_select(&0, &x.ct_lt(y).unwrap_u8(), done);
+        // `eq` will be false past the first byte where x and y differ.
+        // `x < y` will be false before the first byte where x and y differ.
+        // Thus `lt` will take the value `x < y` at only that first differing byte.
+        lt |= eq & x.ct_lt(y);
+        eq &= x.ct_eq(y);
     }
-    lt.into()
+    lt
 }
 
 /// AES-256-GCM.
@@ -1328,6 +1329,8 @@ mod tests {
                 TestCase(0u8, &[2, 1], &[2, 0]),
                 TestCase(0u8, &[2, 1], &[2, 0]),
                 TestCase(1u8, &[2, 0], &[2, 1]),
+                TestCase(0u8, &[2, 0], &[1, 1]),
+                TestCase(1u8, &[0, 2, 0], &[1, 1, 1]),
             ];
             for (i, tc) in tests.iter().enumerate() {
                 assert_eq!(tc.0, ct_be_lt(tc.1, tc.2).unwrap_u8(), "#{i}");
