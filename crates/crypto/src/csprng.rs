@@ -3,9 +3,9 @@
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, rc::Rc, sync::Arc};
 
-use generic_array::{ArrayLength, GenericArray};
 #[cfg(all(feature = "getrandom", not(target_os = "vxworks")))]
 pub use getrandom;
+use hybrid_array::{Array, ArraySize};
 #[cfg(feature = "rand_compat")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand_compat")))]
 pub use rand;
@@ -106,7 +106,7 @@ pub trait Random {
     fn random<R: Csprng>(rng: R) -> Self;
 }
 
-impl<N: ArrayLength> Random for GenericArray<u8, N> {
+impl<N: ArraySize> Random for Array<u8, N> {
     fn random<R: Csprng>(rng: R) -> Self {
         let mut v = Self::default();
         rng.fill_bytes(&mut v);

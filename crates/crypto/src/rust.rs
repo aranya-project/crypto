@@ -148,7 +148,7 @@ impl fmt::Debug for Aes256Gcm {
 #[cfg(feature = "committing-aead")]
 mod committing {
     use aes::cipher::{BlockCipherEncrypt, BlockSizeUser, KeyInit};
-    use generic_array::GenericArray;
+    use hybrid_array::Array;
     use typenum::{Unsigned, U32};
 
     use super::{Aes256Gcm, Sha256};
@@ -173,7 +173,7 @@ mod committing {
             Self(cipher)
         }
 
-        fn encrypt_block(&self, block: &mut GenericArray<u8, Self::BlockSize>) {
+        fn encrypt_block(&self, block: &mut Array<u8, Self::BlockSize>) {
             // Mismatched GenericArray versions, yay.
             let block: &mut [u8; 16] = block.as_mut();
             self.0.encrypt_block(block.into())

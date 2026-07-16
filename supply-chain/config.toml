@@ -88,10 +88,6 @@ criteria = "safe-to-deploy"
 version = "0.5.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.const-default]]
-version = "1.0.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.const-oid]]
 version = "0.9.6"
 criteria = "safe-to-deploy"
@@ -156,10 +152,6 @@ criteria = "safe-to-deploy"
 version = "0.14.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.generic-array]]
-version = "1.1.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.getrandom]]
 version = "0.2.2"
 criteria = "safe-to-deploy"
@@ -174,10 +166,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.hmac]]
 version = "0.13.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.hybrid-array]]
-version = "0.4.13"
 criteria = "safe-to-deploy"
 
 [[exemptions.itertools]]

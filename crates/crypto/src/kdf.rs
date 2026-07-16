@@ -5,11 +5,11 @@
 use core::{fmt, iter::IntoIterator, mem, result::Result};
 
 use buggy::Bug;
-use generic_array::{ArrayLength, ConstArrayLength, GenericArray, IntoArrayLength};
+use hybrid_array::{Array, ArraySize};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
-    Const, Unsigned, U32, U64, U65536,
+    Const, ToUInt, Unsigned, U, U32, U64, U65536,
 };
 use zeroize::ZeroizeOnDrop;
 
@@ -72,7 +72,7 @@ pub trait Kdf {
     /// [`extract_and_expand`][Self::extract_and_expand].
     ///
     /// Must be at least 64 octets (512 bits).
-    type MaxOutput: ArrayLength + IsGreaterOrEqual<U64> + 'static;
+    type MaxOutput: ArraySize + IsGreaterOrEqual<U64> + 'static;
     /// The size in octets of the largest key that can be created
     /// with [`expand`][Self::expand],
     /// [`expand_multi`][Self::expand_multi], or
@@ -85,7 +85,7 @@ pub trait Kdf {
     /// [`Kdf`].
     ///
     /// Must be at least 32 octets and less than 2¹⁶ octets.
-    type PrkSize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
+    type PrkSize: ArraySize + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
     /// Shorthand for [`PrkSize`][Self::PrkSize].
     const PRK_SIZE: usize = Self::PrkSize::USIZE;
 
@@ -194,9 +194,9 @@ pub trait Kdf {
 /// A pseudorandom key.
 #[derive(Clone, Default, ZeroizeOnDrop)]
 #[repr(transparent)]
-pub struct Prk<N: ArrayLength>(SecretKeyBytes<N>);
+pub struct Prk<N: ArraySize>(SecretKeyBytes<N>);
 
-impl<N: ArrayLength> Prk<N> {
+impl<N: ArraySize> Prk<N> {
     /// Creates a new PRK.
     #[inline]
     pub const fn new(prk: SecretKeyBytes<N>) -> Self {
@@ -232,21 +232,21 @@ impl<N: ArrayLength> Prk<N> {
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for Prk<N> {
+impl<N: ArraySize> ConstantTimeEq for Prk<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
 }
 
-impl<N: ArrayLength> RawSecretBytes for Prk<N> {
+impl<N: ArraySize> RawSecretBytes for Prk<N> {
     #[inline]
     fn raw_secret_bytes(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl<N: ArrayLength> Expand for Prk<N>
+impl<N: ArraySize> Expand for Prk<N>
 where
     N: IsLess<U65536>,
 {
@@ -262,7 +262,7 @@ where
     }
 }
 
-impl<N: ArrayLength> fmt::Debug for Prk<N> {
+impl<N: ArraySize> fmt::Debug for Prk<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Prk").finish_non_exhaustive()
     }
@@ -271,7 +271,7 @@ impl<N: ArrayLength> fmt::Debug for Prk<N> {
 /// Implemented by types that can expand themselves from a PRK.
 pub trait Expand: Sized {
     /// The size in octets of the derived key.
-    type Size: ArrayLength + IsLess<U65536> + 'static;
+    type Size: ArraySize + IsLess<U65536> + 'static;
 
     /// Derives itself from a PRK.
     fn expand<K: Kdf>(prk: &Prk<K::PrkSize>, info: &[u8]) -> Result<Self, KdfError> {
@@ -285,7 +285,7 @@ pub trait Expand: Sized {
         I: IntoIterator<Item = &'a [u8], IntoIter: Clone>;
 }
 
-impl<N: ArrayLength> Expand for GenericArray<u8, N>
+impl<N: ArraySize> Expand for Array<u8, N>
 where
     N: IsLess<U65536>,
 {
@@ -297,7 +297,7 @@ where
         I: IntoIterator<Item = &'a [u8]>,
         I::IntoIter: Clone,
     {
-        let mut out = GenericArray::default();
+        let mut out = Array::default();
         K::expand_multi(&mut out, prk, info)?;
         Ok(out)
     }
@@ -305,10 +305,10 @@ where
 
 impl<const N: usize> Expand for [u8; N]
 where
-    Const<N>: IntoArrayLength,
-    ConstArrayLength<N>: IsLess<U65536>,
+    Const<N>: ToUInt,
+    U<N>: IsLess<U65536> + ArraySize,
 {
-    type Size = ConstArrayLength<N>;
+    type Size = U<N>;
 
     fn expand_multi<'a, K, I>(prk: &Prk<K::PrkSize>, info: I) -> Result<Self, KdfError>
     where

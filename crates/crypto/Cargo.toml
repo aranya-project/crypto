@@ -90,7 +90,7 @@ rand_compat = [
 serde = [
 	"dep:serde",
 
-	"generic-array/serde",
+	"hybrid-array/serde",
 ]
 
 # Use std.
@@ -170,8 +170,8 @@ der = { version = "0.8", default-features = false }
 ecdsa = { version = "0.17.0", default-features = false, features = ["der"] }
 ed25519-dalek = { version = "3.0.0", default-features = false, features = ["fast", "zeroize"] }
 elliptic-curve = { version = "0.14.1", default-features = false, features = ["ecdh", "arithmetic", "sec1"] }
-generic-array = { version = "1", default-features = false, features = ["const-default", "zeroize"] }
 getrandom = { version = "0.4", default-features = false, optional = true }
+hybrid-array = { version = "0.4.8", default-features = false, features = ["extra-sizes", "zeroize"] }
 more-asserts = { version = "0.3", default-features = false, optional = true }
 p256 = { version = "0.14.0", default-features = false, features = ["ecdh", "ecdsa"] }
 p384 = { version = "0.14.0", default-features = false, features = ["ecdh", "ecdsa"] }
@@ -232,6 +232,3 @@ always_include_features = [
 skip_feature_sets = []
 
 denylist = []
-
-[package.metadata.cargo-machete]
-ignored = ["old-generic-array"]

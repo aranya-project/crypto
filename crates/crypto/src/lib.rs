@@ -41,7 +41,7 @@ pub mod test_util;
 mod util;
 
 pub use buggy;
-pub use generic_array;
+pub use hybrid_array;
 #[doc(hidden)]
 pub use spideroak_crypto_derive;
 pub use subtle;

@@ -18,7 +18,7 @@
 use core::{fmt, iter, marker::PhantomData, num::NonZeroU16, result::Result};
 
 use buggy::{bug, Bug, BugExt};
-use generic_array::ArrayLength;
+use hybrid_array::ArraySize;
 use subtle::{Choice, ConstantTimeEq};
 use typenum::Unsigned as _;
 
@@ -39,7 +39,7 @@ macro_rules! i2osp {
     };
     ($v:expr, $n:ty) => {{
         let src = $v.to_be_bytes();
-        let mut dst = generic_array::GenericArray::<u8, $n>::default();
+        let mut dst = hybrid_array::Array::<u8, $n>::default();
         // Copy `src` into `dst`, padding with zeros on the
         // left.
         //
@@ -1176,7 +1176,7 @@ impl Seq {
     ///
     /// Exported for `aranya-crypto`. Do not use.
     #[doc(hidden)]
-    pub const fn max<N: ArrayLength>() -> u64 {
+    pub const fn max<N: ArraySize>() -> u64 {
         // 1<<(8*N) - 1
         let shift = 8usize.saturating_mul(N::USIZE);
         match 1u64.checked_shl(shift as u32) {
@@ -1187,7 +1187,7 @@ impl Seq {
 
     /// Increments the sequence by one and returns the *previous*
     /// sequence number.
-    fn increment<N: ArrayLength>(&mut self) -> Result<Self, Bug> {
+    fn increment<N: ArraySize>(&mut self) -> Result<Self, Bug> {
         // if self.seq >= (1 << (8*Nn)) - 1:
         //     raise MessageLimitReachedError
         if self.seq >= Self::max::<N>() {
@@ -1204,7 +1204,7 @@ impl Seq {
     }
 
     /// Computes the per-message nonce.
-    fn compute_nonce<N: ArrayLength>(
+    fn compute_nonce<N: ArraySize>(
         self,
         base_nonce: &Nonce<N>,
     ) -> Result<Nonce<N>, MessageLimitReached> {

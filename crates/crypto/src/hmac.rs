@@ -4,9 +4,9 @@
 
 #![forbid(unsafe_code)]
 
-use core::{cmp, fmt};
+use core::{array::TryFromSliceError, cmp, fmt};
 
-use generic_array::{ArrayLength, GenericArray, LengthError};
+use hybrid_array::{Array, ArraySize};
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{ZeroizeOnDrop, Zeroizing};
 
@@ -84,9 +84,9 @@ impl<H: Hash + BlockSize> Hmac<H> {
 /// An [`Hmac`] authentication code.
 #[derive(Clone, Debug)]
 #[repr(transparent)]
-pub struct Tag<N: ArrayLength>(Digest<N>);
+pub struct Tag<N: ArraySize>(Digest<N>);
 
-impl<N: ArrayLength> Tag<N> {
+impl<N: ArraySize> Tag<N> {
     /// Returns the size in bytes of the tag.
     #[cfg(feature = "committing-aead")]
     #[cfg_attr(docsrs, doc(cfg(feature = "committing-aead")))]
@@ -100,7 +100,7 @@ impl<N: ArrayLength> Tag<N> {
     // needed by the `hkdf` module and `aranya-crypto` crates,
     // however.
     #[doc(hidden)]
-    pub fn into_array(self) -> GenericArray<u8, N> {
+    pub fn into_array(self) -> Array<u8, N> {
         self.0.into_array()
     }
 }
@@ -110,7 +110,7 @@ impl<N: ArrayLength> Tag<N> {
 // `ConstantTimeEq`. It's needed by the `hkdf` module, however.
 cfg_if::cfg_if! {
     if #[cfg(feature = "hazmat")] {
-        impl<N: ArrayLength> Tag<N> {
+        impl<N: ArraySize> Tag<N> {
             /// Returns the tag as a byte slice.
             ///
             /// # ⚠️ Warning
@@ -125,7 +125,7 @@ cfg_if::cfg_if! {
             }
         }
     } else {
-        impl<N: ArrayLength> Tag<N> {
+        impl<N: ArraySize> Tag<N> {
             pub(crate) const fn as_bytes(&self) -> &[u8] {
                 self.0.as_bytes()
             }
@@ -133,7 +133,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for Tag<N> {
+impl<N: ArraySize> ConstantTimeEq for Tag<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
@@ -141,12 +141,12 @@ impl<N: ArrayLength> ConstantTimeEq for Tag<N> {
 }
 
 // Required by `crate::test_util::test_mac`.
-impl<'a, N: ArrayLength> TryFrom<&'a [u8]> for Tag<N> {
-    type Error = LengthError;
+impl<'a, N: ArraySize> TryFrom<&'a [u8]> for Tag<N> {
+    type Error = TryFromSliceError;
 
     fn try_from(tag: &'a [u8]) -> Result<Self, Self::Error> {
-        let digest = GenericArray::try_from_slice(tag)?;
-        Ok(Self(Digest::new(digest.clone())))
+        let digest = Array::try_from(tag)?;
+        Ok(Self(Digest::new(digest)))
     }
 }
 

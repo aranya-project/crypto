@@ -2,7 +2,7 @@
 
 #![forbid(unsafe_code)]
 
-use generic_array::{ArrayLength, GenericArray};
+use hybrid_array::{Array, ArraySize};
 
 /// Implemented by types that operate on blocks.
 ///
@@ -10,8 +10,8 @@ use generic_array::{ArrayLength, GenericArray};
 /// construction.
 pub trait BlockSize {
     /// The size in bytes of the block.
-    type BlockSize: ArrayLength;
+    type BlockSize: ArraySize;
 }
 
 /// A block.
-pub type Block<S> = GenericArray<u8, <S as BlockSize>::BlockSize>;
+pub type Block<S> = Array<u8, <S as BlockSize>::BlockSize>;
