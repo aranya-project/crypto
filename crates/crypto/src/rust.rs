@@ -672,11 +672,11 @@ impl<R: Csprng> TryRng for RngWrapper<R> {
     type Error = core::convert::Infallible;
 
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
-        crate::csprng::try_next_u32_via_fill(self)
+        rand_core::utils::next_word_via_fill(self)
     }
 
     fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
-        crate::csprng::try_next_u64_via_fill(self)
+        rand_core::utils::next_word_via_fill(self)
     }
 
     fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {

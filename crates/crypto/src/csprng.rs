@@ -9,7 +9,6 @@ pub use getrandom;
 #[cfg(feature = "rand_compat")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand_compat")))]
 pub use rand;
-use rand_core::TryRng;
 
 /// A cryptographically secure pseudorandom number generator
 /// (CSPRNG).
@@ -67,7 +66,7 @@ impl Csprng for rand::rngs::SysRng {
     fn fill_bytes(&self, dst: &mut [u8]) {
         // Note: this keeps the previous behavior of panicking in the rare case
         // that getrandom fails.
-        TryRng::try_fill_bytes(&mut { *self }, dst).expect("SysRng failure")
+        rand_core::TryRng::try_fill_bytes(&mut { *self }, dst).expect("SysRng failure")
     }
 }
 
@@ -84,15 +83,15 @@ impl Csprng for rand::rngs::ThreadRng {
 impl rand_core::TryCryptoRng for &dyn Csprng {}
 
 #[cfg(feature = "rand_compat")]
-impl TryRng for &dyn Csprng {
+impl rand_core::TryRng for &dyn Csprng {
     type Error = core::convert::Infallible;
 
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
-        try_next_u32_via_fill(self)
+        rand_core::utils::next_word_via_fill(self)
     }
 
     fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
-        try_next_u64_via_fill(self)
+        rand_core::utils::next_word_via_fill(self)
     }
 
     fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
@@ -138,20 +137,6 @@ macro_rules! rand_int_impl {
 }
 rand_int_impl!(u8 u16 u32 u64 u128 usize);
 rand_int_impl!(i8 i16 i32 i64 i128 isize);
-
-/// Implement `next_u32` via `fill_bytes`, little-endian order.
-pub(crate) fn try_next_u32_via_fill<R: TryRng + ?Sized>(rng: &mut R) -> Result<u32, R::Error> {
-    let mut buf = [0; 4];
-    rng.try_fill_bytes(&mut buf)?;
-    Ok(u32::from_le_bytes(buf))
-}
-
-/// Implement `next_u64` via `fill_bytes`, little-endian order.
-pub(crate) fn try_next_u64_via_fill<R: TryRng + ?Sized>(rng: &mut R) -> Result<u64, R::Error> {
-    let mut buf = [0; 8];
-    rng.try_fill_bytes(&mut buf)?;
-    Ok(u64::from_le_bytes(buf))
-}
 
 #[cfg(feature = "trng")]
 pub(crate) mod trng {
