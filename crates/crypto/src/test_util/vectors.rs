@@ -5,8 +5,8 @@ extern crate alloc;
 use alloc::{string::ToString, vec};
 use core::borrow::Borrow;
 
+use ctutils::CtEq;
 pub use hpke::TestName as HpkeTest;
-use subtle::ConstantTimeEq;
 pub use wycheproof::{
     self, aead::TestName as AeadTest, ecdh::TestName as EcdhTest, ecdsa::TestName as EcdsaTest,
     eddsa::TestName as EddsaTest, hkdf::TestName as HkdfTest, mac::TestName as MacTest, TestResult,
@@ -579,8 +579,8 @@ where
             match tc.result {
                 TestResult::Valid | TestResult::Acceptable => {
                     h.clone().verify(&tc_tag).unwrap_or_else(|_| panic!("{id}"));
-                    assert_eq!(h.clone().tag().ct_eq(&tc_tag).unwrap_u8(), 1, "{id}");
-                    assert_eq!(h.clone().tag().ct_eq(&h.tag()).unwrap_u8(), 1, "{id}");
+                    assert!(h.clone().tag().ct_eq(&tc_tag).to_bool(), "{id}");
+                    assert!(h.clone().tag().ct_eq(&h.tag()).to_bool(), "{id}");
                 }
                 TestResult::Invalid => {
                     h.verify(&tc_tag).expect_err(msg!(id));

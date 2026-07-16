@@ -9,6 +9,7 @@ use aes_gcm::{
     A_MAX, P_MAX,
 };
 use crypto_common::BlockSizeUser;
+use ctutils::{Choice, CtEq};
 use ecdsa::{
     der,
     signature::{Signer as Signer_, Verifier},
@@ -21,7 +22,6 @@ use elliptic_curve::{
 };
 use rand_core::{TryCryptoRng, TryRng};
 use sha2::digest::OutputSizeUser;
-use subtle::{Choice, ConstantTimeEq};
 use typenum::{Unsigned, U12, U16};
 use zeroize::ZeroizeOnDrop;
 
@@ -337,9 +337,9 @@ macro_rules! ecdh_impl {
             }
         }
 
-        impl ConstantTimeEq for $sk {
+        impl CtEq for $sk {
             fn ct_eq(&self, other: &Self) -> Choice {
-                self.0.ct_eq(&other.0)
+                elliptic_curve::subtle::ConstantTimeEq::ct_eq(&self.0, &other.0).into()
             }
         }
 
@@ -479,9 +479,9 @@ macro_rules! ecdsa_impl {
             }
         }
 
-        impl ConstantTimeEq for $sk {
+        impl CtEq for $sk {
             fn ct_eq(&self, other: &Self) -> Choice {
-                self.0.ct_eq(&other.0)
+                elliptic_curve::subtle::ConstantTimeEq::ct_eq(&self.0, &other.0).into()
             }
         }
 

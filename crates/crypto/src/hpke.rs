@@ -18,8 +18,8 @@
 use core::{fmt, iter, marker::PhantomData, num::NonZeroU16, result::Result};
 
 use buggy::{bug, Bug, BugExt};
+use ctutils::{Choice, CtEq};
 use generic_array::ArrayLength;
-use subtle::{Choice, ConstantTimeEq};
 use typenum::Unsigned as _;
 
 use crate::{
@@ -152,7 +152,7 @@ impl<'a> Psk<'a> {
     }
 }
 
-impl ConstantTimeEq for Psk<'_> {
+impl CtEq for Psk<'_> {
     fn ct_eq(&self, other: &Self) -> Choice {
         self.psk.ct_eq(other.psk) & self.psk_id.ct_eq(other.psk_id)
     }
@@ -1343,7 +1343,7 @@ mod tests {
         for (pass, lhs, rhs) in cases {
             let lhs = Psk::new(lhs.0.as_bytes(), lhs.1.as_bytes()).expect("should not fail");
             let rhs = Psk::new(rhs.0.as_bytes(), rhs.1.as_bytes()).expect("should not fail");
-            assert_eq!(pass, bool::from(lhs.ct_eq(&rhs)));
+            assert_eq!(pass, lhs.ct_eq(&rhs).to_bool());
         }
     }
 

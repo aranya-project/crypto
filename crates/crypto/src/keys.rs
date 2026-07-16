@@ -2,8 +2,8 @@
 
 use core::{borrow::Borrow, fmt, iter::IntoIterator, mem, result::Result};
 
+use ctutils::{Choice, CtEq};
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
-use subtle::{Choice, ConstantTimeEq};
 use typenum::{generic_const_mappings::Const, IsLess, U65536};
 use zeroize::ZeroizeOnDrop;
 
@@ -17,9 +17,7 @@ use crate::{
 ///
 /// Secret keys are either symmetric keys (e.g., for AES) or
 /// asymmetric private keys (e.g., for ECDH).
-pub trait SecretKey:
-    Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + Random + ZeroizeOnDrop
-{
+pub trait SecretKey: Clone + CtEq + for<'a> Import<&'a [u8]> + Random + ZeroizeOnDrop {
     /// The size in octets of the key.
     type Size: ArrayLength + 'static;
 
@@ -105,7 +103,7 @@ impl<N: ArrayLength> SecretKeyBytes<N> {
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for SecretKeyBytes<N> {
+impl<N: ArrayLength> CtEq for SecretKeyBytes<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
@@ -266,9 +264,9 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: $crate::generic_array::ArrayLength> ::subtle::ConstantTimeEq for $name<N> {
+        impl<N: $crate::generic_array::ArrayLength> ::ctutils::CtEq for $name<N> {
             #[inline]
-            fn ct_eq(&self, other: &Self) -> ::subtle::Choice {
+            fn ct_eq(&self, other: &Self) -> ::ctutils::Choice {
                 self.0.ct_eq(&other.0)
             }
         }

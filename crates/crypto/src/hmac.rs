@@ -6,8 +6,8 @@
 
 use core::{cmp, fmt};
 
+use ctutils::{Choice, CtEq};
 use generic_array::{ArrayLength, GenericArray, LengthError};
-use subtle::{Choice, ConstantTimeEq};
 use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::{
@@ -96,7 +96,7 @@ impl<N: ArrayLength> Tag<N> {
     }
 
     // NB: this is hidden because the only safe way to use a MAC
-    // is to compare it for equality using `ConstantTimeEq`. It's
+    // is to compare it for equality using `CtEq`. It's
     // needed by the `hkdf` module and `aranya-crypto` crates,
     // however.
     #[doc(hidden)]
@@ -107,7 +107,7 @@ impl<N: ArrayLength> Tag<N> {
 
 // NB: this is intentionally not public by default because the
 // only safe way to use a MAC is to compare it for equality using
-// `ConstantTimeEq`. It's needed by the `hkdf` module, however.
+// `CtEq`. It's needed by the `hkdf` module, however.
 cfg_if::cfg_if! {
     if #[cfg(feature = "hazmat")] {
         impl<N: ArrayLength> Tag<N> {
@@ -133,7 +133,7 @@ cfg_if::cfg_if! {
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for Tag<N> {
+impl<N: ArrayLength> CtEq for Tag<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
@@ -205,7 +205,7 @@ impl<H: Hash + BlockSize> Import<&[u8]> for HmacKey<H> {
     }
 }
 
-impl<H: Hash + BlockSize> ConstantTimeEq for HmacKey<H> {
+impl<H: Hash + BlockSize> CtEq for HmacKey<H> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)

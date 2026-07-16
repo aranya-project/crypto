@@ -41,9 +41,9 @@ pub mod test_util;
 mod util;
 
 pub use buggy;
+pub use ctutils;
 pub use generic_array;
 #[doc(hidden)]
 pub use spideroak_crypto_derive;
-pub use subtle;
 pub use typenum;
 pub use zeroize;

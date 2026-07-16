@@ -5,8 +5,8 @@
 use core::{fmt, iter::IntoIterator, mem, result::Result};
 
 use buggy::Bug;
+use ctutils::{Choice, CtEq};
 use generic_array::{ArrayLength, ConstArrayLength, GenericArray, IntoArrayLength};
-use subtle::{Choice, ConstantTimeEq};
 use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
     Const, Unsigned, U32, U64, U65536,
@@ -232,7 +232,7 @@ impl<N: ArrayLength> Prk<N> {
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for Prk<N> {
+impl<N: ArrayLength> CtEq for Prk<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)

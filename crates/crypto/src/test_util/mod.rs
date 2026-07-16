@@ -21,15 +21,13 @@ pub mod vectors;
 
 use core::{fmt, marker::PhantomData};
 
-pub use aead::test_aead;
-pub use hash::test_hash;
-pub use hpke::test_hpke;
-pub use kdf::test_kdf;
-pub use mac::test_mac;
-pub use signer::test_signer;
-use subtle::{Choice, ConstantTimeEq};
+use ctutils::{Choice, CtEq};
 use zeroize::ZeroizeOnDrop;
 
+pub use self::{
+    aead::test_aead, hash::test_hash, hpke::test_hpke, kdf::test_kdf, mac::test_mac,
+    signer::test_signer,
+};
 use crate::{
     aead::{Aead, Lifetime, OpenError, SealError},
     csprng::{Csprng, Random},
@@ -56,13 +54,13 @@ pub use __apply;
 #[macro_export]
 macro_rules! assert_ct_eq {
     ($lhs:expr, $rhs:expr) => {
-        assert!(bool::from(::subtle::ConstantTimeEq::ct_eq(&$lhs, &$rhs)))
+        assert!(::ctutils::CtEq::ct_eq(&$lhs, &$rhs).to_bool())
     };
     ($lhs:expr, $rhs:expr, ) => {
         $crate::assert_ct_eq!($lhs, $rhs)
     };
     ($lhs:expr, $rhs:expr, $($args:tt)+) => {
-        assert!(bool::from(::subtle::ConstantTimeEq::ct_eq(&$lhs, &$rhs)), $($args)+)
+        assert!(::ctutils::CtEq::ct_eq(&$lhs, &$rhs).to_bool(), $($args)+)
     };
 }
 pub(super) use assert_ct_eq;
@@ -71,13 +69,13 @@ pub(super) use assert_ct_eq;
 #[macro_export]
 macro_rules! assert_ct_ne {
     ($lhs:expr, $rhs:expr) => {
-        assert!(bool::from(::subtle::ConstantTimeEq::ct_ne(&$lhs, &$rhs)))
+        assert!(::ctutils::CtEq::ct_ne(&$lhs, &$rhs).to_bool())
     };
     ($lhs:expr, $rhs:expr, ) => {
         $crate::assert_ct_ne!($lhs, $rhs)
     };
     ($lhs:expr, $rhs:expr, $($args:tt)+) => {
-        assert!(bool::from(::subtle::ConstantTimeEq::ct_ne(&$lhs, &$rhs)), $($args)+)
+        assert!(::ctutils::CtEq::ct_ne(&$lhs, &$rhs).to_bool(), $($args)+)
     };
 }
 pub(super) use assert_ct_ne;
@@ -275,9 +273,9 @@ where
     }
 }
 
-impl<T: Signer + ?Sized> ConstantTimeEq for SigningKeyWithDefaults<T> {
+impl<T: Signer + ?Sized> CtEq for SigningKeyWithDefaults<T> {
     fn ct_eq(&self, other: &Self) -> Choice {
-        ConstantTimeEq::ct_eq(&self.0, &other.0)
+        CtEq::ct_eq(&self.0, &other.0)
     }
 }
 

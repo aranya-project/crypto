@@ -7,9 +7,9 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use ctutils::{Choice, CtEq};
 use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
 use sha3_utils::{encode_string, right_encode_bytes};
-use subtle::{Choice, ConstantTimeEq};
 use typenum::{
     generic_const_mappings::Const,
     type_operators::{IsGreaterOrEqual, IsLess},
@@ -155,11 +155,11 @@ impl<N: ArrayLength> PartialEq for Digest<N> {
         // To protect against this, we only allow comparisons
         // with == while testing. Out of paranoia, we also use
         // a constant time comparison for the equality check.
-        bool::from(ConstantTimeEq::ct_eq(self, other))
+        self.ct_eq(other).to_bool()
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for Digest<N> {
+impl<N: ArrayLength> CtEq for Digest<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.as_bytes().ct_eq(other.as_bytes())

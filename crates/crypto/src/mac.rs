@@ -6,8 +6,8 @@ use core::{
     result::Result,
 };
 
+use ctutils::{Choice, CtEq};
 use generic_array::{ArrayLength, GenericArray};
-use subtle::{Choice, ConstantTimeEq};
 use typenum::{IsGreaterOrEqual, IsLess, U32, U48, U64, U65536};
 
 use crate::keys::{raw_key, InvalidKey, SecretKey};
@@ -49,7 +49,7 @@ impl core::error::Error for MacError {}
 /// KMAC256 (for |K| >= 256).
 pub trait Mac: Clone + Sized {
     /// An authentication tag.
-    type Tag: ConstantTimeEq;
+    type Tag: CtEq;
     /// The size in octets of a tag used by this [`Mac`].
     ///
     /// Must be at least 32 octets and less than 2¹⁶ octets.
@@ -102,7 +102,7 @@ pub trait Mac: Clone + Sized {
     /// Determines in constant time whether the current tag is
     /// equal to `expect`.
     fn verify(self, expect: &Self::Tag) -> Result<(), MacError> {
-        if bool::from(self.tag().ct_eq(expect)) {
+        if self.tag().ct_eq(expect).to_bool() {
             Ok(())
         } else {
             Err(MacError::Verification)
@@ -145,7 +145,7 @@ impl<const N: usize> Tag<N> {
     }
 }
 
-impl<const N: usize> ConstantTimeEq for Tag<N> {
+impl<const N: usize> CtEq for Tag<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0[..].ct_eq(&other.0[..])
