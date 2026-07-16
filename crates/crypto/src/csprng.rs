@@ -9,6 +9,7 @@ pub use getrandom;
 #[cfg(feature = "rand_compat")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand_compat")))]
 pub use rand;
+use rand_core::TryRng;
 
 /// A cryptographically secure pseudorandom number generator
 /// (CSPRNG).
@@ -62,9 +63,11 @@ impl<R: Csprng + ?Sized> Csprng for Arc<R> {
 
 #[cfg(feature = "getrandom")]
 #[cfg_attr(docsrs, doc(cfg(feature = "getrandom")))]
-impl Csprng for rand_core::OsRng {
+impl Csprng for rand::rngs::SysRng {
     fn fill_bytes(&self, dst: &mut [u8]) {
-        rand_core::RngCore::fill_bytes(&mut { *self }, dst)
+        // Note: this keeps the previous behavior of panicking in the rare case
+        // that getrandom fails.
+        TryRng::try_fill_bytes(&mut { *self }, dst).expect("SysRng failure")
     }
 }
 
@@ -73,28 +76,26 @@ impl Csprng for rand_core::OsRng {
 impl Csprng for rand::rngs::ThreadRng {
     fn fill_bytes(&self, dst: &mut [u8]) {
         // NB: Clones an `Rc`
-        rand_core::RngCore::fill_bytes(&mut self.clone(), dst)
+        rand_core::Rng::fill_bytes(&mut self.clone(), dst)
     }
 }
 
 #[cfg(feature = "rand_compat")]
-impl rand_core::CryptoRng for &dyn Csprng {}
+impl rand_core::TryCryptoRng for &dyn Csprng {}
 
 #[cfg(feature = "rand_compat")]
-impl rand_core::RngCore for &dyn Csprng {
-    fn next_u32(&mut self) -> u32 {
-        rand_core::impls::next_u32_via_fill(self)
+impl TryRng for &dyn Csprng {
+    type Error = core::convert::Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        try_next_u32_via_fill(self)
     }
 
-    fn next_u64(&mut self) -> u64 {
-        rand_core::impls::next_u64_via_fill(self)
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        try_next_u64_via_fill(self)
     }
 
-    fn fill_bytes(&mut self, dst: &mut [u8]) {
-        Csprng::fill_bytes(self, dst);
-    }
-
-    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), rand_core::Error> {
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
         Csprng::fill_bytes(self, dst);
         Ok(())
     }
@@ -138,13 +139,27 @@ macro_rules! rand_int_impl {
 rand_int_impl!(u8 u16 u32 u64 u128 usize);
 rand_int_impl!(i8 i16 i32 i64 i128 isize);
 
+/// Implement `next_u32` via `fill_bytes`, little-endian order.
+pub(crate) fn try_next_u32_via_fill<R: TryRng + ?Sized>(rng: &mut R) -> Result<u32, R::Error> {
+    let mut buf = [0; 4];
+    rng.try_fill_bytes(&mut buf)?;
+    Ok(u32::from_le_bytes(buf))
+}
+
+/// Implement `next_u64` via `fill_bytes`, little-endian order.
+pub(crate) fn try_next_u64_via_fill<R: TryRng + ?Sized>(rng: &mut R) -> Result<u64, R::Error> {
+    let mut buf = [0; 8];
+    rng.try_fill_bytes(&mut buf)?;
+    Ok(u64::from_le_bytes(buf))
+}
+
 #[cfg(feature = "trng")]
 pub(crate) mod trng {
     use core::iter::{IntoIterator, Iterator};
 
     use cfg_if::cfg_if;
     use rand_chacha::ChaCha8Rng;
-    use rand_core::{RngCore, SeedableRng};
+    use rand_core::{Rng, SeedableRng};
     use zeroize::{zeroize_flat_type, ZeroizeOnDrop};
 
     use crate::{csprng::Csprng, kdf::Kdf};
@@ -345,14 +360,15 @@ pub(crate) mod trng {
 
     #[cfg(test)]
     mod tests {
-        use rand_core::{OsRng, RngCore};
+        use rand::rngs::SysRng;
+        use rand_core::TryRng;
 
         use super::{random_seed, thread_rng, ChaCha8Csprng, ThreadRng};
         use crate::{csprng::Csprng, kdf::Kdf};
 
         #[no_mangle]
         extern "C" fn OS_hardware_rand() -> u32 {
-            OsRng.next_u32()
+            SysRng.try_next_u32().unwrap() // :(
         }
 
         /// Test with BearSSL's HKDF.

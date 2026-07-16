@@ -101,8 +101,8 @@ macro_rules! __doctest_os_hardware_rand {
         #[cfg(feature = "trng")]
         #[no_mangle]
         extern "C" fn OS_hardware_rand() -> u32 {
-            use rand::RngCore;
-            rand::rngs::OsRng.next_u32()
+            use rand::TryRng;
+            rand::rngs::SysRng.try_next_u32().unwrap()
         }
     };
 }
