@@ -5,8 +5,8 @@
 use core::{borrow::Borrow, fmt, result::Result};
 
 use aes_gcm::{
-    aead::{AeadInPlace, KeyInit, KeySizeUser},
-    A_MAX, C_MAX, P_MAX,
+    aead::{AeadInOut as _, KeyInit, KeySizeUser},
+    A_MAX, P_MAX,
 };
 use crypto_common::BlockSizeUser;
 use ecdsa::{
@@ -16,10 +16,10 @@ use ecdsa::{
 use elliptic_curve::{
     ecdh,
     scalar::NonZeroScalar,
-    sec1::{EncodedPoint, FromEncodedPoint, ToEncodedPoint},
-    CurveArithmetic, FieldBytesSize,
+    sec1::{FromSec1Point, Sec1Point, ToSec1Point},
+    CurveArithmetic, FieldBytesSize, Generate as _,
 };
-use rand_core::{impls, CryptoRng, RngCore};
+use rand_core::{TryCryptoRng, TryRng};
 use sha2::digest::OutputSizeUser;
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{Unsigned, U12, U16};
@@ -67,7 +67,7 @@ impl Aead for Aes256Gcm {
 
     const MAX_PLAINTEXT_SIZE: u64 = P_MAX;
     const MAX_ADDITIONAL_DATA_SIZE: u64 = A_MAX;
-    const MAX_CIPHERTEXT_SIZE: u64 = C_MAX;
+    const MAX_CIPHERTEXT_SIZE: u64 = P_MAX + Self::OVERHEAD as u64;
 
     type Key = AeadKey<Self::KeySize>;
 
@@ -88,14 +88,14 @@ impl Aead for Aes256Gcm {
 
         let got_tag = self
             .0
-            .encrypt_in_place_detached(
+            .encrypt_inout_detached(
                 // From<&[T]> for GenericArray<T, _> panics on incorrect length
                 #[allow(clippy::unnecessary_fallible_conversions)]
                 nonce
                     .try_into()
                     .map_err(|_| SealError::InvalidNonceSize(InvalidNonceSize))?,
                 additional_data,
-                data,
+                data.into(),
             )
             .map_err(|_| SealError::Encryption)?;
         tag.copy_from_slice(&got_tag[..]);
@@ -113,14 +113,14 @@ impl Aead for Aes256Gcm {
         check_open_in_place_params::<Self>(nonce, data, tag, additional_data)?;
 
         self.0
-            .decrypt_in_place_detached(
+            .decrypt_inout_detached(
                 // From<&[T]> for GenericArray<T, _> panics on incorrect length
                 #[allow(clippy::unnecessary_fallible_conversions)]
                 nonce
                     .try_into()
                     .map_err(|_| OpenError::InvalidNonceSize(InvalidNonceSize))?,
                 additional_data,
-                data,
+                data.into(),
                 // From<&[T]> for GenericArray<T, _> panics on incorrect length
                 #[allow(clippy::unnecessary_fallible_conversions)]
                 tag.try_into().map_err(|_| OpenError::InvalidOverheadSize)?,
@@ -147,7 +147,7 @@ impl fmt::Debug for Aes256Gcm {
 
 #[cfg(feature = "committing-aead")]
 mod committing {
-    use aes::cipher::{BlockEncrypt, BlockSizeUser, KeyInit};
+    use aes::cipher::{BlockCipherEncrypt, BlockSizeUser, KeyInit};
     use generic_array::GenericArray;
     use typenum::{Unsigned, U32};
 
@@ -225,7 +225,7 @@ macro_rules! curve_impl {
 
         #[doc = concat!("An encoded ", $doc, "point.")]
         #[derive(Copy, Clone, Debug)]
-        pub struct $point(EncodedPoint<$inner>);
+        pub struct $point(Sec1Point<$inner>);
 
         impl Borrow<[u8]> for $point {
             fn borrow(&self) -> &[u8] {
@@ -235,14 +235,14 @@ macro_rules! curve_impl {
 
         impl<'a> Import<&'a [u8]> for $point {
             fn import(data: &'a [u8]) -> Result<Self, ImportError> {
-                let point = EncodedPoint::<$inner>::from_bytes(data)
+                let point = Sec1Point::<$inner>::from_bytes(data)
                     .map_err(|_| ImportError::InvalidSyntax)?;
                 Ok(Self(point))
             }
         }
 
         impl ToHex for &$point {
-            type Output = EncodedPoint<$inner>;
+            type Output = Sec1Point<$inner>;
 
             fn to_hex(self) -> Hex<Self::Output> {
                 Hex::new(self.0)
@@ -326,7 +326,7 @@ macro_rules! ecdh_impl {
         impl Random for $sk {
             #[inline]
             fn random<R: Csprng>(rng: R) -> Self {
-                let sk = NonZeroScalar::random(&mut RngWrapper(rng));
+                let sk = NonZeroScalar::generate_from_rng(&mut RngWrapper(rng));
                 Self(sk)
             }
         }
@@ -362,7 +362,7 @@ macro_rules! ecdh_impl {
             type Data = $point;
 
             fn export(&self) -> Self::Data {
-                $point(self.0.to_encoded_point(false))
+                $point(self.0.to_sec1_point(false))
             }
         }
 
@@ -376,9 +376,9 @@ macro_rules! ecdh_impl {
 
         impl<'a> Import<&'a [u8]> for $pk {
             fn import(data: &'a [u8]) -> Result<Self, ImportError> {
-                let point = EncodedPoint::<$curve>::from_bytes(data)
+                let point = Sec1Point::<$curve>::from_bytes(data)
                     .map_err(|_| ImportError::InvalidSyntax)?;
-                let pk = Option::from(elliptic_curve::PublicKey::from_encoded_point(&point))
+                let pk = Option::from(elliptic_curve::PublicKey::from_sec1_point(&point))
                     .ok_or(ImportError::InvalidSyntax)?;
                 Ok(Self(pk))
             }
@@ -468,7 +468,7 @@ macro_rules! ecdsa_impl {
         impl Random for $sk {
             #[inline]
             fn random<R: Csprng>(rng: R) -> Self {
-                let sk = ecdsa::SigningKey::random(&mut RngWrapper(rng));
+                let sk = ecdsa::SigningKey::generate_from_rng(&mut RngWrapper(rng));
                 Self(sk)
             }
         }
@@ -509,7 +509,7 @@ macro_rules! ecdsa_impl {
             type Data = $point;
 
             fn export(&self) -> Self::Data {
-                $point(self.0.to_encoded_point(false))
+                $point(self.0.to_sec1_point(false))
             }
         }
 
@@ -523,9 +523,9 @@ macro_rules! ecdsa_impl {
 
         impl<'a> Import<&'a [u8]> for $pk {
             fn import(data: &'a [u8]) -> Result<Self, ImportError> {
-                let point = EncodedPoint::<$curve>::from_bytes(data)
+                let point = Sec1Point::<$curve>::from_bytes(data)
                     .map_err(|_| ImportError::InvalidSyntax)?;
-                let pk = ecdsa::VerifyingKey::from_encoded_point(&point)
+                let pk = ecdsa::VerifyingKey::from_sec1_point(&point)
                     .map_err(|_| ImportError::InvalidSyntax)?;
                 Ok(Self(pk))
             }
@@ -666,23 +666,21 @@ hmac_impl!(
 /// Translates [`Csprng`] to [`RngCore`].
 struct RngWrapper<R>(R);
 
-impl<R> CryptoRng for RngWrapper<R> {}
+impl<R: Csprng> TryCryptoRng for RngWrapper<R> {}
 
-impl<R: Csprng> RngCore for RngWrapper<R> {
-    fn next_u32(&mut self) -> u32 {
-        impls::next_u32_via_fill(self)
+impl<R: Csprng> TryRng for RngWrapper<R> {
+    type Error = core::convert::Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        rand_core::utils::next_word_via_fill(self)
     }
 
-    fn next_u64(&mut self) -> u64 {
-        impls::next_u64_via_fill(self)
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        rand_core::utils::next_word_via_fill(self)
     }
 
-    fn fill_bytes(&mut self, dst: &mut [u8]) {
-        self.0.fill_bytes(dst)
-    }
-
-    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.fill_bytes(dst);
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+        self.0.fill_bytes(dst);
         Ok(())
     }
 }

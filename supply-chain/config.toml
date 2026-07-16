@@ -41,11 +41,11 @@ audit-as-crates-io = false
 notes = "SpiderOak crate"
 
 [[exemptions.aead]]
-version = "0.4.3"
+version = "0.6.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.aes]]
-version = "0.7.5"
+version = "0.9.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.aes-gcm]]
@@ -64,12 +64,28 @@ criteria = "safe-to-deploy"
 version = "0.70.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.block-buffer]]
+version = "0.12.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.cc]]
 version = "1.2.10"
 criteria = "safe-to-deploy"
 
+[[exemptions.chacha20]]
+version = "0.10.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.cipher]]
+version = "0.5.2"
+criteria = "safe-to-deploy"
+
 [[exemptions.clang-sys]]
 version = "1.8.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.cmov]]
+version = "0.5.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.const-default]]
@@ -80,20 +96,32 @@ criteria = "safe-to-deploy"
 version = "0.9.6"
 criteria = "safe-to-deploy"
 
+[[exemptions.cpubits]]
+version = "0.1.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.cpufeatures]]
 version = "0.2.16"
 criteria = "safe-to-deploy"
 
 [[exemptions.crypto-bigint]]
-version = "0.5.5"
+version = "0.7.5"
+criteria = "safe-to-deploy"
+
+[[exemptions.crypto-common]]
+version = "0.2.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.ctr]]
-version = "0.9.2"
+version = "0.10.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.ctutils]]
+version = "0.4.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.curve25519-dalek]]
-version = "4.1.0"
+version = "5.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.curve25519-dalek-derive]]
@@ -105,19 +133,19 @@ version = "2.7.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.der]]
-version = "0.7.8"
+version = "0.8.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.digest]]
-version = "0.9.0"
+version = "0.11.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.ecdsa]]
-version = "0.16.9"
+version = "0.17.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.ed25519]]
-version = "2.2.1"
+version = "3.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.ed25519-dalek]]
@@ -125,15 +153,7 @@ version = "2.1.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.elliptic-curve]]
-version = "0.13.8"
-criteria = "safe-to-deploy"
-
-[[exemptions.ff]]
-version = "0.12.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.generic-array]]
-version = "0.14.5"
+version = "0.14.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.generic-array]]
@@ -145,15 +165,19 @@ version = "0.2.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.ghash]]
-version = "0.5.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.group]]
-version = "0.12.0"
+version = "0.6.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.hkdf]]
-version = "0.12.4"
+version = "0.13.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.hmac]]
+version = "0.13.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.hybrid-array]]
+version = "0.4.13"
 criteria = "safe-to-deploy"
 
 [[exemptions.itertools]]
@@ -165,15 +189,11 @@ version = "0.1.24"
 criteria = "safe-to-deploy"
 
 [[exemptions.keccak]]
-version = "0.1.5"
+version = "0.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.libloading]]
 version = "0.8.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.merlin]]
-version = "3.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.minimal-lexical]]
@@ -185,27 +205,31 @@ version = "0.3.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.p256]]
-version = "0.13.2"
+version = "0.14.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.p384]]
-version = "0.13.0"
+version = "0.14.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.pkcs8]]
-version = "0.10.2"
+version = "0.11.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.polyval]]
-version = "0.6.2"
+version = "0.7.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.ppv-lite86]]
 version = "0.2.20"
 criteria = "safe-to-deploy"
 
+[[exemptions.primefield]]
+version = "0.14.0"
+criteria = "safe-to-deploy"
+
 [[exemptions.primeorder]]
-version = "0.13.6"
+version = "0.14.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.r-efi]]
@@ -213,11 +237,23 @@ version = "5.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rfc6979]]
-version = "0.4.0"
+version = "0.6.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.sec1]]
-version = "0.7.3"
+version = "0.8.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.serdect]]
+version = "0.4.3"
+criteria = "safe-to-deploy"
+
+[[exemptions.sha2]]
+version = "0.11.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.signature]]
+version = "3.0.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.spin]]
@@ -225,15 +261,19 @@ version = "0.9.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.spki]]
-version = "0.7.3"
+version = "0.8.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.typenum]]
 version = "1.15.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.version_check]]
-version = "0.9.5"
+[[exemptions.universal-hash]]
+version = "0.6.1"
+criteria = "safe-to-deploy"
+
+[[exemptions.wnaf]]
+version = "0.14.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.wycheproof]]

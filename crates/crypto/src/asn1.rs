@@ -100,14 +100,14 @@ impl<S: Signer + ?Sized, const N: usize> Sig<S, N> {
         // sig := SEQUENCE || R || S
         let mut rd = SliceReader::new(der)?;
         let hdr = Header::decode(&mut rd)?;
-        hdr.tag.assert_eq(Tag::Sequence)?;
+        hdr.tag().assert_eq(Tag::Sequence)?;
 
-        rd.read_nested(hdr.length, |rd| {
+        rd.read_nested(hdr.length(), |rd| {
             UintRef::decode(rd)?;
             UintRef::decode(rd)?;
-            Ok(())
+            Ok::<(), der::Error>(())
         })?;
-        Ok(rd.finish(())?)
+        Ok(rd.finish()?)
     }
 
     /// Creates a [`Sig`] from the DER-encoded signature `der`.
@@ -265,15 +265,15 @@ impl<const N: usize> RawSig<N> {
         // sig := SEQUENCE || R || S
         let mut rd = SliceReader::new(der)?;
         let hdr = Header::decode(&mut rd)?;
-        hdr.tag.assert_eq(Tag::Sequence)?;
+        hdr.tag().assert_eq(Tag::Sequence)?;
 
-        let ret = rd.read_nested(hdr.length, |rd| {
+        let (r, s) = rd.read_nested(hdr.length(), |rd| {
             let r = UintRef::decode(rd)?;
             let s = UintRef::decode(rd)?;
-            Ok((r, s))
+            Ok::<_, der::Error>((r, s))
         })?;
+        rd.finish()?;
 
-        let (r, s) = rd.finish(ret)?;
         RawSig::from_integers(r, s)
     }
 
