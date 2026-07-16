@@ -89,8 +89,6 @@ impl Aead for Aes256Gcm {
         let got_tag = self
             .0
             .encrypt_inout_detached(
-                // From<&[T]> for GenericArray<T, _> panics on incorrect length
-                #[allow(clippy::unnecessary_fallible_conversions)]
                 nonce
                     .try_into()
                     .map_err(|_| SealError::InvalidNonceSize(InvalidNonceSize))?,
@@ -114,15 +112,11 @@ impl Aead for Aes256Gcm {
 
         self.0
             .decrypt_inout_detached(
-                // From<&[T]> for GenericArray<T, _> panics on incorrect length
-                #[allow(clippy::unnecessary_fallible_conversions)]
                 nonce
                     .try_into()
                     .map_err(|_| OpenError::InvalidNonceSize(InvalidNonceSize))?,
                 additional_data,
                 data.into(),
-                // From<&[T]> for GenericArray<T, _> panics on incorrect length
-                #[allow(clippy::unnecessary_fallible_conversions)]
                 tag.try_into().map_err(|_| OpenError::InvalidOverheadSize)?,
             )
             .map_err(|_| OpenError::Authentication)
@@ -174,9 +168,7 @@ mod committing {
         }
 
         fn encrypt_block(&self, block: &mut Array<u8, Self::BlockSize>) {
-            // Mismatched GenericArray versions, yay.
-            let block: &mut [u8; 16] = block.as_mut();
-            self.0.encrypt_block(block.into())
+            self.0.encrypt_block(block.as_mut())
         }
     }
 
@@ -317,9 +309,7 @@ macro_rules! ecdh_impl {
 
             #[inline]
             fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
-                // Mismatched GenericArray versions, yay.
-                let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
-                Ok(SecretKeyBytes::new(secret.into()))
+                Ok(SecretKeyBytes::new(self.0.to_bytes()))
             }
         }
 
@@ -459,9 +449,7 @@ macro_rules! ecdsa_impl {
 
             #[inline]
             fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError> {
-                // Mismatched GenericArray versions, yay.
-                let secret: [u8; FieldBytesSize::<$curve>::USIZE] = self.0.to_bytes().into();
-                Ok(SecretKeyBytes::new(secret.into()))
+                Ok(SecretKeyBytes::new(self.0.to_bytes()))
             }
         }
 
