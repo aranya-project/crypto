@@ -2,9 +2,9 @@
 
 use core::{borrow::Borrow, fmt, iter::IntoIterator, mem, result::Result};
 
-use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
+use hybrid_array::{Array, ArraySize};
 use subtle::{Choice, ConstantTimeEq};
-use typenum::{generic_const_mappings::Const, IsLess, U65536};
+use typenum::{IsLess, U65536};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
@@ -21,7 +21,7 @@ pub trait SecretKey:
     Clone + ConstantTimeEq + for<'a> Import<&'a [u8]> + Random + ZeroizeOnDrop
 {
     /// The size in octets of the key.
-    type Size: ArrayLength + 'static;
+    type Size: ArraySize + 'static;
 
     /// Attempts to export the key's secret data.
     fn try_export_secret(&self) -> Result<SecretKeyBytes<Self::Size>, ExportError>;
@@ -50,21 +50,21 @@ impl RawSecretBytes for [u8] {
 /// A fixed-length byte encoding of a [`SecretKey`]'s data.
 #[derive(Clone, Default, ZeroizeOnDrop)]
 #[repr(transparent)]
-pub struct SecretKeyBytes<N: ArrayLength>(GenericArray<u8, N>);
+pub struct SecretKeyBytes<N: ArraySize>(Array<u8, N>);
 
-impl<N: ArrayLength> fmt::Debug for SecretKeyBytes<N> {
+impl<N: ArraySize> fmt::Debug for SecretKeyBytes<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SecretKeyBytes").finish_non_exhaustive()
     }
 }
 
-impl<N: ArrayLength> SecretKeyBytes<N> {
+impl<N: ArraySize> SecretKeyBytes<N> {
     /// The size in bytes of the secret key.
     pub const SIZE: usize = N::USIZE;
 
     /// Creates a new secret.
     #[inline]
-    pub const fn new(secret: GenericArray<u8, N>) -> Self {
+    pub const fn new(secret: Array<u8, N>) -> Self {
         Self(secret)
     }
 
@@ -78,9 +78,9 @@ impl<N: ArrayLength> SecretKeyBytes<N> {
     /// Returns a reference to the secret key bytes as an array.
     pub(crate) fn as_array<const U: usize>(&self) -> &[u8; U]
     where
-        Const<U>: IntoArrayLength<ArrayLength = N>,
+        N: ArraySize<ArrayType<u8> = [u8; U]>,
     {
-        self.0.as_ref()
+        &(self.0).0
     }
 
     /// Returns the secret key bytes as a byte slice.
@@ -96,7 +96,7 @@ impl<N: ArrayLength> SecretKeyBytes<N> {
 
     /// Converts the secret key bytes to an array.
     #[inline]
-    pub fn into_bytes(mut self) -> GenericArray<u8, N> {
+    pub fn into_bytes(mut self) -> Array<u8, N> {
         // This is fine since we're consuming the receiver. If
         // the receiver were an exclusive reference this would be
         // very wrong since it'd be replacing the secret key with
@@ -105,20 +105,20 @@ impl<N: ArrayLength> SecretKeyBytes<N> {
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for SecretKeyBytes<N> {
+impl<N: ArraySize> ConstantTimeEq for SecretKeyBytes<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
 }
 
-impl<N: ArrayLength> Random for SecretKeyBytes<N> {
+impl<N: ArraySize> Random for SecretKeyBytes<N> {
     fn random<R: Csprng>(rng: R) -> Self {
         Self(Random::random(rng))
     }
 }
 
-impl<N: ArrayLength> Expand for SecretKeyBytes<N>
+impl<N: ArraySize> Expand for SecretKeyBytes<N>
 where
     N: IsLess<U65536>,
 {
@@ -134,7 +134,7 @@ where
     }
 }
 
-impl<N: ArrayLength> RawSecretBytes for SecretKeyBytes<N> {
+impl<N: ArraySize> RawSecretBytes for SecretKeyBytes<N> {
     #[inline]
     fn raw_secret_bytes(&self) -> &[u8] {
         self.as_bytes()
@@ -180,9 +180,9 @@ macro_rules! raw_key {
         $(#[$meta])*
         #[derive(::core::clone::Clone, $crate::zeroize::ZeroizeOnDrop)]
         #[repr(transparent)]
-        $vis struct $name<N: $crate::generic_array::ArrayLength>($crate::keys::SecretKeyBytes<N>);
+        $vis struct $name<N: $crate::hybrid_array::ArraySize>($crate::keys::SecretKeyBytes<N>);
 
-        impl<N: ::generic_array::ArrayLength> $name<N> {
+        impl<N: ::hybrid_array::ArraySize> $name<N> {
             /// Creates a new raw key.
             #[inline]
             pub const fn new(key: $crate::keys::SecretKeyBytes<N>) -> Self {
@@ -221,7 +221,7 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: $crate::generic_array::ArrayLength> $crate::keys::SecretKey for $name<N> {
+        impl<N: $crate::hybrid_array::ArraySize> $crate::keys::SecretKey for $name<N> {
             type Size = N;
 
             #[inline]
@@ -233,21 +233,21 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: $crate::generic_array::ArrayLength> $crate::csprng::Random for $name<N> {
+        impl<N: $crate::hybrid_array::ArraySize> $crate::csprng::Random for $name<N> {
             fn random<R: $crate::csprng::Csprng>(rng: R) -> Self {
                 let sk = <$crate::keys::SecretKeyBytes<N> as $crate::csprng::Random>::random(rng);
                 Self(sk)
             }
         }
 
-        impl<N: $crate::generic_array::ArrayLength> $crate::keys::RawSecretBytes for $name<N> {
+        impl<N: $crate::hybrid_array::ArraySize> $crate::keys::RawSecretBytes for $name<N> {
             #[inline]
             fn raw_secret_bytes(&self) -> &[u8] {
                 $crate::keys::RawSecretBytes::raw_secret_bytes(&self.0)
             }
         }
 
-        impl<N: $crate::generic_array::ArrayLength> $crate::kdf::Expand for $name<N>
+        impl<N: $crate::hybrid_array::ArraySize> $crate::kdf::Expand for $name<N>
         where
             N: ::typenum::IsLess<::typenum::U65536>
         {
@@ -266,7 +266,7 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: $crate::generic_array::ArrayLength> ::subtle::ConstantTimeEq for $name<N> {
+        impl<N: $crate::hybrid_array::ArraySize> ::subtle::ConstantTimeEq for $name<N> {
             #[inline]
             fn ct_eq(&self, other: &Self) -> ::subtle::Choice {
                 self.0.ct_eq(&other.0)
@@ -275,17 +275,16 @@ macro_rules! raw_key {
 
         impl<N, const U: usize> $crate::import::Import<[u8; U]> for $name<N>
         where
-            N: $crate::generic_array::ArrayLength,
-            ::typenum::generic_const_mappings::Const<U>: $crate::generic_array::IntoArrayLength<ArrayLength = N>,
+            N: $crate::hybrid_array::ArraySize<ArrayType<u8> = [u8; U]>,
         {
             #[inline]
             fn import(key: [u8; U]) -> ::core::result::Result<Self, $crate::import::ImportError> {
-                let sk = $crate::keys::SecretKeyBytes::new(key.into());
+                let sk = $crate::keys::SecretKeyBytes::new($crate::hybrid_array::Array(key));
                 ::core::result::Result::Ok(Self(sk))
             }
         }
 
-        impl<N: $crate::generic_array::ArrayLength> $crate::import::Import<&[u8]> for $name<N> {
+        impl<N: $crate::hybrid_array::ArraySize> $crate::import::Import<&[u8]> for $name<N> {
             #[inline]
             fn import(data: &[u8]) -> ::core::result::Result<Self, $crate::import::ImportError> {
                 let bytes = $crate::import::Import::<_>::import(data)?;
@@ -294,7 +293,7 @@ macro_rules! raw_key {
             }
         }
 
-        impl<N: ::generic_array::ArrayLength> ::core::fmt::Debug for $name<N> {
+        impl<N: ::hybrid_array::ArraySize> ::core::fmt::Debug for $name<N> {
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 f.debug_struct(stringify!($name)).finish_non_exhaustive()
             }

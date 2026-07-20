@@ -97,6 +97,11 @@ who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.4.2 -> 0.4.3"
 
+[[audits.hybrid-array]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = ["safe-to-deploy", "does-not-implement-crypto"]
+version = "0.4.13"
+
 [[audits.keccak]]
 who = "Ben Zimmerman <bzimmerman@spideroak.com>"
 criteria = "safe-to-deploy"

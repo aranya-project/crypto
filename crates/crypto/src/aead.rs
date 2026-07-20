@@ -13,10 +13,9 @@ use core::{
 };
 
 use buggy::{Bug, BugExt};
-use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
+use hybrid_array::{Array, ArraySize};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{
-    generic_const_mappings::Const,
     type_operators::{IsGreaterOrEqual, IsLess},
     Unsigned, U16, U65536,
 };
@@ -358,14 +357,14 @@ pub trait Aead {
     /// The size in octets of a key used by this [`Aead`].
     ///
     /// Must be at least 16 octets and less than 2¹⁶ octets.
-    type KeySize: ArrayLength + IsGreaterOrEqual<U16> + IsLess<U65536> + 'static;
+    type KeySize: ArraySize + IsGreaterOrEqual<U16> + IsLess<U65536> + 'static;
     /// Shorthand for [`KeySize`][Self::KeySize].
     const KEY_SIZE: usize = Self::KeySize::USIZE;
 
     /// The size in octets of a nonce used by this [`Aead`].
     ///
     /// Must be less than 2¹⁶ octets.
-    type NonceSize: ArrayLength + IsLess<U65536> + 'static;
+    type NonceSize: ArraySize + IsLess<U65536> + 'static;
     /// Shorthand for [`NonceSize`][Self::NonceSize].
     const NONCE_SIZE: usize = Self::NonceSize::USIZE;
 
@@ -377,7 +376,7 @@ pub trait Aead {
     /// the size of the authentication tag and key commitment.
     ///
     /// Must be at least 16 octets (128 bits).
-    type Overhead: ArrayLength + IsGreaterOrEqual<U16> + 'static;
+    type Overhead: ArraySize + IsGreaterOrEqual<U16> + 'static;
     /// Shorthand for [`Overhead`][Self::Overhead].
     const OVERHEAD: usize = Self::Overhead::USIZE;
 
@@ -536,7 +535,7 @@ pub trait Aead {
 pub type KeyData<A> = SecretKeyBytes<<<A as Aead>::Key as SecretKey>::Size>;
 
 /// An authentication tag.
-pub type Tag<A> = GenericArray<u8, <A as Aead>::Overhead>;
+pub type Tag<A> = Array<u8, <A as Aead>::Overhead>;
 
 const fn check_aead_params<A: Aead + ?Sized>() {
     const {
@@ -676,11 +675,11 @@ raw_key! {
     pub AeadKey,
 }
 
-impl<N: ArrayLength> AeadKey<N> {
+impl<N: ArraySize> AeadKey<N> {
     // Used by `crate::rust::Aes256Gcm::new`.
     pub(crate) fn as_array<const U: usize>(&self) -> &[u8; U]
     where
-        Const<U>: IntoArrayLength<ArrayLength = N>,
+        N: ArraySize<ArrayType<u8> = [u8; U]>,
     {
         self.0.as_array()
     }
@@ -689,9 +688,9 @@ impl<N: ArrayLength> AeadKey<N> {
 /// An [`Aead`] nonce.
 #[derive(Clone, Default, Hash, Eq, PartialEq)]
 #[repr(transparent)]
-pub struct Nonce<N: ArrayLength>(GenericArray<u8, N>);
+pub struct Nonce<N: ArraySize>(Array<u8, N>);
 
-impl<N: ArrayLength> Nonce<N> {
+impl<N: ArraySize> Nonce<N> {
     /// The size in octets of the nonce.
     pub const SIZE: usize = N::USIZE;
 
@@ -704,29 +703,29 @@ impl<N: ArrayLength> Nonce<N> {
 
     // For `aranya-crypto`. Do not use.
     #[doc(hidden)]
-    pub fn into_inner(self) -> GenericArray<u8, N> {
+    pub fn into_inner(self) -> Array<u8, N> {
         self.0
     }
 
-    pub(crate) const fn from_bytes(nonce: GenericArray<u8, N>) -> Self {
+    pub(crate) const fn from_bytes(nonce: Array<u8, N>) -> Self {
         Self(nonce)
     }
 
     pub(crate) fn try_from_slice(data: &[u8]) -> Result<Self, InvalidNonceSize> {
-        let nonce = GenericArray::try_from_slice(data).map_err(|_| InvalidNonceSize)?;
-        Ok(Self(nonce.clone()))
+        let nonce = Array::try_from(data).map_err(|_| InvalidNonceSize)?;
+        Ok(Self(nonce))
     }
 }
 
-impl<N: ArrayLength> Copy for Nonce<N> where N::ArrayType<u8>: Copy {}
+impl<N: ArraySize> Copy for Nonce<N> where N::ArrayType<u8>: Copy {}
 
-impl<N: ArrayLength> Debug for Nonce<N> {
+impl<N: ArraySize> Debug for Nonce<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Nonce").field(&self.0).finish()
     }
 }
 
-impl<N: ArrayLength> Deref for Nonce<N> {
+impl<N: ArraySize> Deref for Nonce<N> {
     type Target = [u8];
 
     #[inline]
@@ -735,14 +734,14 @@ impl<N: ArrayLength> Deref for Nonce<N> {
     }
 }
 
-impl<N: ArrayLength> DerefMut for Nonce<N> {
+impl<N: ArraySize> DerefMut for Nonce<N> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<N: ArrayLength> BitXor for Nonce<N> {
+impl<N: ArraySize> BitXor for Nonce<N> {
     type Output = Self;
 
     #[inline]
@@ -754,7 +753,7 @@ impl<N: ArrayLength> BitXor for Nonce<N> {
     }
 }
 
-impl<N: ArrayLength> BitXor for &Nonce<N> {
+impl<N: ArraySize> BitXor for &Nonce<N> {
     type Output = Nonce<N>;
 
     #[inline]
@@ -767,20 +766,20 @@ impl<N: ArrayLength> BitXor for &Nonce<N> {
     }
 }
 
-impl<N: ArrayLength> ConstantTimeEq for Nonce<N> {
+impl<N: ArraySize> ConstantTimeEq for Nonce<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
     }
 }
 
-impl<N: ArrayLength> Random for Nonce<N> {
+impl<N: ArraySize> Random for Nonce<N> {
     fn random<R: Csprng>(rng: R) -> Self {
         Self(Random::random(rng))
     }
 }
 
-impl<N: ArrayLength> Expand for Nonce<N>
+impl<N: ArraySize> Expand for Nonce<N>
 where
     N: IsLess<U65536>,
 {
@@ -796,7 +795,7 @@ where
     }
 }
 
-impl<N: ArrayLength> TryFrom<&[u8]> for Nonce<N> {
+impl<N: ArraySize> TryFrom<&[u8]> for Nonce<N> {
     type Error = InvalidNonceSize;
 
     fn try_from(data: &[u8]) -> Result<Self, InvalidNonceSize> {
@@ -833,7 +832,7 @@ mod committing {
     use core::{fmt, marker::PhantomData, num::NonZeroU64, result::Result};
 
     use buggy::{Bug, BugExt};
-    use generic_array::{ArrayLength, GenericArray};
+    use hybrid_array::{Array, ArraySize};
     use typenum::{
         type_operators::{IsGreaterOrEqual, IsLess},
         Unsigned, U16, U65536,
@@ -846,7 +845,7 @@ mod committing {
     #[doc(hidden)]
     pub trait BlockCipher {
         /// The size in octets of a the cipher's block.
-        type BlockSize: ArrayLength + IsGreaterOrEqual<U16> + IsLess<U65536> + 'static;
+        type BlockSize: ArraySize + IsGreaterOrEqual<U16> + IsLess<U65536> + 'static;
         /// Shorthand for [`BlockSize::USIZE`][Self::BlockSize];
         const BLOCK_SIZE: usize = Self::BlockSize::USIZE;
         /// The cipher's key.
@@ -855,7 +854,7 @@ mod committing {
         /// Creates a new instance of the block cipher.
         fn new(key: &Self::Key) -> Self;
         /// Encrypts `block` in place.
-        fn encrypt_block(&self, block: &mut GenericArray<u8, Self::BlockSize>);
+        fn encrypt_block(&self, block: &mut Array<u8, Self::BlockSize>);
     }
 
     /// An implementation of the Counter-then-Xor (CX) PRF per
@@ -875,7 +874,6 @@ mod committing {
         // The paper requires m < n where m is the nonce space
         // and n is the block size.
         A::NonceSize: IsLess<C::BlockSize>,
-        GenericArray<u8, C::BlockSize>: Clone,
     {
         /// Returns the key commitment and new key (P,L) for
         /// (K,M).
@@ -884,7 +882,7 @@ mod committing {
         pub fn commit(
             key: &A::Key,
             nonce: &Nonce<A::NonceSize>,
-        ) -> Result<(GenericArray<u8, C::BlockSize>, KeyData<A>), Bug> {
+        ) -> Result<(Array<u8, C::BlockSize>, KeyData<A>), Bug> {
             let mut cx = Default::default();
             let key = Self::commit_into(&mut cx, key, nonce)?;
             Ok((cx, key))
@@ -893,7 +891,7 @@ mod committing {
         /// Same as [`commit`][Self::commit], but writes directly
         /// to `cx`.
         pub fn commit_into(
-            cx: &mut GenericArray<u8, C::BlockSize>,
+            cx: &mut Array<u8, C::BlockSize>,
             key: &A::Key,
             nonce: &Nonce<A::NonceSize>,
         ) -> Result<KeyData<A>, Bug> {
@@ -907,12 +905,12 @@ mod committing {
             fn pad<C: BlockCipher>(
                 m: &[u8],
                 i: NonZeroU64,
-            ) -> Result<GenericArray<u8, C::BlockSize>, Bug> {
+            ) -> Result<Array<u8, C::BlockSize>, Bug> {
                 // This is checked by `Self`'s generic bounds, but it
                 // doesn't hurt to double check.
                 debug_assert!(m.len() < C::BlockSize::USIZE);
 
-                let mut b = GenericArray::<u8, C::BlockSize>::default();
+                let mut b = Array::<u8, C::BlockSize>::default();
                 b[..m.len()].copy_from_slice(m);
                 let x = i.get().to_le_bytes();
                 let n = usize::checked_sub(b.len(), m.len())
@@ -1365,7 +1363,7 @@ mod committing {
                         hmac.update(ad);
                         hmac.tag()
                     };
-                    let mut key_bytes = $crate::generic_array::GenericArray::<
+                    let mut key_bytes = $crate::hybrid_array::Array::<
                         u8,
                         <<$inner as $crate::aead::Aead>::Key as $crate::keys::SecretKey>::Size,
                     >::default();

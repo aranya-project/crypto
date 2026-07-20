@@ -6,7 +6,7 @@ use core::{
     result::Result,
 };
 
-use generic_array::{ArrayLength, GenericArray};
+use hybrid_array::{Array, ArraySize};
 use subtle::{Choice, ConstantTimeEq};
 use typenum::{IsGreaterOrEqual, IsLess, U32, U48, U64, U65536};
 
@@ -53,7 +53,7 @@ pub trait Mac: Clone + Sized {
     /// The size in octets of a tag used by this [`Mac`].
     ///
     /// Must be at least 32 octets and less than 2¹⁶ octets.
-    type TagSize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
+    type TagSize: ArraySize + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
 
     /// A fixed-length key used by [`new`][Self::new].
     ///
@@ -68,7 +68,7 @@ pub trait Mac: Clone + Sized {
     ///
     /// Must be at least [`MinKeySize`][Self::MinKeySize] or 32
     /// octets (whichever is greater) and less than 2¹⁶ octets.
-    type KeySize: ArrayLength
+    type KeySize: ArraySize
         + IsGreaterOrEqual<Self::MinKeySize>
         + IsGreaterOrEqual<U32>
         + IsLess<U65536>
@@ -81,7 +81,7 @@ pub trait Mac: Clone + Sized {
     /// key used by [`try_new`][Self::try_new].
     ///
     /// Must be at least 32 octets and less than 2¹⁶ octets.
-    type MinKeySize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
+    type MinKeySize: ArraySize + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
 
     /// Attempts to create a new `Mac` with a variable-length
     /// key.
@@ -166,23 +166,23 @@ impl<const N: usize> From<[u8; N]> for Tag<N> {
     }
 }
 
-impl From<GenericArray<u8, U32>> for Tag<32> {
+impl From<Array<u8, U32>> for Tag<32> {
     #[inline]
-    fn from(tag: GenericArray<u8, U32>) -> Self {
+    fn from(tag: Array<u8, U32>) -> Self {
         Self(tag.into())
     }
 }
 
-impl From<GenericArray<u8, U48>> for Tag<48> {
+impl From<Array<u8, U48>> for Tag<48> {
     #[inline]
-    fn from(tag: GenericArray<u8, U48>) -> Self {
+    fn from(tag: Array<u8, U48>) -> Self {
         Self(tag.into())
     }
 }
 
-impl From<GenericArray<u8, U64>> for Tag<64> {
+impl From<Array<u8, U64>> for Tag<64> {
     #[inline]
-    fn from(tag: GenericArray<u8, U64>) -> Self {
+    fn from(tag: Array<u8, U64>) -> Self {
         Self(tag.into())
     }
 }

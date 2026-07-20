@@ -7,7 +7,7 @@ use core::{
 };
 
 use buggy::Bug;
-use generic_array::{ArrayLength, GenericArray};
+use hybrid_array::{Array, ArraySize};
 
 use crate::signer::PkError;
 
@@ -134,9 +134,9 @@ impl<const N: usize> Import<[u8; N]> for [u8; N] {
     }
 }
 
-impl<'a, N: ArrayLength> Import<&'a [u8]> for &'a GenericArray<u8, N> {
+impl<'a, N: ArraySize> Import<&'a [u8]> for &'a Array<u8, N> {
     fn import(data: &'a [u8]) -> Result<Self, ImportError> {
-        GenericArray::try_from_slice(data).map_err(|_| {
+        data.try_into().map_err(|_| {
             ImportError::InvalidSize(InvalidSizeError {
                 got: data.len(),
                 want: N::USIZE..N::USIZE,
@@ -145,16 +145,16 @@ impl<'a, N: ArrayLength> Import<&'a [u8]> for &'a GenericArray<u8, N> {
     }
 }
 
-impl<N: ArrayLength> Import<&[u8]> for GenericArray<u8, N> {
+impl<N: ArraySize> Import<&[u8]> for Array<u8, N> {
     fn import(data: &[u8]) -> Result<Self, ImportError> {
-        let data: &GenericArray<u8, N> = Import::<_>::import(data)?;
+        let data: &Array<u8, N> = Import::<_>::import(data)?;
         Ok(data.clone())
     }
 }
 
-impl<N: ArrayLength> Import<GenericArray<u8, N>> for GenericArray<u8, N> {
+impl<N: ArraySize> Import<Array<u8, N>> for Array<u8, N> {
     #[inline]
-    fn import(data: GenericArray<u8, N>) -> Result<Self, ImportError> {
+    fn import(data: Array<u8, N>) -> Result<Self, ImportError> {
         Ok(data)
     }
 }

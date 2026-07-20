@@ -5,7 +5,7 @@ extern crate alloc;
 use alloc::vec;
 use core::slice;
 
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use typenum::U64;
 
 use crate::{
@@ -173,7 +173,7 @@ pub fn test_export<K: HpkeKem, F: HpkeKdf, A: HpkeAead + IndCca2, R: Csprng>(rng
         .expect("unable to create recv context");
 
     #[derive(Debug, Default, Eq, PartialEq)]
-    struct Key(GenericArray<u8, U64>);
+    struct Key(Array<u8, U64>);
     impl Expand for Key {
         type Size = U64;
 
