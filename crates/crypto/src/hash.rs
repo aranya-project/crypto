@@ -8,10 +8,9 @@ use core::{
 };
 
 use ctutils::{Choice, CtEq};
-use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
+use hybrid_array::{Array, ArraySize};
 use sha3_utils::{encode_string, right_encode_bytes};
 use typenum::{
-    generic_const_mappings::Const,
     type_operators::{IsGreaterOrEqual, IsLess},
     Unsigned, U32, U65536,
 };
@@ -35,7 +34,7 @@ pub trait Hash: Clone {
     /// The size in octets of a digest used by this [`Hash`].
     ///
     /// Must be at least 32 octets and less than 2¹⁶ octets.
-    type DigestSize: ArrayLength + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
+    type DigestSize: ArraySize + IsGreaterOrEqual<U32> + IsLess<U65536> + 'static;
     /// Shorthand for [`DigestSize`][Self::DigestSize].
     const DIGEST_SIZE: usize = Self::DigestSize::USIZE;
 
@@ -66,12 +65,12 @@ pub trait Hash: Clone {
 /// The output of a [`Hash`].
 #[derive(Clone, Default)]
 #[repr(transparent)]
-pub struct Digest<N: ArrayLength>(GenericArray<u8, N>);
+pub struct Digest<N: ArraySize>(Array<u8, N>);
 
-impl<N: ArrayLength> Digest<N> {
+impl<N: ArraySize> Digest<N> {
     /// Creates a new hash digest.
     #[inline]
-    pub const fn new(digest: GenericArray<u8, N>) -> Self {
+    pub const fn new(digest: Array<u8, N>) -> Self {
         Self(digest)
     }
 
@@ -79,9 +78,9 @@ impl<N: ArrayLength> Digest<N> {
     #[inline]
     pub const fn from_array<const U: usize>(digest: [u8; U]) -> Self
     where
-        Const<U>: IntoArrayLength<ArrayLength = N>,
+        N: ArraySize<ArrayType<u8> = [u8; U]>,
     {
-        Self::new(GenericArray::from_array(digest))
+        Self::new(Array(digest))
     }
 
     /// Returns the length of the hash digest.
@@ -105,14 +104,14 @@ impl<N: ArrayLength> Digest<N> {
 
     /// Converts itself to an array.
     #[inline]
-    pub fn into_array(self) -> GenericArray<u8, N> {
+    pub fn into_array(self) -> Array<u8, N> {
         self.0
     }
 }
 
-impl<N: ArrayLength> Copy for Digest<N> where N::ArrayType<u8>: Copy {}
+impl<N: ArraySize> Copy for Digest<N> where N::ArrayType<u8>: Copy {}
 
-impl<N: ArrayLength> Deref for Digest<N> {
+impl<N: ArraySize> Deref for Digest<N> {
     type Target = [u8];
 
     #[inline]
@@ -121,14 +120,14 @@ impl<N: ArrayLength> Deref for Digest<N> {
     }
 }
 
-impl<N: ArrayLength> DerefMut for Digest<N> {
+impl<N: ArraySize> DerefMut for Digest<N> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<N: ArrayLength> Debug for Digest<N> {
+impl<N: ArraySize> Debug for Digest<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Digest").field(&self.0).finish()
     }
@@ -137,12 +136,12 @@ impl<N: ArrayLength> Debug for Digest<N> {
 // Gated for safety purposes; see the comment inside
 // `PartialEq::Eq`.
 #[cfg(any(test, feature = "test_util"))]
-impl<N: ArrayLength> Eq for Digest<N> {}
+impl<N: ArraySize> Eq for Digest<N> {}
 
 // Gated for safety purposes; see the comment inside
 // `PartialEq::Eq`.
 #[cfg(any(test, feature = "test_util"))]
-impl<N: ArrayLength> PartialEq for Digest<N> {
+impl<N: ArraySize> PartialEq for Digest<N> {
     fn eq(&self, other: &Self) -> bool {
         // While it's generally fine to compare digests with ==
         // (non-constant time), it has the potential to be
@@ -159,7 +158,7 @@ impl<N: ArrayLength> PartialEq for Digest<N> {
     }
 }
 
-impl<N: ArrayLength> CtEq for Digest<N> {
+impl<N: ArraySize> CtEq for Digest<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.as_bytes().ct_eq(other.as_bytes())

@@ -42,7 +42,7 @@ mod util;
 
 pub use buggy;
 pub use ctutils;
-pub use generic_array;
+pub use hybrid_array;
 #[doc(hidden)]
 pub use spideroak_crypto_derive;
 pub use typenum;

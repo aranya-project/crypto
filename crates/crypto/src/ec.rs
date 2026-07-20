@@ -7,8 +7,8 @@ use core::{
 };
 
 use ctutils::{Choice, CtEq};
-use generic_array::{ArrayLength, GenericArray, IntoArrayLength};
-use typenum::{Const, Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U67, U97};
+use hybrid_array::{Array, ArraySize};
+use typenum::{Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U67, U97};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{
@@ -20,15 +20,15 @@ use crate::{
 // `Compressed`, and `Scalar`?
 
 /// An elliptic curve.
-pub trait Curve: Copy + Clone + Eq + PartialEq {
+pub trait Curve: Copy + Eq {
     /// The size in bytes of a scalar.
-    type ScalarSize: ArrayLength + Unsigned + Copy + Clone + Eq + PartialEq;
+    type ScalarSize: ArraySize + Eq;
 
     /// The size in bytes of a compressed point.
-    type CompressedSize: ArrayLength + Unsigned + Copy + Clone + Eq + PartialEq;
+    type CompressedSize: ArraySize + Eq;
 
     /// The size in bytes of a uncompressed point.
-    type UncompressedSize: ArrayLength + Unsigned + Copy + Clone + Eq + PartialEq;
+    type UncompressedSize: ArraySize + Eq;
 }
 
 macro_rules! curve_impl {
@@ -61,7 +61,7 @@ macro_rules! pk_impl {
         #[doc = "This is equivalent to X9.62 encoding.\n\n"]
         #[doc = "[SEC]: https://www.secg.org/sec1-v2.pdf"]
         #[derive(Clone, Default, Eq, PartialEq, Zeroize)]
-        pub struct $name<C: Curve>(pub GenericArray<u8, C::$size>);
+        pub struct $name<C: Curve>(pub Array<u8, C::$size>);
 
         impl<C: Curve> $name<C> {
             /// Returns a raw pointer to the point.
@@ -81,7 +81,7 @@ macro_rules! pk_impl {
             }
         }
 
-        impl<C: Curve> Copy for $name<C> where <C::$size as ArrayLength>::ArrayType<u8>: Copy {}
+        impl<C: Curve> Copy for $name<C> where <C::$size as ArraySize>::ArrayType<u8>: Copy {}
 
         impl<C: Curve> AsRef<[u8]> for $name<C> {
             #[inline]
@@ -113,7 +113,7 @@ macro_rules! pk_impl {
 
         impl<C: Curve, const N: usize> From<$name<C>> for [u8; N]
         where
-            [u8; N]: From<GenericArray<u8, C::$size>>,
+            [u8; N]: From<Array<u8, C::$size>>,
         {
             fn from(v: $name<C>) -> Self {
                 v.0.into()
@@ -122,7 +122,7 @@ macro_rules! pk_impl {
 
         impl<C: Curve, const N: usize> From<[u8; N]> for $name<C>
         where
-            GenericArray<u8, C::$size>: From<[u8; N]>,
+            Array<u8, C::$size>: From<[u8; N]>,
         {
             fn from(data: [u8; N]) -> Self {
                 Self(data.into())
@@ -133,7 +133,7 @@ macro_rules! pk_impl {
             type Error = InvalidSizeError;
 
             fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-                let v: &GenericArray<u8, _> = data.try_into().map_err(|_| InvalidSizeError {
+                let v: &Array<u8, _> = data.try_into().map_err(|_| InvalidSizeError {
                     got: data.len(),
                     want: C::$size::USIZE..C::$size::USIZE,
                 })?;
@@ -143,7 +143,7 @@ macro_rules! pk_impl {
 
         impl<C: Curve, const N: usize> Import<[u8; N]> for $name<C>
         where
-            GenericArray<u8, C::$size>: From<[u8; N]>,
+            Array<u8, C::$size>: From<[u8; N]>,
         {
             fn import(data: [u8; N]) -> Result<Self, ImportError> {
                 Ok(Self::from(data))
@@ -158,8 +158,8 @@ macro_rules! pk_impl {
 
         impl<C: Curve> fmt::Debug for $name<C>
         where
-            <C as Curve>::$size: ArrayLength + Shl<B1>,
-            Double<C::$size>: ArrayLength,
+            <C as Curve>::$size: ArraySize + Shl<B1>,
+            Double<C::$size>: ArraySize,
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_tuple(stringify!($name))
@@ -174,7 +174,7 @@ pk_impl!(Uncompressed, UncompressedSize);
 
 /// An elliptic curve scalar.
 #[derive(Default, ZeroizeOnDrop)]
-pub struct Scalar<C: Curve>(pub GenericArray<u8, C::ScalarSize>);
+pub struct Scalar<C: Curve>(pub Array<u8, C::ScalarSize>);
 
 impl<C: Curve> Scalar<C> {
     /// Returns a raw pointer to the scalar.
@@ -194,10 +194,7 @@ impl<C: Curve> Scalar<C> {
     }
 }
 
-impl<C: Curve> Clone for Scalar<C>
-where
-    <C::ScalarSize as ArrayLength>::ArrayType<u8>: Clone,
-{
+impl<C: Curve> Clone for Scalar<C> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
@@ -240,7 +237,7 @@ impl<C: Curve> BorrowMut<[u8]> for Scalar<C> {
 
 impl<C: Curve, const N: usize> From<Scalar<C>> for [u8; N]
 where
-    [u8; N]: From<GenericArray<u8, C::ScalarSize>>,
+    [u8; N]: From<Array<u8, C::ScalarSize>>,
 {
     fn from(v: Scalar<C>) -> Self {
         v.0.clone().into()
@@ -249,8 +246,7 @@ where
 
 impl<C: Curve, const N: usize> From<[u8; N]> for Scalar<C>
 where
-    Const<N>: IntoArrayLength,
-    GenericArray<u8, C::ScalarSize>: From<[u8; N]>,
+    Array<u8, C::ScalarSize>: From<[u8; N]>,
 {
     fn from(v: [u8; N]) -> Self {
         Self(v.into())
@@ -261,19 +257,17 @@ impl<C: Curve> TryFrom<&[u8]> for Scalar<C> {
     type Error = InvalidSizeError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-        let v: &GenericArray<u8, _> = data.try_into().map_err(|_| InvalidSizeError {
+        let v: Array<u8, _> = data.try_into().map_err(|_| InvalidSizeError {
             got: data.len(),
             want: C::ScalarSize::USIZE..C::ScalarSize::USIZE,
         })?;
-        Ok(Self(v.clone()))
+        Ok(Self(v))
     }
 }
 
 impl<C: Curve, const N: usize> Import<[u8; N]> for Scalar<C>
 where
-    C::ScalarSize: ArrayLength,
-    Const<N>: IntoArrayLength,
-    GenericArray<u8, C::ScalarSize>: From<[u8; N]>,
+    Array<u8, C::ScalarSize>: From<[u8; N]>,
 {
     fn import(data: [u8; N]) -> Result<Self, ImportError> {
         Ok(Self::from(data))

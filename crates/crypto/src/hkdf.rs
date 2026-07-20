@@ -6,7 +6,7 @@
 
 use core::{fmt, marker::PhantomData};
 
-use generic_array::GenericArray;
+use hybrid_array::Array;
 use typenum::{Prod, U255};
 
 use crate::{
@@ -57,7 +57,7 @@ impl<H: Hash + BlockSize> Hkdf<H> {
         // if not provided, it is set to a string of HashLen
         // zeros.
         let salt = if salt.is_empty() {
-            let zero = GenericArray::<u8, H::DigestSize>::default();
+            let zero = Array::<u8, H::DigestSize>::default();
             HmacKey::new(zero.as_slice())
         } else {
             HmacKey::new(salt)
