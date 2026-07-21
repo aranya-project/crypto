@@ -20,7 +20,7 @@ use core::{
 pub use aranya_bearssl_sys;
 #[allow(clippy::wildcard_imports)]
 use aranya_bearssl_sys::*;
-use subtle::{Choice, ConstantTimeEq, ConstantTimeLess};
+use ctutils::{Choice, CtEq, CtLt};
 use typenum::{Unsigned, U, U12, U16, U32};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
@@ -516,7 +516,7 @@ macro_rules! ecdh_impl {
             }
         }
 
-        impl ConstantTimeEq for $sk {
+        impl CtEq for $sk {
             fn ct_eq(&self, other: &Self) -> Choice {
                 self.kbuf.ct_eq(&other.kbuf)
             }
@@ -542,13 +542,13 @@ macro_rules! ecdh_impl {
                 // less than the (subgroup) order.
 
                 // First check that the key is non-zero.
-                if bool::from(ct_eq_zero(kbuf.as_ref())) {
+                if ct_eq_zero(kbuf.as_ref()).to_bool() {
                     return Err(ImportError::InvalidSyntax);
                 }
 
                 // Then check that the key is less than the
                 // (subgroup) order.
-                if !bool::from(ct_be_lt(kbuf.as_ref(), $curve::order())) {
+                if !ct_be_lt(kbuf.as_ref(), $curve::order()).to_bool() {
                     return Err(ImportError::InvalidSyntax);
                 }
 
@@ -815,7 +815,7 @@ macro_rules! ecdsa_impl {
             }
         }
 
-        impl ConstantTimeEq for $sk {
+        impl CtEq for $sk {
             fn ct_eq(&self, other: &Self) -> Choice {
                 self.kbuf.ct_eq(&other.kbuf)
             }
@@ -839,13 +839,13 @@ macro_rules! ecdsa_impl {
                 // less than the (subgroup) order.
 
                 // First check that the key is non-zero.
-                if bool::from(ct_eq_zero(kbuf.as_ref())) {
+                if ct_eq_zero(kbuf.as_ref()).to_bool() {
                     return Err(ImportError::InvalidSyntax);
                 }
 
                 // Then check that the key is less than the
                 // (subgroup) order.
-                if !bool::from(ct_be_lt(kbuf.as_ref(), $curve::order())) {
+                if !ct_be_lt(kbuf.as_ref(), $curve::order()).to_bool() {
                     return Err(ImportError::InvalidSyntax);
                 }
 
@@ -1295,7 +1295,7 @@ mod tests {
                 (&[1, 0, 0, 0, 0], false),
             ];
             for (i, (data, want)) in tests.iter().enumerate() {
-                let got = bool::from(ct_eq_zero(data));
+                let got = ct_eq_zero(data).to_bool();
                 assert_eq!(got, *want, "#{i}");
             }
         }
@@ -1317,7 +1317,7 @@ mod tests {
                 TestCase(1u8, &[0, 2, 0], &[1, 1, 1]),
             ];
             for (i, tc) in tests.iter().enumerate() {
-                assert_eq!(tc.0, ct_be_lt(tc.1, tc.2).unwrap_u8(), "#{i}");
+                assert_eq!(tc.0, ct_be_lt(tc.1, tc.2).to_u8(), "#{i}");
             }
         }
     }

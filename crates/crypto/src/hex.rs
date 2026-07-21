@@ -2,7 +2,7 @@
 
 use core::{fmt, result::Result, str};
 
-use subtle::{Choice, ConditionallySelectable};
+use ctutils::{Choice, CtAssign};
 
 /// Encodes `T` as hexadecimal in constant time.
 #[derive(Copy, Clone)]
@@ -180,9 +180,9 @@ pub fn ct_decode(dst: &mut [u8], src: &[u8]) -> Result<usize, InvalidEncoding> {
         let val = (hi << 4) | (lo & 0x0f);
         // Out of paranoia, do not update `dst` if `valid` is
         // false.
-        *dst = u8::conditional_select(dst, &val, valid);
+        dst.ct_assign(&val, valid);
     }
-    if bool::from(valid) {
+    if valid.to_bool() {
         Ok(src.len() / 2)
     } else {
         Err(InvalidEncoding(

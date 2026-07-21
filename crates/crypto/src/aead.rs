@@ -13,8 +13,8 @@ use core::{
 };
 
 use buggy::{Bug, BugExt};
+use ctutils::{Choice, CtEq};
 use hybrid_array::{Array, ArraySize};
-use subtle::{Choice, ConstantTimeEq};
 use typenum::{
     type_operators::{IsGreaterOrEqual, IsLess},
     Unsigned, U16, U65536,
@@ -766,7 +766,7 @@ impl<N: ArraySize> BitXor for &Nonce<N> {
     }
 }
 
-impl<N: ArraySize> ConstantTimeEq for Nonce<N> {
+impl<N: ArraySize> CtEq for Nonce<N> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.0.ct_eq(&other.0)
@@ -1185,10 +1185,10 @@ mod committing {
                         &self.key,
                         &nonce.try_into()?,
                     )?;
-                    if !bool::from($crate::subtle::ConstantTimeEq::ct_eq(
+                    if $crate::ctutils::CtEq::ct_ne(
                         want_cx.as_slice(),
                         got_cx,
-                    )) {
+                    ).to_bool() {
                         Err($crate::aead::OpenError::Authentication)
                     } else {
                         let key = $crate::import::Import::<_>::import(key_bytes.as_bytes())
@@ -1224,10 +1224,10 @@ mod committing {
                         &self.key,
                         &nonce.try_into()?,
                     )?;
-                    if !bool::from($crate::subtle::ConstantTimeEq::ct_eq(
+                    if $crate::ctutils::CtEq::ct_ne(
                         want_cx.as_slice(),
                         got_cx,
-                    )) {
+                    ).to_bool() {
                         Err($crate::aead::OpenError::Authentication)
                     } else {
                         let key = $crate::import::Import::<_>::import(key_bytes.as_bytes())

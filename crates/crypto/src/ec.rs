@@ -6,8 +6,8 @@ use core::{
     ops::Shl,
 };
 
+use ctutils::{Choice, CtEq};
 use hybrid_array::{Array, ArraySize};
-use subtle::{Choice, ConstantTimeEq};
 use typenum::{Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U67, U97};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -200,7 +200,7 @@ impl<C: Curve> Clone for Scalar<C> {
     }
 }
 
-impl<C: Curve> ConstantTimeEq for Scalar<C> {
+impl<C: Curve> CtEq for Scalar<C> {
     #[inline]
     fn ct_eq(&self, other: &Self) -> Choice {
         self.as_ref().ct_eq(other.as_ref())

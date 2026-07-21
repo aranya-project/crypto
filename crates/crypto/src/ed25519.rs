@@ -11,8 +11,8 @@
 
 use core::fmt;
 
+use ctutils::{Choice, CtEq};
 use ed25519_dalek as dalek;
-use subtle::{Choice, ConstantTimeEq};
 use typenum::U32;
 use zeroize::ZeroizeOnDrop;
 
@@ -88,9 +88,9 @@ impl Random for SigningKey {
     }
 }
 
-impl ConstantTimeEq for SigningKey {
+impl CtEq for SigningKey {
     fn ct_eq(&self, other: &Self) -> Choice {
-        self.0.ct_eq(&other.0)
+        elliptic_curve::subtle::ConstantTimeEq::ct_eq(&self.0, &other.0).into()
     }
 }
 
