@@ -52,8 +52,8 @@ const NIST_KEMS: &Oid = extend_oid!(NIST, 4);
 impl_oid! {
     // CSOR
     AES_128_GCM, "id-aes128-GCM" => extend_oid!(NIST_AES, 6),
-    AES_192_GCM, "id-aes128-GCM" => extend_oid!(NIST_AES, 26),
-    AES_256_GCM, "id-aes128-GCM" => extend_oid!(NIST_AES, 46),
+    AES_192_GCM, "id-aes192-GCM" => extend_oid!(NIST_AES, 26),
+    AES_256_GCM, "id-aes256-GCM" => extend_oid!(NIST_AES, 46),
 
     // CSOR, RFC 5758
     SHA2_256, "id-sha256" => extend_oid!(NIST_HASH_ALGS, 1),
@@ -102,7 +102,7 @@ impl_oid! {
     SLH_DSA_SHA2_256S, "id-slh-dsa-sha2-256s" => extend_oid!(NIST_SIGN_ALGS, 24),
     SLH_DSA_SHA2_256F, "id-slh-dsa-sha2-256f" => extend_oid!(NIST_SIGN_ALGS, 25),
     SLH_DSA_SHAKE_128S, "id-slh-dsa-shake-128s" => extend_oid!(NIST_SIGN_ALGS, 26),
-    SLH_DSA_SHAKE_128F, "id-slh-dsa-shake-128s" => extend_oid!(NIST_SIGN_ALGS, 27),
+    SLH_DSA_SHAKE_128F, "id-slh-dsa-shake-128f" => extend_oid!(NIST_SIGN_ALGS, 27),
     SLH_DSA_SHAKE_192S, "id-slh-dsa-shake-192s" => extend_oid!(NIST_SIGN_ALGS, 28),
     SLH_DSA_SHAKE_192F, "id-slh-dsa-shake-192f" => extend_oid!(NIST_SIGN_ALGS, 29),
     SLH_DSA_SHAKE_256S, "id-slh-dsa-shake-256s" => extend_oid!(NIST_SIGN_ALGS, 30),
@@ -116,7 +116,7 @@ impl_oid! {
     HASH_SLH_DSA_SHA2_256S_WITH_SHA2_512, "id-hash-slh-dsa-sha2-256s-with-sha512" => extend_oid!(NIST_SIGN_ALGS, 39),
     HASH_SLH_DSA_SHA2_256F_WITH_SHA2_512, "id-hash-slh-dsa-sha2-256f-with-sha512" => extend_oid!(NIST_SIGN_ALGS, 40),
     HASH_SLH_DSA_SHAKE_128S_WITH_SHAKE_128, "id-hash-slh-dsa-shake-128s-with-shake128" => extend_oid!(NIST_SIGN_ALGS, 41),
-    HASH_SLH_DSA_SHAKE_128F_WITH_SHAKE_128, "id-hash-slh-dsa-shake-128s-with-shake128" => extend_oid!(NIST_SIGN_ALGS, 42),
+    HASH_SLH_DSA_SHAKE_128F_WITH_SHAKE_128, "id-hash-slh-dsa-shake-128f-with-shake128" => extend_oid!(NIST_SIGN_ALGS, 42),
     HASH_SLH_DSA_SHAKE_192S_WITH_SHAKE_256, "id-hash-slh-dsa-shake-192s-with-shake256" => extend_oid!(NIST_SIGN_ALGS, 43),
     HASH_SLH_DSA_SHAKE_192F_WITH_SHAKE_256, "id-hash-slh-dsa-shake-192f-with-shake256" => extend_oid!(NIST_SIGN_ALGS, 44),
     HASH_SLH_DSA_SHAKE_256S_WITH_SHAKE_256, "id-hash-slh-dsa-shake-256s-with-shake256" => extend_oid!(NIST_SIGN_ALGS, 45),
@@ -172,7 +172,7 @@ const THAWTE: &Oid = oid!("1.3.101");
 impl_oid! {
     // RFC 8410
     X25519, "id-X25519" => extend_oid!(THAWTE, 110),
-    X448, "id-X25519" => extend_oid!(THAWTE, 111),
+    X448, "id-X448" => extend_oid!(THAWTE, 111),
     ED25519, "id-Ed25519" => extend_oid!(THAWTE, 112),
     ED448, "id-Ed449" => extend_oid!(THAWTE, 113),
 }
