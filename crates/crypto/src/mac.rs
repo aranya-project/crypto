@@ -10,7 +10,7 @@ use ctutils::{Choice, CtEq};
 use hybrid_array::{Array, ArraySize};
 use typenum::{IsGreaterOrEqual, IsLess, U32, U48, U64, U65536};
 
-use crate::keys::{raw_key, InvalidKey, SecretKey};
+use crate::keys::{InvalidKey, SecretKey, raw_key};
 
 /// An error from a [`Mac`].
 #[derive(Debug, Eq, PartialEq)]

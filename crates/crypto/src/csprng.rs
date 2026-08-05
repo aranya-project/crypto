@@ -145,7 +145,7 @@ pub(crate) mod trng {
     use cfg_if::cfg_if;
     use rand_chacha::ChaCha8Rng;
     use rand_core::{Rng, SeedableRng};
-    use zeroize::{zeroize_flat_type, ZeroizeOnDrop};
+    use zeroize::{ZeroizeOnDrop, zeroize_flat_type};
 
     use crate::{csprng::Csprng, kdf::Kdf};
 
@@ -346,7 +346,7 @@ pub(crate) mod trng {
         use rand::rngs::SysRng;
         use rand_core::TryRng;
 
-        use super::{random_seed, thread_rng, ChaCha8Csprng, ThreadRng};
+        use super::{ChaCha8Csprng, ThreadRng, random_seed, thread_rng};
         use crate::{csprng::Csprng, kdf::Kdf};
 
         #[unsafe(no_mangle)]

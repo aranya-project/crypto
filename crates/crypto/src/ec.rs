@@ -8,7 +8,7 @@ use core::{
 
 use ctutils::{Choice, CtEq};
 use hybrid_array::{Array, ArraySize};
-use typenum::{Double, Unsigned, B1, U133, U32, U33, U48, U49, U65, U66, U67, U97};
+use typenum::{B1, Double, U32, U33, U48, U49, U65, U66, U67, U97, U133, Unsigned};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{

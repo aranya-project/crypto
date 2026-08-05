@@ -5,8 +5,8 @@
 use core::{borrow::Borrow, fmt, result::Result};
 
 use aes_gcm::{
-    aead::{AeadInOut as _, KeyInit, KeySizeUser},
     A_MAX, P_MAX,
+    aead::{AeadInOut as _, KeyInit, KeySizeUser},
 };
 use crypto_common::BlockSizeUser;
 use ctutils::{Choice, CtEq};
@@ -15,20 +15,19 @@ use ecdsa::{
     signature::{Signer as Signer_, Verifier},
 };
 use elliptic_curve::{
-    ecdh,
+    CurveArithmetic, FieldBytesSize, Generate as _, ecdh,
     scalar::NonZeroScalar,
     sec1::{FromSec1Point, Sec1Point, ToSec1Point},
-    CurveArithmetic, FieldBytesSize, Generate as _,
 };
 use rand_core::{TryCryptoRng, TryRng};
 use sha2::digest::OutputSizeUser;
-use typenum::{Unsigned, U12, U16};
+use typenum::{U12, U16, Unsigned};
 use zeroize::ZeroizeOnDrop;
 
 use crate::{
     aead::{
-        check_open_in_place_params, check_seal_in_place_params, Aead, AeadKey, IndCca2, Lifetime,
-        OpenError, SealError,
+        Aead, AeadKey, IndCca2, Lifetime, OpenError, SealError, check_open_in_place_params,
+        check_seal_in_place_params,
     },
     block::BlockSize,
     csprng::{Csprng, Random},
@@ -38,17 +37,17 @@ use crate::{
     hkdf::hkdf_impl,
     hmac::hmac_impl,
     hpke::{AeadId, HpkeAead, KdfId, KemId},
-    import::{try_from_slice, ExportError, Import, ImportError},
-    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey},
+    import::{ExportError, Import, ImportError, try_from_slice},
+    kem::{DecapKey, Ecdh, EcdhError, EncapKey, dhkem_impl},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{
+        Identified, Oid,
         consts::{
             AES_256_GCM, ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, HKDF_WITH_SHA2_256,
             HKDF_WITH_SHA2_384, HKDF_WITH_SHA2_512, HMAC_WITH_SHA2_256, HMAC_WITH_SHA2_384,
             HMAC_WITH_SHA2_512, HMAC_WITH_SHA2_512_256, SECP256R1, SECP384R1, SHA2_256, SHA2_384,
             SHA2_512, SHA2_512_256,
         },
-        Identified, Oid,
     },
     signer::{Signature, Signer, SignerError, SigningKey, VerifyingKey},
 };
@@ -143,7 +142,7 @@ impl fmt::Debug for Aes256Gcm {
 mod committing {
     use aes::cipher::{BlockCipherEncrypt, BlockSizeUser, KeyInit};
     use hybrid_array::Array;
-    use typenum::{Unsigned, U32};
+    use typenum::{U32, Unsigned};
 
     use super::{Aes256Gcm, Sha256};
     use crate::{
@@ -703,7 +702,7 @@ mod tests {
 
     mod ecdh_tests {
         use super::*;
-        use crate::test_util::vectors::{test_ecdh, EcdhTest};
+        use crate::test_util::vectors::{EcdhTest, test_ecdh};
 
         #[test]
         fn test_ecdh_p256() {

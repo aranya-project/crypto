@@ -11,8 +11,8 @@ use ctutils::{Choice, CtEq};
 use hybrid_array::{Array, ArraySize};
 use sha3_utils::{encode_string, right_encode_bytes};
 use typenum::{
+    U32, U65536, Unsigned,
     type_operators::{IsGreaterOrEqual, IsLess},
-    Unsigned, U32, U65536,
 };
 
 /// A cryptographic hash function.

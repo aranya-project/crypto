@@ -6,10 +6,10 @@ use std::{
 };
 
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
-    parse::{Parse, ParseStream},
     Data, DeriveInput, Error, Expr, ExprLit, Fields, Ident, Lit, LitInt,
+    parse::{Parse, ParseStream},
 };
 
 pub(crate) fn parse(item: TokenStream) -> syn::Result<TokenStream> {

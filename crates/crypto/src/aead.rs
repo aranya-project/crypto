@@ -16,15 +16,15 @@ use buggy::{Bug, BugExt};
 use ctutils::{Choice, CtEq};
 use hybrid_array::{Array, ArraySize};
 use typenum::{
+    U16, U65536, Unsigned,
     type_operators::{IsGreaterOrEqual, IsLess},
-    Unsigned, U16, U65536,
 };
 use zeroize::Zeroize;
 
 use crate::{
     csprng::{Csprng, Random},
     kdf::{Expand, Kdf, KdfError, Prk},
-    keys::{raw_key, SecretKey, SecretKeyBytes},
+    keys::{SecretKey, SecretKeyBytes, raw_key},
     util::const_assert,
 };
 
@@ -834,8 +834,8 @@ mod committing {
     use buggy::{Bug, BugExt};
     use hybrid_array::{Array, ArraySize};
     use typenum::{
+        U16, U65536, Unsigned,
         type_operators::{IsGreaterOrEqual, IsLess},
-        Unsigned, U16, U65536,
     };
 
     use super::{Aead, KeyData, Nonce, OpenError, SealError};

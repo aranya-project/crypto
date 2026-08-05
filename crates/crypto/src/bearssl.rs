@@ -21,15 +21,15 @@ pub use aranya_bearssl_sys;
 #[allow(clippy::wildcard_imports)]
 use aranya_bearssl_sys::*;
 use ctutils::{Choice, CtEq, CtLt};
-use typenum::{Unsigned, U, U12, U16, U32};
+use typenum::{U, U12, U16, U32, Unsigned};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::{
     aead::{
-        check_open_in_place_params, check_seal_in_place_params, Aead, AeadKey, IndCca2, Lifetime,
-        OpenError, SealError,
+        Aead, AeadKey, IndCca2, Lifetime, OpenError, SealError, check_open_in_place_params,
+        check_seal_in_place_params,
     },
-    asn1::{max_sig_len, raw_sig_len, RawSig, Sig},
+    asn1::{RawSig, Sig, max_sig_len, raw_sig_len},
     block::BlockSize,
     csprng::{Csprng, Random},
     ec::{Curve, Curve25519, Scalar, Secp256r1, Secp384r1, Secp521r1, Uncompressed},
@@ -38,16 +38,16 @@ use crate::{
     hmac::hmac_impl,
     hpke::{AeadId, HpkeAead, KdfId, KemId},
     import::{ExportError, Import, ImportError},
-    kem::{dhkem_impl, DecapKey, Ecdh, EcdhError, EncapKey, SharedSecret},
+    kem::{DecapKey, Ecdh, EcdhError, EncapKey, SharedSecret, dhkem_impl},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
     oid::{
+        Identified, Oid,
         consts::{
             AES_256_GCM, ECDSA_WITH_SHA2_256, ECDSA_WITH_SHA2_384, ECDSA_WITH_SHA2_512,
             HKDF_WITH_SHA2_256, HKDF_WITH_SHA2_384, HKDF_WITH_SHA2_512, HMAC_WITH_SHA2_256,
             HMAC_WITH_SHA2_384, HMAC_WITH_SHA2_512, SECP256R1, SECP384R1, SECP521R1, SHA2_256,
             SHA2_384, SHA2_512, X25519 as OID_X25519,
         },
-        Identified, Oid,
     },
     signer::{PkError, Signature, Signer, SignerError, SigningKey, VerifyingKey},
 };
@@ -1348,7 +1348,7 @@ mod tests {
 
     mod ecdh_tests {
         use super::*;
-        use crate::test_util::vectors::{test_ecdh, EcdhTest};
+        use crate::test_util::vectors::{EcdhTest, test_ecdh};
 
         #[test]
         fn test_ecdh_p256() {

@@ -17,19 +17,19 @@
 
 use core::{fmt, iter, marker::PhantomData, num::NonZeroU16, result::Result};
 
-use buggy::{bug, Bug, BugExt};
+use buggy::{Bug, BugExt, bug};
 use ctutils::{Choice, CtEq};
 use hybrid_array::ArraySize;
 use typenum::Unsigned as _;
 
 use crate::{
+    AlgId,
     aead::{Aead, IndCca2, KeyData, Nonce, OpenError, SealError},
     csprng::Csprng,
     import::{ExportError, Import as _, ImportError},
     kdf::{Expand, Kdf, KdfError, Prk},
     kem::{Kem, KemError},
     keys::RawSecretBytes as _,
-    AlgId,
 };
 
 /// Converts `v` to a big-endian byte array.
