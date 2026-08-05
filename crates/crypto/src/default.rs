@@ -14,10 +14,10 @@ use crate::csprng::Csprng;
 /// routine:
 ///
 /// ```
-/// extern "C" {
+/// unsafe extern "C" {
 ///     /// Reads `len` cryptographically secure bytes into
 ///     /// `dst`.
-///     fn crypto_getrandom(dst: *mut u8, len: usize);
+///     unsafe fn crypto_getrandom(dst: *mut u8, len: usize);
 /// }
 /// ```
 ///
