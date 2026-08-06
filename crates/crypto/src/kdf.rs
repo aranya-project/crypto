@@ -8,8 +8,8 @@ use buggy::Bug;
 use ctutils::{Choice, CtEq};
 use hybrid_array::{Array, ArraySize};
 use typenum::{
+    Const, ToUInt, U, U32, U64, U65536, Unsigned,
     type_operators::{IsGreaterOrEqual, IsLess},
-    Const, ToUInt, Unsigned, U, U32, U64, U65536,
 };
 use zeroize::ZeroizeOnDrop;
 

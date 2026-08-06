@@ -145,7 +145,7 @@ pub(crate) mod trng {
     use cfg_if::cfg_if;
     use rand_chacha::ChaCha8Rng;
     use rand_core::{Rng, SeedableRng};
-    use zeroize::{zeroize_flat_type, ZeroizeOnDrop};
+    use zeroize::{ZeroizeOnDrop, zeroize_flat_type};
 
     use crate::{csprng::Csprng, kdf::Kdf};
 
@@ -248,13 +248,11 @@ pub(crate) mod trng {
         type Item = u32;
 
         fn next(&mut self) -> Option<u32> {
-            extern "C" {
+            unsafe extern "C" {
                 // Provided by customer.
-                fn OS_hardware_rand() -> u32;
+                safe fn OS_hardware_rand() -> u32;
             }
-            // SAFETY: FFI call, no invariants
-            let x = unsafe { OS_hardware_rand() };
-            Some(x)
+            Some(OS_hardware_rand())
         }
     }
 
@@ -348,10 +346,10 @@ pub(crate) mod trng {
         use rand::rngs::SysRng;
         use rand_core::TryRng;
 
-        use super::{random_seed, thread_rng, ChaCha8Csprng, ThreadRng};
+        use super::{ChaCha8Csprng, ThreadRng, random_seed, thread_rng};
         use crate::{csprng::Csprng, kdf::Kdf};
 
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         extern "C" fn OS_hardware_rand() -> u32 {
             SysRng.try_next_u32().unwrap() // :(
         }

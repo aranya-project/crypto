@@ -19,9 +19,9 @@ use zeroize::ZeroizeOnDrop;
 use crate::{
     csprng::{Csprng, Random},
     hex::ToHex,
-    import::{try_import, ExportError, Import, ImportError},
+    import::{ExportError, Import, ImportError, try_import},
     keys::{PublicKey, SecretKey, SecretKeyBytes},
-    oid::{consts::ED25519, Identified, Oid},
+    oid::{Identified, Oid, consts::ED25519},
     signer::{self, PkError, Signer, SignerError},
 };
 

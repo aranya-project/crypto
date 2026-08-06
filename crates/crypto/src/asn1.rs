@@ -11,7 +11,7 @@ use core::{
 };
 
 use buggy::{Bug, BugExt};
-use der::{asn1::UintRef, Decode, Encode, Header, Reader, SliceReader, SliceWriter, Tag};
+use der::{Decode, Encode, Header, Reader, SliceReader, SliceWriter, Tag, asn1::UintRef};
 
 use crate::{
     import::{Import, ImportError},

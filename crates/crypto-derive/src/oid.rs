@@ -3,10 +3,10 @@
 use std::str::FromStr;
 
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
-    parse::{Parse, ParseStream},
     Error, LitStr,
+    parse::{Parse, ParseStream},
 };
 
 pub(crate) fn parse(input: TokenStream) -> syn::Result<TokenStream> {

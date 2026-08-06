@@ -8,8 +8,9 @@ use core::borrow::Borrow;
 use ctutils::CtEq;
 pub use hpke::TestName as HpkeTest;
 pub use wycheproof::{
-    self, aead::TestName as AeadTest, ecdh::TestName as EcdhTest, ecdsa::TestName as EcdsaTest,
-    eddsa::TestName as EddsaTest, hkdf::TestName as HkdfTest, mac::TestName as MacTest, TestResult,
+    self, TestResult, aead::TestName as AeadTest, ecdh::TestName as EcdhTest,
+    ecdsa::TestName as EcdsaTest, eddsa::TestName as EddsaTest, hkdf::TestName as HkdfTest,
+    mac::TestName as MacTest,
 };
 use wycheproof::{aead, ecdh, ecdsa, eddsa, hkdf, mac};
 

@@ -14,10 +14,10 @@ use crate::csprng::Csprng;
 /// routine:
 ///
 /// ```
-/// extern "C" {
+/// unsafe extern "C" {
 ///     /// Reads `len` cryptographically secure bytes into
 ///     /// `dst`.
-///     fn crypto_getrandom(dst: *mut u8, len: usize);
+///     unsafe fn crypto_getrandom(dst: *mut u8, len: usize);
 /// }
 /// ```
 ///
@@ -54,8 +54,8 @@ impl Csprng for Rng {
             } else if #[cfg(feature = "getrandom")] {
                 getrandom::fill(dst).expect("should not fail")
             } else {
-                extern "C" {
-                    fn crypto_getrandom(dst: *mut u8, len: usize);
+                unsafe extern "C" {
+                    unsafe fn crypto_getrandom(dst: *mut u8, len: usize);
                 }
                 // SAFETY: FFI call, no invariants.
                 unsafe {

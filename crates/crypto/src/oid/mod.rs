@@ -7,7 +7,7 @@ pub mod consts;
 use core::{fmt, hash::Hash, hint, iter::FusedIterator, ops::Deref, slice, str::FromStr};
 
 #[cfg(feature = "serde")]
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use crate::util::const_assert;
 
