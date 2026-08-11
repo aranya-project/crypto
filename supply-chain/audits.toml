@@ -163,6 +163,11 @@ who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.10.0 -> 0.10.1"
 
+[[audits.spin]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.10.1 -> 0.12.2"
+
 [[audits.strobe-rs]]
 who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
