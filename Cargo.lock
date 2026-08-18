@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "spideroak-crypto"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -946,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "spideroak-crypto-derive"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",
